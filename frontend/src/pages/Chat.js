@@ -1,47 +1,33 @@
-import React, { useState, useEffect } from "react";
+import React, { useEffect, useState } from "react";
 import { getChatByRequest, sendMessage } from "../services/chatService";
 import { useParams } from "react-router-dom";
 
 function Chat() {
   const { requestId } = useParams();
   const [messages, setMessages] = useState([]);
-  const [input, setInput] = useState("");
+  const [text, setText] = useState("");
 
   useEffect(() => {
-    const fetchMessages = async () => {
-      try {
-        const data = await getChatByRequest(requestId);
-        setMessages(data);
-      } catch (error) {
-        alert(error.message);
-      }
-    };
-    fetchMessages();
+    getChatByRequest(requestId).then(setMessages);
   }, [requestId]);
 
   const handleSend = async () => {
-    if (!input.trim()) return;
-    try {
-      const newMessage = await sendMessage(requestId, { message: input, sender: "user" });
-      setMessages(prev => [...prev, newMessage]);
-      setInput("");
-    } catch (error) {
-      alert(error.message);
-    }
+    const msg = await sendMessage(requestId, { message: text, sender: "user" });
+    setMessages([...messages, msg]);
+    setText("");
   };
 
   return (
     <div className="container">
-      <h2>Chat with Technician</h2>
       <div className="chat-box">
-        {messages.map((msg, idx) => (
-          <div key={idx} className={msg.sender === "user" ? "chat-user" : "chat-technician"}>
-            {msg.message}
+        {messages.map((m,i) => (
+          <div key={i} className={m.sender === "user" ? "chat-user" : "chat-technician"}>
+            {m.message}
           </div>
         ))}
       </div>
       <div className="input-group">
-        <input value={input} onChange={e => setInput(e.target.value)} placeholder="Type your message..." />
+        <input value={text} onChange={e => setText(e.target.value)} />
         <button className="primary" onClick={handleSend}>Send</button>
       </div>
     </div>

@@ -7,21 +7,13 @@ function MaintenanceHistory() {
   const user = JSON.parse(localStorage.getItem("user"));
 
   useEffect(() => {
-    const fetchRequests = async () => {
-      try {
-        const data = await getUserRequests(user.id);
-        setRequests(data);
-      } catch (error) {
-        alert(error.message);
-      }
-    };
-    fetchRequests();
+    getUserRequests(user.id).then(setRequests);
   }, [user.id]);
 
   return (
     <div className="container">
-      <h2>Your Requests</h2>
-      {requests.map(req => <MaintenanceCard key={req.id} request={req} />)}
+      <h2>Request History</h2>
+      {requests.map(r => <MaintenanceCard key={r.id} request={r} />)}
     </div>
   );
 }

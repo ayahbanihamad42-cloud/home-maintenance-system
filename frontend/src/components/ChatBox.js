@@ -15,7 +15,7 @@ function ChatBox({ messages, onSend }) {
   }, [messages]);
 
   return (
-    <div>
+    <div className="chat-wrapper">
       <div className="chat-box">
         {messages.map((msg, i) => (
           <div key={i} className={`chat-message ${msg.sender}`}>
@@ -25,9 +25,13 @@ function ChatBox({ messages, onSend }) {
         ))}
         <div ref={chatEndRef}></div>
       </div>
-      <div style={{ display: "flex", gap: "10px" }}>
-        <input value={text} onChange={e => setText(e.target.value)}
-               onKeyDown={e => e.key === "Enter" && handleSend()} />
+
+      <div className="chat-input">
+        <input
+          value={text}
+          onChange={e => setText(e.target.value)}
+          onKeyDown={e => e.key === "Enter" && handleSend()}
+        />
         <button className="primary" onClick={handleSend}>Send</button>
       </div>
     </div>

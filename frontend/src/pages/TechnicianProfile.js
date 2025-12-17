@@ -7,26 +7,18 @@ function TechnicianProfile() {
   const [technician, setTechnician] = useState(null);
 
   useEffect(() => {
-    const fetchTechnician = async () => {
-      try {
-        const data = await getTechnicianById(id);
-        setTechnician(data);
-      } catch (error) {
-        alert(error.message);
-      }
-    };
-    fetchTechnician();
+    getTechnicianById(id).then(setTechnician);
   }, [id]);
 
-  if (!technician) return <p>Loading...</p>;
+  if (!technician) return null;
 
   return (
     <div className="container">
       <h2>{technician.name}</h2>
-      <p>Service: {technician.service}</p>
-      <p>Phone: {technician.phone}</p>
-      <p>Experience: {technician.experience} years</p>
-      <p>Rating: {technician.rating || 0} ⭐</p>
+      <p>{technician.service}</p>
+      <p>{technician.phone}</p>
+      <p>{technician.experience} years</p>
+      <p>{technician.rating || 0} ⭐</p>
     </div>
   );
 }

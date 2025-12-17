@@ -12,12 +12,8 @@ function RatingReviewRequest() {
 
   useEffect(() => {
     const fetchRequest = async () => {
-      try {
-        const data = await getRequestById(id);
-        setRequest(data);
-      } catch (error) {
-        alert(error.message);
-      }
+      const data = await getRequestById(id);
+      setRequest(data);
     };
     fetchRequest();
   }, [id]);
@@ -28,21 +24,18 @@ function RatingReviewRequest() {
       alert("Please select a rating before submitting!");
       return;
     }
-    try {
-      await submitRating(id, { rating, comment });
-      alert("Thank you! Your review has been submitted.");
-      setComment("");
-      setRating(0);
-    } catch (error) {
-      alert(error.message);
-    }
+    await submitRating(id, { rating, comment });
+    alert("Thank you! Your review has been submitted.");
+    setComment("");
+    setRating(0);
   };
 
-  if (!request) return <p>Loading request details...</p>;
+  if (!request) return null;
 
   return (
     <div className="container">
       <h2>Request Details</h2>
+
       <div className="card">
         <p><strong>Service:</strong> {request.service}</p>
         <p><strong>Technician:</strong> {request.technician?.name || "Not assigned"}</p>
@@ -52,36 +45,44 @@ function RatingReviewRequest() {
         <p><strong>Status:</strong> {request.status}</p>
       </div>
 
-      {/* Tracking Box */}
-      <div className="card" style={{ marginTop: "20px" }}>
+      {/* Tracking */}
+      <div className="card">
         <h3>Tracking</h3>
         <p>Status: {request.status}</p>
       </div>
 
-      {/* Rating Box */}
+      {/* Rating */}
       {request.status === "completed" && (
-        <div className="card" style={{ marginTop: "20px" }}>
+        <div className="card">
           <h3>Rate this Service</h3>
-          <p>Leave your feedback and rating for the technician:</p>
+
           <form onSubmit={handleSubmit}>
-            <div style={{ display: "flex", gap: "5px", fontSize: "30px" }}>
-              {[1,2,3,4,5].map(star => (
-                <span key={star}
-                      style={{ cursor: "pointer", color: (hoverRating || rating) >= star ? "#FFD700" : "#ccc" }}
-                      onMouseEnter={() => setHoverRating(star)}
-                      onMouseLeave={() => setHoverRating(0)}
-                      onClick={() => setRating(star)}>
+            <div className="rating-stars">
+              {[1, 2, 3, 4, 5].map(star => (
+                <span
+                  key={star}
+                  className={`star ${
+                    (hoverRating || rating) >= star ? "active" : ""
+                  }`}
+                  onMouseEnter={() => setHoverRating(star)}
+                  onMouseLeave={() => setHoverRating(0)}
+                  onClick={() => setRating(star)}
+                >
                   ★
                 </span>
               ))}
             </div>
 
-            <div className="input-group" style={{ marginTop: "10px" }}>
-              <label>Comment:</label>
-              <textarea value={comment} onChange={e => setComment(e.target.value)} required />
+            <div className="input-group">
+              <label>Comment</label>
+              <textarea
+                value={comment}
+                onChange={e => setComment(e.target.value)}
+                required
+              />
             </div>
 
-            <button className="primary" type="submit">Submit Review</button>
+            <button className="primary">Submit Review</button>
           </form>
         </div>
       )}
