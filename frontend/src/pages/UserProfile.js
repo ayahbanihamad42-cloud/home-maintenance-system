@@ -1,34 +1,50 @@
-import React,{ useState,useEffect } from 'react';
-import { updateProfile,getUserProfile } from '../services/userService';
+import React, { useEffect, useState } from "react";
+import { getUserProfile } from "../services/userService";
+import Notification from "../components/Notification";
+import { getUserRequests } from "../services/maintenanceService";
 
-const UserProfile = ({ user_id }) => {
-    const [form,setForm] = useState({ name:'',email:'',phone:'',dob:'',city:'' });
+function UserProfile() {
+  const user = JSON.parse(localStorage.getItem("user"));
+  const [profile, setProfile] = useState(null);
+  const [notifications, setNotifications] = useState([]);
 
-    useEffect(()=>{
-        const fetch = async ()=>{
-            const res = await getUserProfile(user_id);
-            setForm(res.data);
-        }
-        fetch();
-    },[user_id]);
+  useEffect(() => {
+    const fetchProfile = async () => {
+      try {
+        const data = await getUserProfile(user.id);
+        setProfile(data);
+      } catch (error) {
+        alert(error.message);
+      }
+    };
+    const fetchNotifications = async () => {
+      try {
+        const requests = await getUserRequests(user.id);
+        const messages = requests
+          .filter(r => r.status !== "completed")
+          .map(r => ({ message: `Request ${r.service} is ${r.status}`, created_at: r.created_at }));
+        setNotifications(messages);
+      } catch (error) {
+        console.log(error);
+      }
+    };
+    fetchProfile();
+    fetchNotifications();
+  }, [user.id]);
 
-    const handleChange = e => setForm({...form,[e.target.name]:e.target.value});
-    const handleSubmit = async e => {
-        e.preventDefault();
-        await updateProfile(user_id,form);
-        alert('Profile updated');
-    }
+  if (!profile) return <p>Loading...</p>;
 
-    return (
-        <form onSubmit={handleSubmit}>
-            <input name="name" value={form.name} onChange={handleChange}/>
-            <input name="email" value={form.email} onChange={handleChange}/>
-            <input name="phone" value={form.phone} onChange={handleChange}/>
-            <input type="date" name="dob" value={form.dob} onChange={handleChange}/>
-            <input name="city" value={form.city} onChange={handleChange}/>
-            <button type="submit">Update Profile</button>
-        </form>
-    );
+  return (
+    <div className="container">
+      <h2>{profile.name}'s Profile</h2>
+      <p>Email: {profile.email}</p>
+      <p>Phone: {profile.phone}</p>
+      <p>City: {profile.city}</p>
+      <p>DOB: {profile.dob}</p>
+      <h3>Notifications</h3>
+      {notifications.map((n,i) => <Notification key={i} notification={n} />)}
+    </div>
+  );
 }
 
 export default UserProfile;

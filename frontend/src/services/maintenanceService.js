@@ -1,6 +1,16 @@
-import axios from './api';
+import API from "./api";
 
-export const createRequest = data => axios.post('/maintenance', data);
-export const getUserRequests = user_id => axios.get(`/maintenance/user/${user_id}`);
-import axios from './api';
-export const createMaintenanceRequest = (user_id,data) => axios.post(`/maintenance`, { user_id, ...data });
+export const createMaintenanceRequest = async (data) => {
+  const res = await API.post("/maintenance", data);
+  return res.data;
+};
+
+export const getUserRequests = async (user_id) => {
+  const res = await API.get(`/maintenance/user/${user_id}`);
+  return res.data;
+};
+
+export const getRequestById = async (id) => {
+  const res = await API.get(`/maintenance/${id}`);
+  return res.data;
+};

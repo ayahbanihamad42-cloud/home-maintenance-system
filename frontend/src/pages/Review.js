@@ -1,48 +1,92 @@
-import React, { useState, useEffect } from 'react';
-import { getRequestById, submitReview } from '../services/maintenanceService';
-import { useParams } from 'react-router-dom';
+import React, { useEffect, useState } from "react";
+import { useParams } from "react-router-dom";
+import { getRequestById } from "../services/maintenanceService";
+import { submitRating } from "../services/ratingService";
 
-const Review = ({ user_id }) => {
-    const { requestId } = useParams();
-    const [request, setRequest] = useState(null);
-    const [rating, setRating] = useState(5);
-    const [reviewText, setReviewText] = useState('');
+function RatingReviewRequest() {
+  const { id } = useParams();
+  const [request, setRequest] = useState(null);
+  const [rating, setRating] = useState(0);
+  const [hoverRating, setHoverRating] = useState(0);
+  const [comment, setComment] = useState("");
 
-    useEffect(()=>{
-        const fetchRequest = async ()=>{
-            const res = await getRequestById(requestId);
-            setRequest(res.data);
-        }
-        fetchRequest();
-    },[requestId]);
+  useEffect(() => {
+    const fetchRequest = async () => {
+      try {
+        const data = await getRequestById(id);
+        setRequest(data);
+      } catch (error) {
+        alert(error.message);
+      }
+    };
+    fetchRequest();
+  }, [id]);
 
-    const handleSubmit = async e => {
-        e.preventDefault();
-        await submitReview({ user_id, request_id: requestId, rating, review: reviewText });
-        alert('Review submitted!');
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    if (rating === 0) {
+      alert("Please select a rating before submitting!");
+      return;
     }
+    try {
+      await submitRating(id, { rating, comment });
+      alert("Thank you! Your review has been submitted.");
+      setComment("");
+      setRating(0);
+    } catch (error) {
+      alert(error.message);
+    }
+  };
 
-    if(!request) return <p>Loading...</p>;
+  if (!request) return <p>Loading request details...</p>;
 
-    return (
-        <div style={{ maxWidth:'500px', margin:'auto', padding:'10px', border:'1px solid #ccc', borderRadius:'5px' }}>
-            <h3>Review Your Maintenance Request</h3>
-            <p><b>Service:</b> {request.service}</p>
-            <p><b>Description:</b> {request.description}</p>
-            <p><b>Technician:</b> {request.technician_name}</p>
-            <form onSubmit={handleSubmit}>
-                <label>Rating:</label>
-                <select value={rating} onChange={e=>setRating(e.target.value)}>
-                    {[1,2,3,4,5].map(n=><option key={n} value={n}>{n}</option>)}
-                </select>
+  return (
+    <div className="container">
+      <h2>Request Details</h2>
+      <div className="card">
+        <p><strong>Service:</strong> {request.service}</p>
+        <p><strong>Technician:</strong> {request.technician?.name || "Not assigned"}</p>
+        <p><strong>Date:</strong> {request.date} <strong>Time:</strong> {request.time}</p>
+        <p><strong>Address:</strong> {request.address}</p>
+        <p><strong>Description:</strong> {request.description}</p>
+        <p><strong>Status:</strong> {request.status}</p>
+      </div>
 
-                <label>Review:</label>
-                <textarea value={reviewText} onChange={e=>setReviewText(e.target.value)} placeholder="Write your review" />
+      {/* Tracking Box */}
+      <div className="card" style={{ marginTop: "20px" }}>
+        <h3>Tracking</h3>
+        <p>Status: {request.status}</p>
+      </div>
 
-                <button type="submit" style={{ marginTop:'10px' }}>Submit Review</button>
-            </form>
+      {/* Rating Box */}
+      {request.status === "completed" && (
+        <div className="card" style={{ marginTop: "20px" }}>
+          <h3>Rate this Service</h3>
+          <p>Leave your feedback and rating for the technician:</p>
+          <form onSubmit={handleSubmit}>
+            <div style={{ display: "flex", gap: "5px", fontSize: "30px" }}>
+              {[1,2,3,4,5].map(star => (
+                <span key={star}
+                      style={{ cursor: "pointer", color: (hoverRating || rating) >= star ? "#FFD700" : "#ccc" }}
+                      onMouseEnter={() => setHoverRating(star)}
+                      onMouseLeave={() => setHoverRating(0)}
+                      onClick={() => setRating(star)}>
+                  ★
+                </span>
+              ))}
+            </div>
+
+            <div className="input-group" style={{ marginTop: "10px" }}>
+              <label>Comment:</label>
+              <textarea value={comment} onChange={e => setComment(e.target.value)} required />
+            </div>
+
+            <button className="primary" type="submit">Submit Review</button>
+          </form>
         </div>
-    );
-};
+      )}
+    </div>
+  );
+}
 
-export default Review;
+export default RatingReviewRequest;

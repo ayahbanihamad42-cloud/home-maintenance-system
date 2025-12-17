@@ -10,7 +10,6 @@ import TechniciansByService from "./pages/TechniciansByService";
 import MaintenanceRequest from "./pages/MaintenanceRequest";
 import MaintenanceHistory from "./pages/MaintenanceHistory";
 import TechnicianProfile from "./pages/TechnicianProfile";
-import RatingReview from "./pages/RatingReview";
 import AdminDashboard from "./pages/AdminDashboard";
 
 function App() {
@@ -26,7 +25,6 @@ function App() {
         <Route path="/request/:techId" element={<MaintenanceRequest />} />
         <Route path="/history" element={<MaintenanceHistory />} />
         <Route path="/technician/:id" element={<TechnicianProfile />} />
-        <Route path="/rating/:id" element={<RatingReview />} />
         <Route path="/admin" element={<AdminDashboard />} />
       </Routes>
       <Footer />

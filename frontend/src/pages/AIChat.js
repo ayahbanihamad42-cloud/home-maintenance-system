@@ -1,49 +1,49 @@
-import React, { useState } from 'react';
-import { chatWithAI } from '../services/aiService';
+import React, { useState, useEffect } from "react";
+import { sendAIMessage, getAIChatHistory } from "../services/aiService";
 
-const AIChat = () => {
-    const [messages, setMessages] = useState([]);
-    const [input, setInput] = useState('');
+function AIChat() {
+  const [messages, setMessages] = useState([]);
+  const [input, setInput] = useState("");
 
-    const handleSend = async () => {
-        if(!input) return;
-
-        // عرض رسالة المستخدم
-        setMessages([...messages, { sender:'user', text:input }]);
-
-        try {
-            const res = await chatWithAI({ message: input });
-            // عرض رد AI (ديكور أو إصلاح)
-            setMessages(prev => [...prev, { sender:'AI', text: res.data.reply }]);
-            setInput('');
-        } catch(err){
-            alert("Error sending message");
-        }
+  useEffect(() => {
+    const fetchHistory = async () => {
+      try {
+        const data = await getAIChatHistory();
+        setMessages(data);
+      } catch (error) {
+        alert(error.message);
+      }
     };
+    fetchHistory();
+  }, []);
 
-    const handleKeyPress = e => { if(e.key==='Enter') handleSend(); }
+  const handleSend = async () => {
+    if (!input.trim()) return;
+    try {
+      const reply = await sendAIMessage(input);
+      setMessages(prev => [...prev, { sender: "user", message: input }, { sender: "ai", message: reply }]);
+      setInput("");
+    } catch (error) {
+      alert(error.message);
+    }
+  };
 
-    return (
-        <div style={{ maxWidth:'500px', margin:'auto', padding:'10px', border:'1px solid #ccc', borderRadius:'5px' }}>
-            <h3>Chat with AI (Decor & Repair Suggestions)</h3>
-            <div style={{ height:'300px', overflowY:'scroll', border:'1px solid #eee', padding:'5px', marginBottom:'10px' }}>
-                {messages.map((m,i)=>(
-                    <div key={i} style={{ textAlign: m.sender==='user'?'right':'left', margin:'5px 0' }}>
-                        <b>{m.sender}:</b> {m.text}
-                    </div>
-                ))}
-            </div>
-            <input
-                type="text"
-                value={input}
-                onChange={e=>setInput(e.target.value)}
-                onKeyPress={handleKeyPress}
-                placeholder="Type your message..."
-                style={{ width:'80%', padding:'5px' }}
-            />
-            <button onClick={handleSend} style={{ width:'18%', padding:'5px', marginLeft:'2%' }}>Send</button>
-        </div>
-    );
-};
+  return (
+    <div className="container">
+      <h2>AI Chat</h2>
+      <div className="chat-box">
+        {messages.map((msg, idx) => (
+          <div key={idx} className={msg.sender === "user" ? "chat-user" : "chat-ai"}>
+            {msg.message}
+          </div>
+        ))}
+      </div>
+      <div className="input-group">
+        <input value={input} onChange={e => setInput(e.target.value)} placeholder="Type your message..." />
+        <button className="primary" onClick={handleSend}>Send</button>
+      </div>
+    </div>
+  );
+}
 
 export default AIChat;

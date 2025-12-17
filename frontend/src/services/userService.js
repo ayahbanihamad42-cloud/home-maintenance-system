@@ -1,7 +1,22 @@
-import axios from './api';
+import API from "./api";
 
-export const registerUser = data => axios.post('/users/register', data);
-export const loginUser = data => axios.post('/users/login', data);
-export const getUserProfile = (id, token) => axios.get(`/users/${id}`, { headers:{ Authorization:`Bearer ${token}` } });
-export const updateUserLocation = (id,data) => axios.post(`/users/${id}/location`, data);
-export const updateProfile = (id,data) => axios.put(`/users/${id}`, data);
+export const loginUser = async (data) => {
+  const res = await API.post("/users/login", data);
+  return res.data;
+};
+
+export const registerUser = async (data) => {
+  const res = await API.post("/users/register", data);
+  return res.data;
+};
+
+export const getUserProfile = async (id) => {
+  const res = await API.get(`/users/${id}`);
+  return res.data;
+};
+
+
+export const getUsers = async () => {
+  const res = await API.get("/users");
+  return res.data;
+};

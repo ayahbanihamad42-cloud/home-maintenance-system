@@ -1,29 +1,59 @@
-import React, { useState } from 'react';
-import { registerUser } from '../services/userService';
+import React, { useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { registerUser } from "../services/userService";
 
-const Register = () => {
-    const [form,setForm] = useState({ name:'',email:'',phone:'',dob:'',city:'',password:'' });
+function Register() {
+  const [name, setName] = useState("");
+  const [email, setEmail] = useState("");
+  const [phone, setPhone] = useState("");
+  const [dob, setDob] = useState("");
+  const [city, setCity] = useState("");
+  const [password, setPassword] = useState("");
+  const navigate = useNavigate();
 
-    const handleChange = e => setForm({...form,[e.target.name]: e.target.value});
-    const handleSubmit = async e => {
-        e.preventDefault();
-        try{
-            const res = await registerUser(form);
-            alert(res.data.message);
-        } catch(err){ alert(err.response.data.message); }
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    try {
+      await registerUser({ name, email, phone, dob, city, password });
+      alert("Registration successful");
+      navigate("/login");
+    } catch (error) {
+      alert(error.response?.data?.message || error.message);
     }
+  };
 
-    return (
-        <form onSubmit={handleSubmit}>
-            <input name="name" placeholder="Name" onChange={handleChange} />
-            <input name="email" placeholder="Email" onChange={handleChange} />
-            <input name="phone" placeholder="Phone" onChange={handleChange} />
-            <input type="date" name="dob" onChange={handleChange} />
-            <input name="city" placeholder="City" onChange={handleChange} />
-            <input type="password" name="password" placeholder="Password" onChange={handleChange} />
-            <button type="submit">Register</button>
-        </form>
-    );
+  return (
+    <div style={{ maxWidth: "400px", margin: "50px auto" }}>
+      <h2>Register</h2>
+      <form onSubmit={handleSubmit}>
+        <div className="input-group">
+          <label>Name:</label>
+          <input value={name} onChange={e=>setName(e.target.value)} required />
+        </div>
+        <div className="input-group">
+          <label>Email:</label>
+          <input type="email" value={email} onChange={e=>setEmail(e.target.value)} required />
+        </div>
+        <div className="input-group">
+          <label>Phone:</label>
+          <input value={phone} onChange={e=>setPhone(e.target.value)} required />
+        </div>
+        <div className="input-group">
+          <label>Date of Birth:</label>
+          <input type="date" value={dob} onChange={e=>setDob(e.target.value)} required />
+        </div>
+        <div className="input-group">
+          <label>City:</label>
+          <input value={city} onChange={e=>setCity(e.target.value)} required />
+        </div>
+        <div className="input-group">
+          <label>Password:</label>
+          <input type="password" value={password} onChange={e=>setPassword(e.target.value)} required />
+        </div>
+        <button className="primary" type="submit">Register</button>
+      </form>
+    </div>
+  );
 }
 
 export default Register;

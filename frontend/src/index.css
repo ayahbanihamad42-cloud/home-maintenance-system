@@ -1,65 +1,134 @@
+/* ===== Global ===== */
 body {
   margin: 0;
   font-family: Arial, sans-serif;
-  background: #f5f7fa;
+  background-color: #f5f5f5;
 }
 
-.header, .footer {
-  background: #1f6f8b;
-  color: white;
-  padding: 15px;
-  text-align: center;
-}
-
-.header a {
-  color: white;
-  margin: 0 10px;
+a {
   text-decoration: none;
+  color: inherit;
 }
 
-.page {
-  padding: 20px;
+h2, h3 {
+  margin: 0 0 10px 0;
 }
 
-.center {
-  text-align: center;
+.container {
+  max-width: 1200px;
+  margin: 20px auto;
+  padding: 0 15px;
 }
 
-input, select, textarea {
-  display: block;
-  width: 100%;
-  margin: 10px 0;
-  padding: 10px;
-}
-
-.btn {
-  background: #1f6f8b;
+/* ===== Navbar ===== */
+.navbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 20px;
+  background-color: #1976d2;
   color: white;
-  padding: 10px;
+}
+
+.navbar a {
+  margin-left: 15px;
+  color: white;
+}
+
+.navbar button {
+  margin-left: 15px;
+  padding: 8px 16px;
+  border-radius: 8px;
   border: none;
-  margin-top: 10px;
+  background-color: #f44336;
+  color: white;
   cursor: pointer;
 }
 
+/* ===== Cards ===== */
 .card {
-  background: white;
+  background-color: white;
   padding: 15px;
-  margin: 10px 0;
+  border-radius: 12px;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+  margin-bottom: 15px;
+}
+
+/* ===== Buttons ===== */
+button.primary {
+  background-color: #1976d2;
+  color: white;
+  border: none;
+  padding: 8px 16px;
   border-radius: 8px;
+  cursor: pointer;
 }
 
-.service-grid {
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 15px;
+button.secondary {
+  background-color: #e0e0e0;
+  color: black;
+  border: none;
+  padding: 8px 16px;
+  border-radius: 8px;
+  cursor: pointer;
 }
 
-.notification {
-  background: #dff0d8;
-  padding: 10px;
+/* ===== Inputs ===== */
+input, select, textarea {
+  width: 100%;
+  padding: 8px;
+  margin-top: 4px;
+  border-radius: 6px;
+  border: 1px solid #ccc;
 }
 
+.input-group {
+  margin-bottom: 10px;
+}
+
+/* ===== Chat ===== */
 .chat-box {
   border: 1px solid #ccc;
+  border-radius: 8px;
   padding: 10px;
+  max-height: 400px;
+  overflow-y: auto;
+  background-color: #fff;
+  margin-bottom: 10px;
+}
+
+.chat-message {
+  margin-bottom: 10px;
+}
+
+.chat-message.user {
+  text-align: right;
+}
+
+.chat-message.ai,
+.chat-message.technician {
+  text-align: left;
+}
+
+/* ===== Footer ===== */
+footer {
+  text-align: center;
+  padding: 15px;
+  margin-top: 30px;
+}
+
+/* ===== Services Circles (Home) ===== */
+.service-circle {
+  width: 100px;
+  height: 100px;
+  border-radius: 50%;
+  background-color: #1976d2;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  color: white;
+  font-weight: bold;
+  font-size: 20px;
+  cursor: pointer;
+  margin: 10px;
 }
