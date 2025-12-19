@@ -13,19 +13,16 @@ function Header() {
   return (
     <div className="navbar">
       <div>
-        <Link to="/home">Home</Link>
-      </div>
-      <div>
         {user ? (
           <>
+            <Link to="/home">Home</Link>
             <Link to="/profile">Profile</Link>
             <Link to="/history">History</Link>
             <button onClick={handleLogout}>Logout</button>
           </>
         ) : (
           <>
-            <Link to="/login">Login</Link>
-            <Link to="/register">Register</Link>
+            <Link to="/">Welcome</Link>
           </>
         )}
       </div>

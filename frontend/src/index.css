@@ -2,27 +2,28 @@
 body {
   margin: 0;
   font-family: Inter, Arial, sans-serif;
-  background: #1F6788;
-  color: #1f2937;
+  background: #1F6788; 
+  color: #111827;
 }
 
 .container {
   max-width: 1200px;
   margin: auto;
-  padding: 24px;
+  padding: 32px;
 }
 
 /* ================= NAVBAR ================= */
 .navbar {
-  background: #ffffff 70%;
-  padding: 16px 24px;
+  background: rgba(255, 255, 255, 0.7); 
+  padding: 20px 32px;
   display: flex;
   justify-content: space-between;
   align-items: center;
+  border-radius: 12px;
 }
 
 .navbar a {
-  color: #ffffff 70%;
+  color: #111827; 
   margin-right: 20px;
   text-decoration: none;
   font-weight: 500;
@@ -37,6 +38,11 @@ body {
   cursor: pointer;
 }
 
+.navbar button:hover {
+  background: #dc2626;
+}
+
+
 /* ================= BUTTONS ================= */
 .primary {
   background: #22c55e;
@@ -45,6 +51,10 @@ body {
   padding: 10px 18px;
   border-radius: 8px;
   cursor: pointer;
+}
+
+.primary:hover {
+  background: #16a34a;
 }
 
 .secondary {
@@ -56,11 +66,15 @@ body {
   cursor: pointer;
 }
 
+.secondary:hover {
+  background: #d1d5db;
+}
+
 /* ================= CARDS ================= */
 .card {
-  background: #ffffff 70%;
+  background: #ffffff;
   padding: 20px;
-  border-radius: 16px;
+  border-radius: 12px;
   margin-bottom: 20px;
   box-shadow: 0 8px 20px rgba(0,0,0,0.08);
 }
@@ -81,41 +95,130 @@ body {
   border: 1px solid #d1d5db;
 }
 
-/* ================= CHAT ================= */
-.chat-box {
-  background: #fff;
+.chat-container {
+  max-width: 600px;
+  margin: 40px auto;
+  height: 80vh;
+  display: flex;
+  flex-direction: column;
+  background-color: #ffffff;
+  border-radius: 16px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+  overflow: hidden;
+  border: 1px solid #e5e7eb;
+}
+
+.chat-header {
+  background-color: #0f4c5c;
+  color: #ffffff;
   padding: 16px;
-  border-radius: 12px;
-  max-height: 400px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.chat-header .back-button {
+  background: none;
+  border: none;
+  color: #ffffff;
+  font-size: 20px;
+  cursor: pointer;
+}
+
+.chat-header img {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  object-fit: cover;
+}
+
+.chat-header span {
+  font-size: 18px;
+  font-weight: 600;
+}
+
+.chat-box {
+  flex: 1;
+  padding: 16px;
   overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  background-color: #f9fafb;
 }
 
-.chat-user {
-  background: #dbeafe;
-  padding: 10px;
-  border-radius: 10px;
-  margin-bottom: 8px;
+.message {
+  max-width: 70%;
+  padding: 10px 14px;
+  border-radius: 16px;
+  font-size: 14px;
+  position: relative;
+  word-wrap: break-word;
 }
 
-.chat-ai,
-.chat-technician {
-  background: #f3f4f6;
-  padding: 10px;
-  border-radius: 10px;
-  margin-bottom: 8px;
+.message-user {
+  align-self: flex-end;
+  background-color: #22c55e;
+  color: #ffffff;
+  border-radius: 16px 16px 0 16px;
 }
+
+.message-ai,
+.message-technician {
+  align-self: flex-start;
+  background-color: #e5e7eb;
+  color: #111827;
+  border-radius: 16px 16px 16px 0;
+}
+
+.timestamp {
+  font-size: 10px;
+  color: #6b7280;
+  margin-top: 4px;
+  text-align: right;
+}
+
+.input-group {
+  display: flex;
+  padding: 12px;
+  border-top: 1px solid #e5e7eb;
+  background-color: #ffffff;
+}
+
+.input-group input {
+  flex: 1;
+  padding: 12px;
+  border-radius: 8px;
+  border: 1px solid #ccc;
+  font-size: 14px;
+}
+
+.input-group .primary {
+  background-color: #0f4c5c;
+  color: white;
+  border: none;
+  padding: 12px 20px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-weight: 500;
+  margin-left: 8px;
+}
+
+
 
 /* ================= ADMIN ================= */
 .admin-dashboard {
-  background: #2563eb;
+  background: #1F6788; 
   min-height: 80vh;
-  padding: 30px;
-  border-radius: 20px;
+  padding: 40px;
+  border-radius: 16px;
 }
 
 .admin-title {
   color: #fff;
   margin-bottom: 20px;
+  font-size: 24px;
+  font-weight: 600;
 }
 
 .admin-actions {
@@ -134,12 +237,18 @@ body {
 
 .admin-table th,
 .admin-table td {
-  padding: 14px;
+  padding: 16px;
   border-bottom: 1px solid #e5e7eb;
 }
 
 .admin-table th {
   background: #f1f5f9;
+  color: #374151;
+  font-weight: 500;
+}
+
+.admin-table td {
+  color: #4b5563;
 }
 
 /* ================= TECHNICIAN ================= */
@@ -154,6 +263,7 @@ body {
   height: 60px;
   border-radius: 50%;
   background-size: cover;
+  border: 2px solid #e5e7eb;
 }
 
 .tech-actions {
@@ -161,21 +271,110 @@ body {
   gap: 10px;
   margin-top: 12px;
 }
+/* ================= WELCOME PAGE ================= */
+.welcome-container {
+  text-align: center;
+  margin-top: 100px;
+}
 
-/* ================= SERVICES ================= */
-.service-circle {
-  width: 120px;
-  height: 120px;
-  border-radius: 50%;
-  background: #1e40af;
-  color: #fff;
+.welcome-title {
+  font-size: 48px;
+  font-weight: bold;
+  color: #ffffff;
+  margin-bottom: 32px;
+}
+
+.welcome-image {
+  width: 240px;
+  height: auto;
+  margin-bottom: 32px;
+}
+
+.welcome-buttons {
   display: flex;
-  flex-direction: column;
   justify-content: center;
-  align-items: center;
-  margin: 20px;
+  gap: 24px;
+}
+
+.btn {
+  padding: 12px 24px;
+  font-size: 16px;
+  font-weight: 500;
+  border-radius: 8px;
+  border: none;
   cursor: pointer;
 }
+
+.btn-register {
+  background-color: #22c55e;
+  color: white;
+  box-shadow: 0 4px 12px rgba(34, 197, 94, 0.4);
+}
+
+.btn-login {
+  background-color: white;
+  color: #111827;
+  border: 2px solid #111827;
+}
+
+/* ================= HOME PAGE ================= */
+.home-container {
+  text-align: center;
+  margin-top: 60px;
+}
+
+.home-title {
+  font-size: 32px;
+  font-weight: bold;
+  color: #ffffff;
+  margin-bottom: 40px;
+}
+.services-container {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 48px;
+  justify-items: center;
+  margin-top: 80px;
+}
+
+.service-item {
+  text-align: center;
+}
+
+.service-circle {
+  width: 160px;
+  height: 160px;
+  border-radius: 50%;
+  background: #ffffff;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+  overflow: hidden;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  cursor: pointer;
+  transition: transform 0.3s ease;
+}
+
+.service-circle:hover {
+  transform: scale(1.05);
+}
+
+.service-circle img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: 50%;
+}
+
+.service-name {
+  margin-top: 12px;
+  font-size: 16px;
+  font-weight: 600;
+  color: #ffffff;
+}
+
+
+
 /* ================= RATING ================= */
 .rating-stars {
   display: flex;
@@ -190,5 +389,9 @@ body {
 }
 
 .star.active {
+  color: #facc15;
+}
+
+.star:hover {
   color: #facc15;
 }

@@ -11,6 +11,10 @@ import MaintenanceRequest from "./pages/MaintenanceRequest";
 import MaintenanceHistory from "./pages/MaintenanceHistory";
 import TechnicianProfile from "./pages/TechnicianProfile";
 import AdminDashboard from "./pages/AdminDashboard";
+import Review from "./pages/Review";
+import UserProfile from "./pages/UserProfile";
+import Chat from "./pages/Chat";
+import AIChat from "./pages/AIChat";
 
 function App() {
   return (
@@ -26,6 +30,11 @@ function App() {
         <Route path="/history" element={<MaintenanceHistory />} />
         <Route path="/technician/:id" element={<TechnicianProfile />} />
         <Route path="/admin" element={<AdminDashboard />} />
+        <Route path="/Review/:techId" element={<Review />} />
+
+        <Route path="/profile" element={<UserProfile />} />
+        <Route path="/chat/:requestId" element={<Chat />} />
+        <Route path="/aichat" element={<AIChat />} />
       </Routes>
       <Footer />
     </BrowserRouter>

@@ -19,7 +19,10 @@ function Register() {
         {["name","email","phone","dob","city","password"].map(f => (
           <div className="input-group" key={f}>
             <label>{f}</label>
-            <input onChange={e => setForm({ ...form, [f]: e.target.value })} />
+            <input
+              type={f === "dob" ? "date" : f === "password" ? "password" : "text"} 
+              onChange={e => setForm({ ...form, [f]: e.target.value })}
+            />
           </div>
         ))}
         <button className="primary">Register</button>
