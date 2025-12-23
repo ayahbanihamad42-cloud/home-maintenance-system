@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { getUsers } from "../services/userService";
-import { getTechnicians, addTechnician } from "../services/technicianService";
+import { getTechnicians, addTechnician } from "../services/adminService";
 
 function AdminDashboard() {
   const [view, setView] = useState("users");

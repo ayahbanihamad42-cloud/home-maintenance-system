@@ -1,16 +1,17 @@
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { loginUser } from "../services/userService";
+import { login } from "../../services/auth.service";
 
 function Login() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const navigate = useNavigate();
 
-  const handleSubmit = async (e) => {
+  const handleSubmit = async e => {
     e.preventDefault();
-    const user = await loginUser({ email, password });
-    localStorage.setItem("user", JSON.stringify(user));
+    const res = await login({ email, password });
+    localStorage.setItem("user", JSON.stringify(res.data.user));
+    localStorage.setItem("token", res.data.token);
     navigate("/home");
   };
 
@@ -24,7 +25,8 @@ function Login() {
         </div>
         <div className="input-group">
           <label>Password</label>
-          <input type="password" value={password} onChange={e => setPassword(e.target.value)} />
+          <input type="password" value={password}
+            onChange={e => setPassword(e.target.value)} />
         </div>
         <button className="primary">Login</button>
       </form>
