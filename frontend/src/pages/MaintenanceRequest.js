@@ -1,99 +1,74 @@
-import React, { useState, useEffect } from 'react';
-import { createMaintenanceRequest } from '../services/maintenanceService';
-import { getTechnicians } from '../services/technicianService';
-import { useNavigate } from 'react-router-dom';
+import React, { useEffect, useState } from "react";
+import { useParams } from "react-router-dom";
+import { getTechnicianById } from "../services/technicianService";
+import { createMaintenanceRequest } from "../services/maintenanceService";
 
-const MaintenanceRequest = ({ user_id }) => {
-    const navigate = useNavigate();
-    const [form, setForm] = useState({
-        service:'',
-        description:'',
-        date:'',
-        time:'',
-        city:'',
-        latitude:'',
-        longitude:'',
-        technician_id:'',
-        payment_method:'Cash'  // default
+function MaintenanceRequest() {
+  const { id } = useParams();
+  const [technician, setTechnician] = useState(null);
+  const [description, setDescription] = useState("");
+  const [address, setAddress] = useState("");
+  const [city, setCity] = useState("");
+  const [date, setDate] = useState("");
+  const [time, setTime] = useState("");
+
+  useEffect(() => {
+    getTechnicianById(id).then(setTechnician);
+  }, [id]);
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    const user = JSON.parse(localStorage.getItem("user"));
+    await createMaintenanceRequest({
+      user_id: user.id,
+      technician_id: id,
+      service: technician.service,
+      description,
+      address,
+      city,
+      date,
+      time,
+      status: "pending"
     });
-    const [technicians, setTechnicians] = useState([]);
+    alert("Request submitted");
+  };
 
-    // جلب قائمة الفنيين
-    useEffect(()=>{
-        const fetch = async ()=>{
-            const res = await getTechnicians(); // API GET /technicians
-            setTechnicians(res.data);
-        }
-        fetch();
-    },[]);
+  if (!technician) return null;
 
-    // جلب الموقع الحالي
-    useEffect(()=>{
-        if(navigator.geolocation){
-            navigator.geolocation.getCurrentPosition(pos=>{
-                setForm(prev => ({
-                    ...prev,
-                    latitude: pos.coords.latitude,
-                    longitude: pos.coords.longitude
-                }));
-            });
-        }
-    },[]);
+  return (
+    <div className="container">
+      <h2>Request Service</h2>
 
-    const handleChange = e => setForm({...form,[e.target.name]:e.target.value});
+      <form onSubmit={handleSubmit}>
+        <div className="input-group">
+          <label>Description</label>
+          <textarea value={description} onChange={e => setDescription(e.target.value)} />
+        </div>
 
-    const handleSubmit = async e => {
-        e.preventDefault();
-        try {
-            const res = await createMaintenanceRequest(user_id, form);
-            alert('Maintenance request submitted!');
-            navigate(`/review/${res.data.id}`); // الانتقال لصفحة التقييم بعد الإرسال
-        } catch(err){
-            alert('Error submitting request');
-        }
-    }
+        <div className="input-group">
+          <label>Address</label>
+          <input value={address} onChange={e => setAddress(e.target.value)} />
+        </div>
 
-    return (
-        <form onSubmit={handleSubmit} style={{ maxWidth:'600px', margin:'auto', padding:'10px', border:'1px solid #ccc', borderRadius:'5px' }}>
-            <h3>Create Maintenance Request</h3>
+        <div className="input-group">
+          <label>City</label>
+          <input value={city} onChange={e => setCity(e.target.value)} />
+        </div>
 
-            <label>Service:</label>
-            <input name="service" value={form.service} onChange={handleChange} placeholder="Service type" required />
+        <div className="input-group">
+          <label>Date</label>
+          <input type="date" value={date} onChange={e => setDate(e.target.value)} />
+        </div>
 
-            <label>Description:</label>
-            <textarea name="description" value={form.description} onChange={handleChange} placeholder="Describe the problem" required />
+        <div className="input-group">
+          <label>Time</label>
+          <input type="time" value={time} onChange={e => setTime(e.target.value)} />
+        </div>
 
-            <label>Date:</label>
-            <input type="date" name="date" value={form.date} onChange={handleChange} required />
-
-            <label>Time:</label>
-            <input type="time" name="time" value={form.time} onChange={handleChange} required />
-
-            <label>City:</label>
-            <input name="city" value={form.city} onChange={handleChange} placeholder="City" required />
-
-            <label>Technician:</label>
-            <select name="technician_id" value={form.technician_id} onChange={handleChange} required>
-                <option value="">Select Technician</option>
-                {technicians.map(t=>(
-                    <option key={t.id} value={t.id}>{t.name} - {t.service}</option>
-                ))}
-            </select>
-
-            <label>Payment Method:</label>
-            <select name="payment_method" value={form.payment_method} onChange={handleChange}>
-                <option value="Cash">Cash</option>
-                <option value="ePayment">ePayment</option>
-            </select>
-
-            <p>Location (detected automatically, can adjust):</p>
-            <p>Latitude: {form.latitude}, Longitude: {form.longitude}</p>
-
-            {/* يمكن لاحقاً إضافة خريطة تفاعلية هنا لتحديد الموقع */}
-            
-            <button type="submit" style={{ marginTop:'10px' }}>Submit Request</button>
-        </form>
-    );
-};
+        <button className="primary">Submit Request</button>
+      </form>
+    </div>
+  );
+}
 
 export default MaintenanceRequest;

@@ -1,40 +1,33 @@
-<<<<<<< Updated upstream
-=======
-import { Link } from "react-router-dom";
+import React from "react";
+import { Link, useNavigate } from "react-router-dom";
 
-const Header = () => {
-  const role = "user"; // لاحقًا من auth
+function Header() {
+  const navigate = useNavigate();
+  const user = JSON.parse(localStorage.getItem("user"));
+
+  const handleLogout = () => {
+    localStorage.removeItem("user");
+    navigate("/");
+  };
 
   return (
-    <header className="header">
-      <h2>Maintenance Platform</h2>
-
-      <nav>
-        {role === "user" && (
+    <div className="navbar">
+      <div>
+        {user ? (
           <>
-            <Link to="/home">Services</Link>
-            <Link to="/requests">Requests</Link>
-            <Link to="/history">History</Link>
+            <Link to="/home">Home</Link>
             <Link to="/profile">Profile</Link>
-            <Link to="/">Logout</Link>
+            <Link to="/history">History</Link>
+            <button onClick={handleLogout}>Logout</button>
           </>
-        )}
-
-        {role === "admin" && (
-          <Link to="/admin">Dashboard</Link>
-        )}
-
-        {!role && (
+        ) : (
           <>
             <Link to="/">Welcome</Link>
-            <Link to="/login">Login</Link>
-            <Link to="/register">Register</Link>
           </>
         )}
-      </nav>
-    </header>
+      </div>
+    </div>
   );
-};
+}
 
 export default Header;
->>>>>>> Stashed changes

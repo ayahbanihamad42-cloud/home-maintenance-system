@@ -1,12 +1,13 @@
-<<<<<<< Updated upstream
-=======
-const StoreCard = ({ store }) => (
-  <div className="card">
-    <h3>{store.name}</h3>
-    <p>{store.services}</p>
-    <p>⭐ {store.rating}</p>
-  </div>
-);
+import React from "react";
+
+function StoreCard({ store }) {
+  return (
+    <div className="card">
+      <h3>{store.name}</h3>
+      <p>Service: {store.service}</p>
+      <p>City: {store.city}</p>
+    </div>
+  );
+}
 
 export default StoreCard;
->>>>>>> Stashed changes

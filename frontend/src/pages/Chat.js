@@ -1,34 +1,44 @@
-import React,{ useEffect,useState } from 'react';
-import { getChatByRequest, sendMessage } from '../services/chatService';
+import React, { useEffect, useState } from "react";
+import { getChatMessages, sendChatMessage } from "../services/chatService";
+import { useParams, useNavigate } from "react-router-dom";
+import profileimage from "../images/profileaht.png";
+function Chat() {
+  const { requestId } = useParams();
+  const [messages, setMessages] = useState([]);
+  const [text, setText] = useState("");
+  const navigate = useNavigate();
 
-const Chat = ({ request_id,userRole }) => {
-    const [messages,setMessages] = useState([]);
-    const [msg,setMsg] = useState('');
+  useEffect(() => {
+    getChatMessages(requestId).then(setMessages);
+  }, [requestId]);
 
-    const fetchMessages = async ()=>{
-        const res = await getChatByRequest(request_id);
-        setMessages(res.data);
-    }
+  const handleSend = async () => {
+    const msg = await sendChatMessage({ request_id: requestId, message: text, sender: "user" });
+    setMessages([...messages, { ...msg, time: new Date().toLocaleTimeString() }]);
+    setText("");
+  };
 
-    useEffect(()=>{ fetchMessages(); },[request_id]);
-
-    const handleSend = async ()=>{
-        await sendMessage({ request_id, sender:userRole, message:msg });
-        setMsg('');
-        fetchMessages();
-    }
-
-    return (
-        <div>
-            <div>
-                {messages.map(m=>(
-                    <div key={m.id}><b>{m.sender}:</b> {m.message}</div>
-                ))}
-            </div>
-            <input value={msg} onChange={e=>setMsg(e.target.value)} placeholder="Type a message"/>
-            <button onClick={handleSend}>Send</button>
-        </div>
-    );
+  return (
+    <div className="chat-container">
+      <div className="chat-header">
+      <button className="back-button" onClick={() => navigate(-1)}>←</button>
+       <img src={profileimage} alt="profilechat" />
+       <span>Technician Chat</span>
+      </div>
+      <div className="chat-box">
+        {messages.map((m, i) => (
+          <div key={i} className={`message message-${m.sender}`}>
+            {m.message}
+            <div className="timestamp">{m.time}</div>
+          </div>
+        ))}
+      </div>
+      <div className="input-group">
+        <input value={text} onChange={e => setText(e.target.value)} placeholder="Type a message..." />
+        <button className="primary" onClick={handleSend}>Send</button>
+      </div>
+    </div>
+  );
 }
 
 export default Chat;

@@ -1,30 +1,26 @@
-import React, { useEffect, useState } from 'react';
-import { getTechnicianById } from '../services/technicianService';
-import { useParams } from 'react-router-dom';
+import React, { useEffect, useState } from "react";
+import { useParams } from "react-router-dom";
+import { getTechnicianById } from "../services/technicianService";
 
-const TechnicianProfile = () => {
-    const { id } = useParams();
-    const [technician, setTechnician] = useState(null);
+function TechnicianProfile() {
+  const { id } = useParams();
+  const [technician, setTechnician] = useState(null);
 
-    useEffect(()=>{
-        const fetch = async ()=>{
-            const res = await getTechnicianById(id);
-            setTechnician(res.data);
-        }
-        fetch();
-    },[id]);
+  useEffect(() => {
+    getTechnicianById(id).then(setTechnician);
+  }, [id]);
 
-    if(!technician) return <p>Loading...</p>;
+  if (!technician) return null;
 
-    return (
-        <div style={{ maxWidth:'500px', margin:'auto', padding:'10px', border:'1px solid #ccc', borderRadius:'5px' }}>
-            <h3>{technician.name}</h3>
-            <p>Service: {technician.service}</p>
-            <p>Experience: {technician.experience} years</p>
-            <p>Rating: {technician.rating}</p>
-            <p>Active: {technician.active ? 'Yes' : 'No'}</p>
-        </div>
-    );
-};
+  return (
+    <div className="container">
+      <h2>{technician.name}</h2>
+      <p>{technician.service}</p>
+      <p>{technician.phone}</p>
+      <p>{technician.experience} years</p>
+      <p>{technician.rating || 0} ⭐</p>
+    </div>
+  );
+}
 
 export default TechnicianProfile;

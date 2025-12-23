@@ -1,27 +1,35 @@
-import React,{ useState } from 'react';
-import { loginUser } from '../services/userService';
+import React, { useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { loginUser } from "../services/userService";
 
-const Login = () => {
-    const [form,setForm] = useState({ email:'',password:'' });
-    const handleChange = e => setForm({...form,[e.target.name]:e.target.value});
+function Login() {
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const navigate = useNavigate();
 
-    const handleSubmit = async e => {
-        e.preventDefault();
-        try{
-            const res = await loginUser(form);
-            localStorage.setItem('token',res.data.token);
-            localStorage.setItem('user',JSON.stringify(res.data.user));
-            alert(res.data.message);
-        }catch(err){ alert(err.response.data.message); }
-    }
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    const user = await loginUser({ email, password });
+    localStorage.setItem("user", JSON.stringify(user));
+    navigate("/home");
+  };
 
-    return (
-        <form onSubmit={handleSubmit}>
-            <input name="email" placeholder="Email" onChange={handleChange}/>
-            <input type="password" name="password" placeholder="Password" onChange={handleChange}/>
-            <button type="submit">Login</button>
-        </form>
-    );
+  return (
+    <div className="container auth-box">
+      <h2>Login</h2>
+      <form onSubmit={handleSubmit}>
+        <div className="input-group">
+          <label>Email</label>
+          <input value={email} onChange={e => setEmail(e.target.value)} />
+        </div>
+        <div className="input-group">
+          <label>Password</label>
+          <input type="password" value={password} onChange={e => setPassword(e.target.value)} />
+        </div>
+        <button className="primary">Login</button>
+      </form>
+    </div>
+  );
 }
 
 export default Login;

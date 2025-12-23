@@ -1,29 +1,21 @@
-import React,{ useEffect,useState } from 'react';
-import { getUserRequests } from '../services/maintenanceService';
+import React, { useEffect, useState } from "react";
+import { getUserRequests } from "../services/maintenanceService";
+import MaintenanceCard from "../components/MaintenanceCard";
 
-const MaintenanceHistory = ({ user_id }) => {
-    const [requests,setRequests] = useState([]);
+function MaintenanceHistory() {
+  const [requests, setRequests] = useState([]);
+  const user = JSON.parse(localStorage.getItem("user"));
 
-    useEffect(()=>{
-        const fetch = async ()=>{
-            const res = await getUserRequests(user_id);
-            setRequests(res.data);
-        }
-        fetch();
-    },[user_id]);
+  useEffect(() => {
+    getUserRequests(user.id).then(setRequests);
+  }, [user.id]);
 
-    return (
-        <div>
-            <h3>Maintenance History</h3>
-            {requests.map(r=>(
-                <div key={r.id} style={{ border:'1px solid #ccc', padding:'5px', margin:'5px' }}>
-                    <p>Service: {r.service}</p>
-                    <p>Status: {r.status}</p>
-                    <p>Description: {r.description}</p>
-                </div>
-            ))}
-        </div>
-    );
+  return (
+    <div className="container">
+      <h2>Request History</h2>
+      {requests.map(r => <MaintenanceCard key={r.id} request={r} />)}
+    </div>
+  );
 }
 
 export default MaintenanceHistory;

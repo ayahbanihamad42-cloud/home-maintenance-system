@@ -1,29 +1,34 @@
-import React, { useState } from 'react';
-import { registerUser } from '../services/userService';
+import React, { useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { registerUser } from "../services/userService";
 
-const Register = () => {
-    const [form,setForm] = useState({ name:'',email:'',phone:'',dob:'',city:'',password:'' });
+function Register() {
+  const [form, setForm] = useState({});
+  const navigate = useNavigate();
 
-    const handleChange = e => setForm({...form,[e.target.name]: e.target.value});
-    const handleSubmit = async e => {
-        e.preventDefault();
-        try{
-            const res = await registerUser(form);
-            alert(res.data.message);
-        } catch(err){ alert(err.response.data.message); }
-    }
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    await registerUser(form);
+    navigate("/login");
+  };
 
-    return (
-        <form onSubmit={handleSubmit}>
-            <input name="name" placeholder="Name" onChange={handleChange} />
-            <input name="email" placeholder="Email" onChange={handleChange} />
-            <input name="phone" placeholder="Phone" onChange={handleChange} />
-            <input type="date" name="dob" onChange={handleChange} />
-            <input name="city" placeholder="City" onChange={handleChange} />
-            <input type="password" name="password" placeholder="Password" onChange={handleChange} />
-            <button type="submit">Register</button>
-        </form>
-    );
+  return (
+    <div className="container auth-box">
+      <h2>Register</h2>
+      <form onSubmit={handleSubmit}>
+        {["name","email","phone","dob","city","password"].map(f => (
+          <div className="input-group" key={f}>
+            <label>{f}</label>
+            <input
+              type={f === "dob" ? "date" : f === "password" ? "password" : "text"} 
+              onChange={e => setForm({ ...form, [f]: e.target.value })}
+            />
+          </div>
+        ))}
+        <button className="primary">Register</button>
+      </form>
+    </div>
+  );
 }
 
 export default Register;

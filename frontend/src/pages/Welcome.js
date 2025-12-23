@@ -1,15 +1,20 @@
-import Button from "../components/Button";
+import React from "react";
 import { useNavigate } from "react-router-dom";
+import "../index.css";
+import welomeimage from "../images/home.png";
+function Welcome() {
+  const navigate = useNavigate();
 
-const Welcome = () => {
-  const nav = useNavigate();
   return (
-    <div className="page">
-      <h1>Welcome</h1>
-      <Button text="Login" onClick={() => nav("/login")} />
-      <Button text="Register" onClick={() => nav("/register")} />
+    <div className="welcome-container">
+      <h1 className="welcome-title">Welcome</h1>
+      <img className="welcome-image" src={welomeimage} alt="home" />
+      <div className="welcome-buttons">
+        <button className="btn btn-register" onClick={() => navigate("/register")}>Register</button>
+        <button className="btn btn-login" onClick={() => navigate("/login")}>Login</button>
+      </div>
     </div>
   );
-};
+}
 
 export default Welcome;
