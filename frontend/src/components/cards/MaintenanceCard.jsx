@@ -8,7 +8,10 @@ function MaintenanceCard({ request }) {
     <div className="card">
       <h3>{request.service}</h3>
       <p>{request.status}</p>
-      <button className="primary" onClick={() => navigate(`/review/${request.id}`)}>
+      <button
+        className="primary"
+        onClick={() => navigate(`/review/${request.id}`)}
+      >
         View
       </button>
     </div>

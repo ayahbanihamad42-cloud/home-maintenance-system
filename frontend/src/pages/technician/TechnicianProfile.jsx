@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
-import { getTechnicianById } from "../services/technicianService";
+import { getTechnicianById } from "../../services/technicianService";
 
 function TechnicianProfile() {
   const { id } = useParams();

@@ -6,7 +6,7 @@ function Header() {
   const user = JSON.parse(localStorage.getItem("user"));
 
   const handleLogout = () => {
-    localStorage.removeItem("user");
+    localStorage.clear();
     navigate("/");
   };
 
@@ -21,9 +21,7 @@ function Header() {
             <button onClick={handleLogout}>Logout</button>
           </>
         ) : (
-          <>
-            <Link to="/">Welcome</Link>
-          </>
+          <Link to="/">Welcome</Link>
         )}
       </div>
     </div>

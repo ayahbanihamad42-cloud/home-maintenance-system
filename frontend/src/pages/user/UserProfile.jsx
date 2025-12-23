@@ -1,12 +1,12 @@
 import React, { useEffect, useState } from "react";
-import { getUserProfile } from "../services/userService";
+import API from "../../services/api";
 
 function UserProfile() {
   const user = JSON.parse(localStorage.getItem("user"));
   const [profile, setProfile] = useState(null);
 
   useEffect(() => {
-    getUserProfile(user.id).then(setProfile);
+    API.get(`/users/${user.id}`).then(res => setProfile(res.data));
   }, [user.id]);
 
   if (!profile) return null;
@@ -17,6 +17,7 @@ function UserProfile() {
       <p>{profile.email}</p>
       <p>{profile.phone}</p>
       <p>{profile.city}</p>
+      <p>{profile.dob}</p>
     </div>
   );
 }
