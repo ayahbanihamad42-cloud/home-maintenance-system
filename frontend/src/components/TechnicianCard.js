@@ -1,13 +1,15 @@
+import React from 'react';
 
-function TechnicianCard({ name, specialty }) {
-  return (
-    <div className="card">
-      <h3>{name}</h3>
-      <p>Specialty: {specialty}</p>
-      <button>View Profile</button>
-    </div>
-  );
-}
+const TechnicianCard = ({ technician }) => {
+    return (
+        <div style={{ border:'1px solid #ccc', borderRadius:'5px', padding:'10px', margin:'5px' }}>
+            <h4>{technician.name}</h4>
+            <p>Service: {technician.service}</p>
+            <p>Experience: {technician.experience} years</p>
+            <p>Rating: {technician.rating}</p>
+            <p>Active: {technician.active ? 'Yes' : 'No'}</p>
+        </div>
+    );
+};
 
 export default TechnicianCard;
- StoreCard.js
