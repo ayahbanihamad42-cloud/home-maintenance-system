@@ -1,7 +1,7 @@
 import React from "react";
 import { useNavigate } from "react-router-dom";
-import "../index.css";
-import welomeimage from "../images/home.png";
+import "../../index.css";
+import welomeimage from "../../images/home.png";
 function Welcome() {
   const navigate = useNavigate();
 

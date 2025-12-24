@@ -1,9 +1,13 @@
-import axios from './api';
+import API from "./api";
 
-export const getTechniciansByService = service => axios.get(`/technicians/service/${service}`);
-export const assignTechnician = request_id => axios.post('/technicians/assign',{ request_id });
-export const getTechnicianById = id => axios.get(`/technicians/${id}`);
+export const getTechniciansByService = service =>
+  API.get(`/technicians/service/${service}`).then(r => r.data);
 
+export const getTechnicianById = id =>
+  API.get(`/technicians/${id}`).then(r => r.data);
 
+export const assignTechnician = request_id =>
+  API.post("/technicians/assign", { request_id });
 
-
+export const getTechnicians = () =>
+  API.get("/technicians").then(r => r.data);

@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
-import { getUsers } from "../services/userService";
-import { getTechnicians, addTechnician } from "../services/adminService";
+import { fetchCurrentUser } from "../../services/auth.service.jsx";
+import { assignTechnician, getTechnicians } from "../../services/technicianService";
 
 function AdminDashboard() {
   const [view, setView] = useState("users");
@@ -11,7 +11,7 @@ function AdminDashboard() {
     const fetchData = async () => {
       try {
         if (view === "users") {
-          const { data } = await getUsers();
+          const { data } = await fetchCurrentUser();
           setUsers(data);
         } else {
           const { data } = await getTechnicians();
@@ -26,7 +26,7 @@ function AdminDashboard() {
 
   const handleAddTechnician = async (tech) => {
     try {
-      await addTechnician(tech);
+      await assignTechnician(tech);
       alert(`Technician ${tech.name} added successfully`);
       const { data } = await getTechnicians();
       setTechnicians(data);

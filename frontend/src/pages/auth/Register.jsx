@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { registerUser } from "../services/userService";
+import { register } from "../../services/auth.service.jsx";
 
 function Register() {
   const [form, setForm] = useState({});
@@ -8,12 +8,12 @@ function Register() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    await registerUser(form);
+    await register(form);
     navigate("/login");
   };
 
   return (
-    <div className="container auth-box">
+    <div className="container ">
       <h2>Register</h2>
       <form onSubmit={handleSubmit}>
         {["name","email","phone","dob","city","password"].map(f => (

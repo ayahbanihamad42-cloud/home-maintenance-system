@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import AIBox from "../components/chat/AIBox";
+import AIBox from "../../src/components/chat/AIChatBox.jsx";
 import { chatWithAI } from "../services/aiService";
 
 function AIChat() {

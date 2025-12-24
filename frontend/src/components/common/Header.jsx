@@ -21,7 +21,7 @@ function Header() {
             <button onClick={handleLogout}>Logout</button>
           </>
         ) : (
-          <Link to="/">Welcome</Link>
+          <>Welcome to our Home Maintenance System</>
         )}
       </div>
     </div>

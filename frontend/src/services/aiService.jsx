@@ -1,3 +1,7 @@
-import axios from './api';
+import API from "./api";
 
-export const chatWithAI = data => axios.post('/ai/chat', data);
+export const chatWithAI = message =>
+  API.post("/ai/chat", { message }).then(r => r.data);
+
+export const getAIResponses = user_id =>
+  API.get(`/ai/${user_id}`).then(r => r.data);

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { createMaintenance } from "../../services/maintenanceService";
+import { createMaintenanceRequest } from "../../services/maintenanceService.jsx";
 
 function MaintenanceRequest() {
   const [form, setForm] = useState({
@@ -11,7 +11,6 @@ function MaintenanceRequest() {
     location: { lat: "", lng: "" }
   });
 
-  // 📍 جلب الموقع تلقائياً عند فتح الصفحة
   useEffect(() => {
     if (navigator.geolocation) {
       navigator.geolocation.getCurrentPosition(
@@ -37,7 +36,7 @@ function MaintenanceRequest() {
       alert("Please select date and time");
       return;
     }
-    await createMaintenance(form);
+    await createMaintenanceRequest(form);
     alert("Request submitted");
   };
 
@@ -84,7 +83,6 @@ function MaintenanceRequest() {
           />
         </label>
 
-        {/* عرض الإحداثيات للمستخدم */}
         <p>
           Your location: {form.location.lat} , {form.location.lng}
         </p>

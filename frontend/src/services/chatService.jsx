@@ -1,4 +1,7 @@
-import axios from './api';
+import API from "./api";
 
-export const getChatByRequest = request_id => axios.get(`/chat/${request_id}`);
-export const sendMessage = data => axios.post('/chat', data);
+export const getChatMessages = request_id =>
+  API.get(`/chat/request/${request_id}`).then(r => r.data);
+
+export const sendChatMessage = data =>
+  API.post("/chat", data).then(r => r.data);
