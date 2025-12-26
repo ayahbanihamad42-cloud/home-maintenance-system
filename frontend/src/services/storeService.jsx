@@ -1,11 +1,10 @@
-import axios from "axios";
+/*
+ Fetches nearby maintenance stores or companies.
+ */
 
-export const getStoreServices = async (service) => {
-  try {
-    const res = await axios.get(`/api/stores?service=${service}`);
-    return res.data; 
-  } catch (err) {
-    console.error(err);
-    return [];
-  }
+import API from "./api";
+
+export const getStoresByService = async (service) => {
+  const res = await API.get(`/stores?service=${service}`);
+  return res.data;
 };

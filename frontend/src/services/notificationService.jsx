@@ -1,7 +1,14 @@
+/*
+ Fetches and updates user notifications.
+ */
+
 import API from "./api";
 
-export const getNotifications = user_id =>
-  API.get(`/notifications/user/${user_id}`);
+export const getNotifications = async () => {
+  const res = await API.get("/notifications");
+  return res.data;
+};
 
-export const sendNotification = data =>
-  API.post("/notifications", data);
+export const markAsRead = async (id) => {
+  await API.put(`/notifications/${id}`);
+};

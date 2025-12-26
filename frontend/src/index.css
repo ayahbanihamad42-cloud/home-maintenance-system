@@ -99,7 +99,7 @@ body {
   border-radius: 8px;
    font-size: 14px;
    border: 1px solid #d1d5db;
-   background-color: #e5e7eb;
+   background-color: transparent;
 }
 
 
@@ -190,7 +190,6 @@ body {
   display: flex;
   padding: 12px;
   border-top: 1px solid #e5e7eb;
-  background-color: #ffffff;
 }
 
 .input-group input {
@@ -320,9 +319,9 @@ body {
 }
 
 .btn-login {
-  background-color:#22c55e;
-  color: #111827;
-  border: 2px solid #111827;
+  background-color: #22c55e;
+  color: white;
+  box-shadow: 0 4px 12px rgba(34, 197, 94, 0.4);
 }
 
 /* ================= HOME PAGE ================= */

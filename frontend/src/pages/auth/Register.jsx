@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { register } from "../../services/auth.service.jsx";
-
+import { Link } from "react-router-dom";
 function Register() {
   const [form, setForm] = useState({});
   const navigate = useNavigate();
@@ -27,6 +27,9 @@ function Register() {
         ))}
         <button className="primary">Register</button>
       </form>
+      <Link to="/login">
+       Already have an account? Login
+      </Link>
     </div>
   );
 }

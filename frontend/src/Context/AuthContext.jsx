@@ -1,40 +1,23 @@
-import React, { createContext, useState, useEffect } from "react";
-import axios from "axios";
+/*
+ * Global authentication state
+ * Determines role-based rendering (user / technician)
+ */
 
-export const UserContext = createContext();
+import { createContext, useState, useEffect } from "react";
+import { getUser } from "../services/auth.service";
 
-export const UserProvider = ({ children }) => {
+export const AuthContext = createContext();
+
+export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
-  const [token, setToken] = useState(null);
-  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const savedToken = localStorage.getItem("token");
-    if (savedToken) {
-      setToken(savedToken);
-      axios.get("/api/me", { headers: { Authorization: `Bearer ${savedToken}` } })
-        .then(res => setUser(res.data))
-        .finally(() => setLoading(false));
-    } else {
-      setLoading(false);
-    }
+    setUser(getUser());
   }, []);
 
-  const login = (data) => {
-    setToken(data.token);
-    setUser(data.user);
-    localStorage.setItem("token", data.token);
-  };
-
-  const logout = () => {
-    setToken(null);
-    setUser(null);
-    localStorage.removeItem("token");
-  };
-
   return (
-    <UserContext.Provider value={{ user, token, login, logout, loading }}>
+    <AuthContext.Provider value={{ user }}>
       {children}
-    </UserContext.Provider>
+    </AuthContext.Provider>
   );
 };

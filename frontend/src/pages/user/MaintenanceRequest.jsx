@@ -1,96 +1,40 @@
-import React, { useState, useEffect } from "react";
-import { createMaintenanceRequest } from "../../services/maintenanceService.jsx";
+/**
+ * MaintenanceRequest Page (Improved)
+ * --------------------------------
+ * Fetches available time slots dynamically
+ */
 
+import { useState, useEffect } from "react";
+import API from "../../services/api";
 function MaintenanceRequest() {
-  const [form, setForm] = useState({
-    service: "",
-    city: "",
-    description: "",
-    date: "",
-    time: "",
-    location: { lat: "", lng: "" }
-  });
+  const [date, setDate] = useState("");
+  const [slots, setSlots] = useState([]);
+  const [time, setTime] = useState("");
 
   useEffect(() => {
-    if (navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition(
-        position => {
-          setForm(prev => ({
-            ...prev,
-            location: {
-              lat: position.coords.latitude,
-              lng: position.coords.longitude
-            }
-          }));
-        },
-        err => {
-          console.error("Error getting location:", err);
-        }
-      );
+    if (date) {
+      API.get(`/technicians/1/availability?date=${date}`)
+        .then(res => setSlots(res.data));
     }
-  }, []);
-
-  const submit = async e => {
-    e.preventDefault();
-    if (!form.date || !form.time) {
-      alert("Please select date and time");
-      return;
-    }
-    await createMaintenanceRequest(form);
-    alert("Request submitted");
-  };
+  }, [date]);
 
   return (
     <div className="container">
       <h2>Maintenance Request</h2>
 
-      <form onSubmit={submit}>
-        <input
-          placeholder="Service"
-          onChange={e => setForm({ ...form, service: e.target.value })}
-          required
-        />
+      <input type="date" onChange={e=>setDate(e.target.value)} />
 
-        <input
-          placeholder="City"
-          onChange={e => setForm({ ...form, city: e.target.value })}
-          required
-        />
+      <select onChange={e=>setTime(e.target.value)}>
+        <option>Select time</option>
+        {slots.map(t => (
+          <option key={t}>{t}</option>
+        ))}
+      </select>
 
-        <textarea
-          placeholder="Description"
-          onChange={e => setForm({ ...form, description: e.target.value })}
-          required
-        />
-
-        <label>
-          Date:
-          <input
-            type="date"
-            value={form.date}
-            onChange={e => setForm({ ...form, date: e.target.value })}
-            required
-          />
-        </label>
-
-        <label>
-          Time:
-          <input
-            type="time"
-            value={form.time}
-            onChange={e => setForm({ ...form, time: e.target.value })}
-            required
-          />
-        </label>
-
-        <p>
-          Your location: {form.location.lat} , {form.location.lng}
-        </p>
-
-        <button className="primary" type="submit">Submit</button>
-      </form>
+      <button className="primary">Submit</button>
     </div>
   );
 }
 
 export default MaintenanceRequest;
+ 

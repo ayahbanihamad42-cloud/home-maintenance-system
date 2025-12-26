@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
-import { submitRating } from "../services/ratingService";
-import API from "../services/api";
+import { submitRating } from "../../services/ratingService";
+import API from "../../services/api";
 
 function Review() {
   const { request_id } = useParams();

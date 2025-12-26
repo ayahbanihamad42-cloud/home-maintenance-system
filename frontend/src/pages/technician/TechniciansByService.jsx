@@ -3,23 +3,34 @@ import { useParams } from "react-router-dom";
 import TechnicianCard from "../../components/cards/TechnicianCard";
 import StoreCard from "../../components/cards/StoreCard";
 import { getTechniciansByService } from "../../services/technicianService";
-import { getStoreServices } from "../../services/storeService";
+import { getStoresByService } from "../../services/storeService";
 
 function TechniciansByService() {
   const { service } = useParams();
   const [technicians, setTechnicians] = useState([]);
   const [stores, setStores] = useState([]);
   const [filter, setFilter] = useState("all");
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    getTechniciansByService(service).then(setTechnicians);
-    getStoreServices(service).then(setStores);
+    setLoading(true);
+    Promise.all([
+      getTechniciansByService(service),
+      getStoresByService(service)
+    ])
+      .then(([techs, storeList]) => {
+        setTechnicians(techs);
+        setStores(storeList);
+      })
+      .finally(() => setLoading(false));
   }, [service]);
 
   const list =
-    filter === "store" ? stores :
-    filter === "technician" ? technicians :
-    [...technicians, ...stores];
+    filter === "store"
+      ? stores
+      : filter === "technician"
+      ? technicians
+      : [...technicians, ...stores];
 
   return (
     <div className="container">
@@ -31,15 +42,21 @@ function TechniciansByService() {
         <option value="store">Stores</option>
       </select>
 
-      <div className="cards-grid">
-        {list.map(item =>
-          "technicianId" in item ? (
-            <TechnicianCard key={item.technicianId} technician={item} />
-          ) : (
-            <StoreCard key={item.storeId} store={item} />
-          )
-        )}
-      </div>
+      {loading ? (
+        <p>Loading {service} options...</p>
+      ) : list.length === 0 ? (
+        <p>No {service} options found.</p>
+      ) : (
+        <div className="cards-grid">
+          {list.map(item =>
+            "technicianId" in item ? (
+              <TechnicianCard key={item.technicianId} technician={item} />
+            ) : (
+              <StoreCard key={item.storeId} store={item} />
+            )
+          )}
+        </div>
+      )}
     </div>
   );
 }

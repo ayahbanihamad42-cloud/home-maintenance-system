@@ -1,3 +1,4 @@
+
 import React from "react";
 import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
 
@@ -6,7 +7,7 @@ import Home from "./pages/user/Home";
 import Login from "./pages/auth/Login";
 import Register from "./pages/auth/Register";
 import Profile from "./pages/user/UserProfile";
-import TechnicianProfile from "./pages/technician/TechnicianProfile";
+import TechnicianProfile from "./pages/technician/TechnicianProfile"; // <-- فقط مرة واحدة
 import TechniciansByService from "./pages/technician/TechniciansByService";
 import Welcome from "./pages/user/Welcome";
 import MaintenanceHistory from "./pages/user/MaintenanceHistory";
@@ -14,7 +15,10 @@ import MaintenanceRequest from "./pages/user/MaintenanceRequest";
 import AdminDashboard from "./pages/admin/AdminDashboard";
 import AIChat from "./pages/AIChat";
 import Chat from "./pages/Chat";
-import Review from "./pages/Review";
+import Review from "./pages/user/Review";
+import TechnicianAvailability from "./pages/technician/TechnicianAvailability";
+import TechnicianRequests from "./pages/technician/TechnicianRequests";
+import TechnicianDashboard from "./pages/technician/TechnicianDashboard";
 
 function App() {
   return (
@@ -38,6 +42,9 @@ function App() {
         <Route path="/chat" element={<Chat />} />
 
         <Route path="/review/:requestId" element={<Review />} />
+        <Route path="/technician/availability" element={<TechnicianAvailability />} />
+        <Route path="/technician/requests" element={<TechnicianRequests />} />
+        <Route path="/technician/dashboard" element={<TechnicianDashboard />} />
       </Routes>
     </Router>
   );
