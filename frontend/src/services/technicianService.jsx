@@ -1,13 +1,11 @@
-import API from "./api";
+import api from "../services/api";
 
-export const getTechniciansByService = service =>
-  API.get(`/technicians/service/${service}`).then(r => r.data);
+export const getTechnicians = async (service) => {
+  const res = await api.get(`/technicians/service/${service}`);
+  return res.data;
+};
 
-export const getTechnicianById = id =>
-  API.get(`/technicians/${id}`).then(r => r.data);
-
-export const assignTechnician = request_id =>
-  API.post("/technicians/assign", { request_id });
-
-export const getTechnicians = () =>
-  API.get("/technicians").then(r => r.data);
+export const getAvailability = async (techId) => {
+  const res = await api.get(`/technicians/${techId}/availability`);
+  return res.data;
+};

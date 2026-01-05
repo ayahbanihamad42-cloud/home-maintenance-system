@@ -2,7 +2,7 @@ import React, { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
 import TechnicianCard from "../../components/cards/TechnicianCard";
 import StoreCard from "../../components/cards/StoreCard";
-import { getTechniciansByService } from "../../services/technicianService";
+import { getTechnicians } from "../../services/technicianService";
 import { getStoresByService } from "../../services/storeService";
 
 function TechniciansByService() {
@@ -15,12 +15,19 @@ function TechniciansByService() {
   useEffect(() => {
     setLoading(true);
     Promise.all([
-      getTechniciansByService(service),
+      getTechnicians(service),
       getStoresByService(service)
     ])
       .then(([techs, storeList]) => {
+        console.log("Technicians:", techs);       // ← هنا بتشوفي الفنيين
+        console.log("Stores:", storeList);         // ← وهنا المتاجر
         setTechnicians(techs);
         setStores(storeList);
+      })
+      .catch((err) => {
+        console.error("Error fetching data:", err);
+        setTechnicians([]);
+        setStores([]);
       })
       .finally(() => setLoading(false));
   }, [service]);
@@ -36,7 +43,7 @@ function TechniciansByService() {
     <div className="container">
       <h2>{service} Options</h2>
 
-      <select value={filter} onChange={e => setFilter(e.target.value)}>
+      <select value={filter} onChange={(e) => setFilter(e.target.value)}>
         <option value="all">All</option>
         <option value="technician">Technicians</option>
         <option value="store">Stores</option>
@@ -48,7 +55,7 @@ function TechniciansByService() {
         <p>No {service} options found.</p>
       ) : (
         <div className="cards-grid">
-          {list.map(item =>
+          {list.map((item) =>
             "technicianId" in item ? (
               <TechnicianCard key={item.technicianId} technician={item} />
             ) : (

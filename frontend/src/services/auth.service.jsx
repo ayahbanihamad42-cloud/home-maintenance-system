@@ -1,68 +1,38 @@
-import API from "./api";
+import axios from "./api"; // ملف api.js موجود عندك
 
-/* ================= TOKEN ================= */
+// حفظ واسترجاع التوكن واليوزر
+export const setToken = (token) => localStorage.setItem("token", token);
+export const getToken = () => localStorage.getItem("token");
+export const removeToken = () => localStorage.removeItem("token");
 
-export const setToken = (token) => {
-  localStorage.setItem("token", token);
-};
-
-export const getToken = () => {
-  return localStorage.getItem("token");
-};
-
-export const removeToken = () => {
-  localStorage.removeItem("token");
-};
-
-/* ================= USER ================= */
-
-export const setUser = (user) => {
-  localStorage.setItem("user", JSON.stringify(user));
-};
-
+export const setUser = (user) => localStorage.setItem("user", JSON.stringify(user));
 export const getUser = () => {
   const user = localStorage.getItem("user");
   return user ? JSON.parse(user) : null;
 };
+export const removeUser = () => localStorage.removeItem("user");
 
-export const removeUser = () => {
-  localStorage.removeItem("user");
-};
-
-/* ================= AUTH ================= */
-
-// ✅ LOGIN
-export const login = async (email, password) => {
-  const res = await API.post("/auth/login", { email, password });
-
+// LOGIN
+export const login = async ({ email, password }) => {
+  const res = await axios.post("/auth/login", { email, password });
   setToken(res.data.token);
   setUser(res.data.user);
-
-  return res.data.user;
+  return res.data; // { user, token }
 };
 
-// ✅ REGISTER  ←←← هذا الناقص
+// REGISTER
 export const register = async (data) => {
-  const res = await API.post("/auth/register", data);
-
-  // إذا الباك برجع token مباشرة
+  const res = await axios.post("/auth/register", data);
   if (res.data.token) {
     setToken(res.data.token);
     setUser(res.data.user);
   }
-
   return res.data;
 };
 
-// ✅ LOGOUT
+
+// LOGOUT
 export const logout = () => {
   removeToken();
   removeUser();
-};
-
-// ✅ CURRENT USER (للأدمن)
-export const fetchCurrentUser = async () => {
-  const res = await API.get("/auth/me");
-  setUser(res.data);
-  return res.data;
 };

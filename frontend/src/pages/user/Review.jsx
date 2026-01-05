@@ -1,78 +1,43 @@
 import React, { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
-import { submitRating } from "../../services/ratingService";
-import API from "../../services/api";
+import { getRequestById } from "../../services/maintenanceService";
 
-function Review() {
-  const { request_id } = useParams();
-
-  const [request, setRequest] = useState(null);
-  const [rating, setRating] = useState(0);
-  const [comment, setComment] = useState("");
+function ReviewRequest() {
+  const { id } = useParams();
+  const [req, setReq] = useState(null);
 
   useEffect(() => {
-    API.get(`/maintenance/${request_id}`)
-      .then(res => setRequest(res.data));
-  }, [request_id]);
+    getRequestById(id).then(data => setReq(data));
+  }, [id]);
 
-  const submit = async () => {
-    if (!rating) {
-      alert("Please select rating");
-      return;
-    }
-
-    await submitRating({
-      request_id,
-      technician_id: request.technician_id,
-      rating,
-      comment
-    });
-
-    alert("Review submitted");
-  };
-
-  if (!request) return null;
+  if (!req) return <p>Loading...</p>;
 
   return (
     <div className="container">
-      <h2>Review Service</h2>
-
-      {/* 📦 REQUEST SUMMARY */}
-      <div className="card summary-box">
-        <h3>Request Summary</h3>
-        <p><b>Service:</b> {request.service}</p>
-        <p><b>City:</b> {request.city}</p>
-        <p><b>Technician:</b> {request.technician_name}</p>
-        <p><b>Description:</b> {request.description}</p>
-      </div>
-
-      {/* ⭐ RATING BOX */}
-      <div className="card rating-box">
-        <h3>Your Rating</h3>
-
-        <div className="stars">
-          {[1,2,3,4,5].map(star => (
-            <span
-              key={star}
-              className={star <= rating ? "star active" : "star"}
-              onClick={() => setRating(star)}
-            >
-              ★
-            </span>
-          ))}
+      <div className="glass-card">
+        <h3>Request ID: #{req.id}</h3>
+        <p><b>Service Type:</b> {req.service}</p>
+        
+        <div style={{ display: 'flex', alignItems: 'center', background: '#cfd8dc', padding: '10px', borderRadius: '10px', margin: '15px 0' }}>
+          <span style={{ flex: 1 }}>👤 Technician: Ahmed Hassan</span>
+          <button className="primary-btn" style={{ padding: '5px 15px' }}>Chat</button>
         </div>
 
-        <textarea
-          placeholder="Write your feedback"
-          onChange={e => setComment(e.target.value)}
-        />
+        <div className="timeline">
+          <div className="timeline-item active">Request Accepted</div>
+          <div className="timeline-item">On The Way</div>
+          <div className="timeline-item">Service in Progress</div>
+          <div className="timeline-item">Completed</div>
+        </div>
 
-        <button className="primary" onClick={submit}>
-          Submit Review
-        </button>
+        <div style={{ textAlign: 'center', marginTop: '20px' }}>
+          <p>Rate your experience:</p>
+          <div style={{ fontSize: '25px', color: '#f1c40f' }}>⭐⭐⭐⭐⭐</div>
+          <textarea placeholder="Leave a comment..." style={{ width: '100%', marginTop: '10px', borderRadius: '10px', padding: '10px' }} />
+          <button className="primary-btn" style={{ width: '100%', marginTop: '10px' }}>Submit Review</button>
+        </div>
       </div>
     </div>
   );
 }
-
-export default Review;
+export default ReviewRequest;

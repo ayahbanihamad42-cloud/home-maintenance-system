@@ -21,3 +21,18 @@
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
+# backend (important)
+backend/node_modules/
+frontend/node_modules/
+
+# env (all)
+.env
+backend/.env
+frontend/.env
+
+# editor
+.vscode/
+
+# local sql files
+*.sql
+ayah.session.sql

@@ -12,14 +12,14 @@ function TechnicianCard({ technician }) {
 
       <button
         className="primary"
-        onClick={() => navigate(`/request/${technician.id}`)}
+        onClick={() => navigate(`/request/${technician.technicianId}`)}
       >
         Booking
       </button>
 
       <button
         className="secondary"
-        onClick={() => navigate(`/technician/${technician.id}`)}
+        onClick={() => navigate(`/technician/${technician.technicianId}`)}
       >
         View Profile
       </button>

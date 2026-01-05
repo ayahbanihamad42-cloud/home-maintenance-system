@@ -1,5 +1,6 @@
 import React from "react";
 import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
+
 import Login from "./pages/auth/Login.jsx";
 import Register from "./pages/auth/Register.jsx";
 import Home from "./pages/user/Home.jsx";
@@ -30,8 +31,10 @@ function App() {
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
 
-        <Route path="/technician/:technicianId" element={<TechnicianProfile />} />
+        {/* الفنيين حسب الخدمة */}
         <Route path="/services/:service" element={<TechniciansByService />} />
+        {/* بروفايل الفني */}
+        <Route path="/technician/:technicianId" element={<TechnicianProfile />} />
 
         <Route path="/admin" element={<AdminDashboard />} />
 

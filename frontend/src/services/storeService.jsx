@@ -1,7 +1,3 @@
-/*
- Fetches nearby maintenance stores or companies.
- */
-
 import API from "./api";
 
 export const getStoresByService = async (service) => {

@@ -1,6 +1,6 @@
 /*
- * Central place to configure API base URL
- * and attach Authorization token automatically.
+  Central place to configure API base URL
+ and attach Authorization token automatically.
  */
 
 import axios from "axios";

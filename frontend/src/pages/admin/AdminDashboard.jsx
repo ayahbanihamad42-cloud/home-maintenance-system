@@ -1,50 +1,59 @@
 import React, { useEffect, useState } from "react";
-import { fetchCurrentUser } from "../../services/auth.service.jsx";
-import { assignTechnician, getTechnicians } from "../../services/technicianService";
+import { getUser, getToken } from "../../services/auth.service.jsx"; // ملف auth.service.js
+import { getAvailability,getTechnicians } from "../../services/technicianService.jsx";
+import axios from "axios";
+import { useNavigate } from "react-router-dom";
 
 function AdminDashboard() {
-  const [view, setView] = useState("users");
+  const [view, setView] = useState("users"); // "users" أو "technicians"
   const [users, setUsers] = useState([]);
   const [technicians, setTechnicians] = useState([]);
+  const navigate = useNavigate();
 
+  const API = axios.create({
+    baseURL: "http://localhost:5000/api",
+    headers: {
+      Authorization: `Bearer ${getToken()}`,
+    },
+  });
+
+  // جلب البيانات من الباك
   useEffect(() => {
     const fetchData = async () => {
       try {
         if (view === "users") {
-          const { data } = await fetchCurrentUser();
-          setUsers(data);
+          const res = await API.get("/users"); // Endpoint الباك لجلب المستخدمين
+          setUsers(res.data);
         } else {
-          const { data } = await getTechnicians();
+          const data = await getTechnicians();
           setTechnicians(data);
         }
       } catch (error) {
-        alert(error.message);
+        alert(error.response?.data?.message || error.message);
       }
     };
     fetchData();
   }, [view]);
 
-  const handleAddTechnician = async (tech) => {
+  // إضافة فني لطلب
+  const handleAddTechnician = async (technician) => {
     try {
-      await assignTechnician(tech);
-      alert(`Technician ${tech.name} added successfully`);
-      const { data } = await getTechnicians();
+      await getTechnicians(technician.id); // افترضنا assignTechnician يستقبل ID
+      alert(`Technician ${technician.name} added successfully`);
+      const data = await getTechnicians();
       setTechnicians(data);
     } catch (error) {
-      alert(error.message);
+      alert(error.response?.data?.message || error.message);
     }
   };
 
   return (
     <div className="container">
       <h2>Admin Dashboard</h2>
+
       <div style={{ marginBottom: "20px" }}>
-        <button className="primary" onClick={() => setView("users")}>
-          Manage Users
-        </button>
-        <button className="secondary" onClick={() => setView("technicians")}>
-          Manage Technicians
-        </button>
+        <button className="primary" onClick={() => setView("users")}>Manage Users</button>
+        <button className="secondary" onClick={() => setView("technicians")}>Manage Technicians</button>
       </div>
 
       {view === "users" ? (
@@ -55,19 +64,14 @@ function AdminDashboard() {
             </tr>
           </thead>
           <tbody>
-            {users.map((u) => (
+            {users.map(u => (
               <tr key={u.id}>
                 <td>{u.name}</td>
                 <td>{u.email}</td>
                 <td>{u.phone}</td>
                 <td>{u.city}</td>
                 <td>
-                  <button
-                    className="primary"
-                    onClick={() => alert(`View ${u.name} Profile`)}
-                  >
-                    View Profile
-                  </button>
+                  <button onClick={() => navigate(`/profile/${u.id}`)}>View Profile</button>
                 </td>
               </tr>
             ))}
@@ -81,19 +85,14 @@ function AdminDashboard() {
             </tr>
           </thead>
           <tbody>
-            {technicians.map((t) => (
+            {technicians.map(t => (
               <tr key={t.id}>
                 <td>{t.name}</td>
                 <td>{t.email}</td>
                 <td>{t.phone}</td>
                 <td>{t.city}</td>
                 <td>
-                  <button
-                    className="primary"
-                    onClick={() => handleAddTechnician(t)}
-                  >
-                    Add
-                  </button>
+                  <button onClick={() => handleAddTechnician(t)}>Add</button>
                 </td>
               </tr>
             ))}
