@@ -1,0 +1,11 @@
+import express from "express";
+import * as notif from "../controllers/notificationController.js";
+import auth from "../utils/authMiddleware.js";
+
+const router = express.Router();
+
+router.get("/", auth, notif.getUserNotifications);
+
+router.put("/:id", auth, notif.markAsRead);
+
+export default router;
