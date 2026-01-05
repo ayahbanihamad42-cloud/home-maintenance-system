@@ -17,31 +17,60 @@ body {
 
 /* ================= NAVBAR ================= */
 .navbar {
-  background: rgba(255, 255, 255, 0.7); 
-  padding: 20px 32px;
+  background: #cfe0ea; 
+  padding: 14px 32px;
+  justify-content: space-between;
   display: flex;
   align-items: center;
-  border-radius: 12px;
+  border-radius: 0;
+  border-bottom: 1px solid #b7c9d6;
+}
+navbar-brand {
+  font-weight: 700;
+  color: #0f4c5c;
+  font-size: 20px;
 }
 
+.navbar-links {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+}
 .navbar a {
-  color: #111827; 
-  margin-right: 20px;
+    color: #0f4c5c; 
   text-decoration: none;
   font-weight: 500;
 }
 
 .navbar button {
-  background: #ef4444;
-  color: #fff;
-  border: none;
+  
   padding: 8px 14px;
   border-radius: 6px;
   cursor: pointer;
+  color: #0f4c5c; 
+  text-decoration: none;
+  font-weight: 500;
 }
-
-.navbar button:hover {
-  background: #dc2626;
+.navbar-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.icon-button {
+  background: transparent;
+  border: none;
+  
+  font-size: 20px;
+  cursor: pointer;
+  color: #0f4c5c;
+}
+.logout-btn {
+  background: #0f4c5c;
+  color: #fff;
+  border: none;
+  padding: 8px 14px;
+  border-radius: 8px;
+  cursor: pointer;
 }
 
 
@@ -91,9 +120,6 @@ body {
 
 .input-group input,
 .input-group textarea,
-.input-group select 
-  .input-group input,
-.input-group textarea,
 .input-group select {
   padding: 12px; 
   border-radius: 8px;
@@ -102,6 +128,44 @@ body {
    background-color: transparent;
 }
 
+.section-title {
+  font-size: 22px;
+  margin-bottom: 20px;
+  color: #0f4c5c;
+}
+
+.panel {
+  background: #ffffff;
+  border-radius: 16px;
+  padding: 20px;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.08);
+}
+
+.dashboard-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 16px;
+  margin-top: 16px;
+}
+
+.dashboard-card {
+  padding: 18px;
+  border-radius: 14px;
+  background: #f8fafc;
+  border: 1px solid #e5e7eb;
+}
+
+.dashboard-card h4 {
+  margin: 0 0 12px;
+  color: #0f4c5c;
+}
+
+.dashboard-actions {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-top: 16px;
+}
 
 .chat-container {
   max-width: 600px;

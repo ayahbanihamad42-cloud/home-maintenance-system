@@ -5,8 +5,8 @@
 
 import API from "./api";
 
-export const getChatMessages = async (request_id) => {
-  const res = await API.get(`/chat/${request_id}`);
+export const getChatMessages = async (userId) => {
+  const res = await API.get(`/chat/${userId}`);
   return res.data;
 };
 

@@ -6,7 +6,7 @@
 
 import { useState } from "react";
 import API from "../../services/api";
-
+import Header from "../../components/common/Header";
 function TechnicianAvailability() {
   const [form, setForm] = useState({
     day: "",
@@ -24,16 +24,31 @@ function TechnicianAvailability() {
   };
 
   return (
-    <div className="container">
-      <h2>Set Availability</h2>
+    <>
+      <Header />
+      <div className="container">
+        <h2 className="section-title">Set Availability</h2>
 
-      <input type="date" onChange={e=>setForm({...form,day:e.target.value})}/>
-      <input type="time" onChange={e=>setForm({...form,start_time:e.target.value})}/>
-      <input type="time" onChange={e=>setForm({...form,end_time:e.target.value})}/>
+        <div className="panel">
+          <div className="input-group">
+            <label>Date</label>
+            <input type="date" onChange={e=>setForm({...form,day:e.target.value})}/>
+          </div>
+          <div className="input-group">
+            <label>Start Time</label>
+            <input type="time" onChange={e=>setForm({...form,start_time:e.target.value})}/>
+          </div>
+          <div className="input-group">
+            <label>End Time</label>
+            <input type="time" onChange={e=>setForm({...form,end_time:e.target.value})}/>
+          </div>
 
-      <button className="primary" onClick={submit}>Save</button>
-    </div>
+          <button className="primary" onClick={submit}>Save</button>
+        </div>
+      </div>
+    </>
   );
 }
+
 
 export default TechnicianAvailability;

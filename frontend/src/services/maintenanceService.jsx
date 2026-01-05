@@ -9,8 +9,8 @@ export const createMaintenanceRequest = async (data) => {
   return res.data;
 };
 
-export const getUserRequests = async (userId) => {
-  const res = await API.get(`/maintenance/user/${userId}`);
+export const getUserRequests = async () => {
+  const res = await API.get("/maintenance/my");
   return res.data;
 };
 

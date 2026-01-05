@@ -1,6 +1,3 @@
-import React from "react";
-import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
-
 import Login from "./pages/auth/Login.jsx";
 import Register from "./pages/auth/Register.jsx";
 import Home from "./pages/user/Home.jsx";
@@ -17,6 +14,7 @@ import Review from "./pages/user/Review.jsx";
 import TechnicianAvailability from "./pages/technician/TechnicianAvailability.jsx";
 import TechnicianRequests from "./pages/technician/TechnicianRequests.jsx";
 import TechnicianDashboard from "./pages/technician/TechnicianDashboard.jsx";
+import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
 
 function App() {
   return (
@@ -27,6 +25,7 @@ function App() {
         <Route path="/profile" element={<Profile />} />
         <Route path="/history" element={<MaintenanceHistory />} />
         <Route path="/request" element={<MaintenanceRequest />} />
+        <Route path="/request/:technicianId" element={<MaintenanceRequest />} />
 
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
@@ -39,7 +38,7 @@ function App() {
         <Route path="/admin" element={<AdminDashboard />} />
 
         <Route path="/ai-chat" element={<AIChat />} />
-        <Route path="/chat" element={<Chat />} />
+        <Route path="/chat/:userId" element={<Chat />} />
 
         <Route path="/review/:requestId" element={<Review />} />
         <Route path="/technician/availability" element={<TechnicianAvailability />} />

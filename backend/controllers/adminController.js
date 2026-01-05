@@ -8,10 +8,11 @@ export const getAllUsers = (req, res) => {
 };
 
 export const getAllTechnicians = (req, res) => {
-    const q = `SELECT u.id, u.name, t.service, t.experience FROM users u 
+    const q = `SELECT t.id AS technicianId, u.id AS userId, u.name, u.email, u.phone, u.city, t.service, t.experience FROM users u 
                JOIN technicians t ON u.id = t.user_id`;
     db.query(q, (e, r) => {
         if (e) return res.status(500).json(e);
         res.json(r || []);
     });
+
 };

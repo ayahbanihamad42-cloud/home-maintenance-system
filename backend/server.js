@@ -1,5 +1,16 @@
 import dotenv from "dotenv";
-dotenv.config();
+import path from "path";
+import { fileURLToPath } from "url";
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+// اقرأ .env من داخل backend دائمًا
+dotenv.config({ path: path.join(__dirname, ".env") });
+
+// اختبار سريع
+console.log("DB_USER =", process.env.DB_USER);
+console.log("HAS_DB_PASSWORD =", !!process.env.DB_PASSWORD);
 
 import app from "./app.js";
 

@@ -1,6 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { getUser, getToken } from "../../services/auth.service.jsx"; // ملف auth.service.js
-import { getAvailability,getTechnicians } from "../../services/technicianService.jsx";
+import { getToken } from "../../services/auth.service.jsx";
 import axios from "axios";
 import { useNavigate } from "react-router-dom";
 
@@ -22,10 +21,11 @@ function AdminDashboard() {
     const fetchData = async () => {
       try {
         if (view === "users") {
-          const res = await API.get("/users"); // Endpoint الباك لجلب المستخدمين
+          const res = await API.get("/admin/users");
           setUsers(res.data);
         } else {
-          const data = await getTechnicians();
+          const res = await API.get("/admin/technicians");
+          const data = res.data;
           setTechnicians(data);
         }
       } catch (error) {
@@ -35,17 +35,6 @@ function AdminDashboard() {
     fetchData();
   }, [view]);
 
-  // إضافة فني لطلب
-  const handleAddTechnician = async (technician) => {
-    try {
-      await getTechnicians(technician.id); // افترضنا assignTechnician يستقبل ID
-      alert(`Technician ${technician.name} added successfully`);
-      const data = await getTechnicians();
-      setTechnicians(data);
-    } catch (error) {
-      alert(error.response?.data?.message || error.message);
-    }
-  };
 
   return (
     <div className="container">
@@ -81,19 +70,17 @@ function AdminDashboard() {
         <table className="card" style={{ width: "100%" }}>
           <thead>
             <tr>
-              <th>Name</th><th>Email</th><th>Phone</th><th>City</th><th>Actions</th>
-            </tr>
+            <th>Name</th><th>Email</th><th>Phone</th><th>City</th><th>Service</th><th>Experience</th>            </tr>
           </thead>
           <tbody>
             {technicians.map(t => (
-              <tr key={t.id}>
+              <tr key={t.technicianId}>
                 <td>{t.name}</td>
                 <td>{t.email}</td>
                 <td>{t.phone}</td>
                 <td>{t.city}</td>
-                <td>
-                  <button onClick={() => handleAddTechnician(t)}>Add</button>
-                </td>
+                <td>{t.service}</td>
+                <td>{t.experience} yrs</td>
               </tr>
             ))}
           </tbody>

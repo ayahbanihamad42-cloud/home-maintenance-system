@@ -6,7 +6,7 @@ const router = express.Router();
 // User
 router.post("/", auth, ctrl.createRequest);
 router.get("/my", auth, ctrl.getHistory);
-
+router.get("/:id", auth, ctrl.getRequestById);
 
 
 export default router;

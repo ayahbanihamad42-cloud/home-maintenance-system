@@ -6,7 +6,10 @@ CREATE TABLE users (
     dob DATE,
     city VARCHAR(50),
     password VARCHAR(255) NOT NULL,
-    role ENUM('user', 'technician', 'admin', 'store_owner') DEFAULT 'user'
+    role ENUM('user', 'technician', 'admin', 'store_owner') DEFAULT 'user',
+    is_verified BOOLEAN DEFAULT TRUE,
+    verification_token VARCHAR(255),
+    reset_token VARCHAR(255)
 );
 
 CREATE TABLE technicians (
@@ -33,8 +36,10 @@ CREATE TABLE maintenance_requests (
     technician_id INT,
     description TEXT,
     city VARCHAR(50),
+    service VARCHAR(50),
     scheduled_date DATE,
     scheduled_time TIME,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     status ENUM('pending', 'confirmed', 'completed') DEFAULT 'pending',
     FOREIGN KEY (user_id) REFERENCES users(id),
     FOREIGN KEY (technician_id) REFERENCES technicians(id)
@@ -46,4 +51,33 @@ CREATE TABLE stores (
     category VARCHAR(50),
     city VARCHAR(50),
     address TEXT
+);
+CREATE TABLE messages (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    sender_id INT,
+    receiver_id INT,
+    message TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (sender_id) REFERENCES users(id),
+    FOREIGN KEY (receiver_id) REFERENCES users(id)
+);
+
+CREATE TABLE notifications (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    user_id INT,
+    message TEXT,
+    is_read BOOLEAN DEFAULT FALSE,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES users(id)
+);
+
+CREATE TABLE ratings (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    user_id INT,
+    technician_id INT,
+    rating INT NOT NULL,
+    comment TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES users(id),
+    FOREIGN KEY (technician_id) REFERENCES technicians(id)
 );

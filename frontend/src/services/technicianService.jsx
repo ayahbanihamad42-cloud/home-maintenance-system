@@ -5,7 +5,9 @@ export const getTechnicians = async (service) => {
   return res.data;
 };
 
-export const getAvailability = async (techId) => {
-  const res = await api.get(`/technicians/${techId}/availability`);
-  return res.data;
+export const getAvailability = async (techId, date) => {
+  const res = await api.get(`/technicians/${techId}/availability`, {
+    params: { date }
+  });
+    return res.data;
 };

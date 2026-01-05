@@ -17,15 +17,18 @@ function TechnicianRequests() {
 
   return (
     <div className="container">
-      <h2>Assigned Requests</h2>
-
-      {requests.map(r => (
-        <div key={r.id} className="card">
-          <p><b>Service:</b> {r.service}</p>
-          <p><b>Status:</b> {r.status}</p>
-        </div>
-      ))}
-    </div>
+      <h2 className="section-title">Assigned Requests</h2>
+      <div className="panel">
+        {requests.map(r => (
+          <div key={r.id} className="card">
+            <p><b>Service:</b> {r.service}</p>
+            <p><b>Status:</b> {r.status}</p>
+            <p><b>Date:</b> {r.scheduled_date}</p>
+            <p><b>Time:</b> {r.scheduled_time}</p>
+          </div>
+        ))}
+      </div>
+      </div>
   );
 }
 
