@@ -17,7 +17,7 @@ function Home() {
   ];
 
   return (
-    <div className="home-container">
+    <>
       <Header /> {/* ← الهيدر يظهر فوق الصفحة */}
 
       <h2 className="home-title">Welcome to our services:</h2>
@@ -35,7 +35,7 @@ function Home() {
           </div>
         ))}
       </div>
-    </div>
+    </>
   );
 }
 

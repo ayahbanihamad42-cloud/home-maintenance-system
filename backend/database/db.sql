@@ -39,8 +39,8 @@ CREATE TABLE maintenance_requests (
     service VARCHAR(50),
     scheduled_date DATE,
     scheduled_time TIME,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     status ENUM('pending', 'confirmed', 'completed') DEFAULT 'pending',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (user_id) REFERENCES users(id),
     FOREIGN KEY (technician_id) REFERENCES technicians(id)
 );
@@ -52,6 +52,7 @@ CREATE TABLE stores (
     city VARCHAR(50),
     address TEXT
 );
+
 CREATE TABLE messages (
     id INT AUTO_INCREMENT PRIMARY KEY,
     sender_id INT,

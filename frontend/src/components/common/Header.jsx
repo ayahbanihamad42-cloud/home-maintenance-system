@@ -12,18 +12,25 @@ function Header() {
 
   return (
     <div className="navbar">
-      <div>
-        {user ? (
-          <>
+      <div className="navbar-brand">Maintenance System</div>
+      {user ? (
+        <>
+          <div className="navbar-links">
             <Link to="/home">Home</Link>
+            <Link to="/history">Requests History</Link>
             <Link to="/profile">Profile</Link>
-            <Link to="/history">History</Link>
-            <button onClick={handleLogout}>Logout</button>
-          </>
-        ) : (
-          <>Welcome to our Home Maintenance System</>
-        )}
-      </div>
+            <Link to="/ai-chat">AI Assistant</Link>
+          </div>
+          <div className="navbar-actions">
+            <button className="icon-button" type="button" aria-label="Notifications">
+              🔔
+            </button>
+            <button className="logout-btn" onClick={handleLogout}>Log Out</button>
+          </div>
+        </>
+      ) : (
+        <div className="navbar-links">Welcome to our Home Maintenance System</div>
+      )}
     </div>
   );
 }

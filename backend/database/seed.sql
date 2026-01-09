@@ -1,39 +1,53 @@
-INSERT INTO users (name, email, phone, dob, city, password, role, is_verified)
+INSERT INTO users (name, email, phone, dob, city, password, role)
 VALUES
-  ('Ahmad Saleh', 'ahmad@example.com', '0501111111', '1992-04-12', 'Riyadh', '$2b$10$RKSvUdDzEbTp6LF9Uvi9TuAp7DUh0V1gQhNGfVnLhePTJpkFPXV3u', 'user', TRUE),
-  ('Laila Hassan', 'laila@example.com', '0502222222', '1995-08-25', 'Jeddah', '$2b$10$RKSvUdDzEbTp6LF9Uvi9TuAp7DUh0V1gQhNGfVnLhePTJpkFPXV3u', 'user', TRUE),
-  ('Omar Technician', 'omar.tech@example.com', '0503333333', '1988-01-10', 'Riyadh', '$2b$10$RKSvUdDzEbTp6LF9Uvi9TuAp7DUh0V1gQhNGfVnLhePTJpkFPXV3u', 'technician', TRUE),
-  ('Sara Admin', 'admin@example.com', '0504444444', '1985-06-20', 'Dammam', '$2b$10$RKSvUdDzEbTp6LF9Uvi9TuAp7DUh0V1gQhNGfVnLhePTJpkFPXV3u', 'admin', TRUE);
+('Ahmad Khaled', 'ahmad@gmail.com', '0791234567', '1998-05-10', 'Amman', 'password123', 'user'),
+('Lina Saleh', 'lina@gmail.com', '0789876543', '2000-03-22', 'Irbid', 'password123', 'user'),
+('Omar Hassan', 'omar@gmail.com', '0775554433', '1995-11-15', 'Zarqa', 'password123', 'technician'),
+('Rana Ali', 'rana@gmail.com', '0793332211', '1999-07-01', 'Salt', 'password123', 'technician'),
+('Admin User', 'admin@gmail.com', '0790001111', '1990-01-01', 'Amman', 'adminpass', 'admin');
 
+-- TECHNICIANS
 INSERT INTO technicians (user_id, service, experience)
 VALUES
-  (3, 'Electrical', 7);
+(3, 'Electrical', 5),
+(4, 'Plumbing', 3);
 
-INSERT INTO technician_availability (technician_id, available_date, start_time, end_time, is_booked)
+-- TECHNICIAN AVAILABILITY
+INSERT INTO technician_availability (technician_id, available_date, start_time, end_time)
 VALUES
-  (1, '2024-06-20', '09:00:00', '11:00:00', FALSE),
-  (1, '2024-06-20', '13:00:00', '15:00:00', FALSE);
+(1, '2026-01-10', '09:00:00', '13:00:00'),
+(1, '2026-01-11', '10:00:00', '15:00:00'),
+(2, '2026-01-10', '08:00:00', '12:00:00');
 
-INSERT INTO maintenance_requests (user_id, technician_id, description, city, service, scheduled_date, scheduled_time, status)
+-- MAINTENANCE REQUESTS
+INSERT INTO maintenance_requests
+(user_id, technician_id, description, city, service, scheduled_date, scheduled_time, status)
 VALUES
-  (1, 1, 'Fix kitchen lights', 'Riyadh', 'Electrical', '2024-06-20', '09:00:00', 'pending');
+(1, 1, 'Fix electrical wiring in living room', 'Amman', 'Electrical', '2026-01-10', '10:00:00', 'confirmed'),
+(2, 2, 'Water leakage in kitchen sink', 'Irbid', 'Plumbing', '2026-01-10', '09:00:00', 'pending');
 
+-- STORES
 INSERT INTO stores (store_name, category, city, address)
 VALUES
-  ('Al Noor Supplies', 'Electrical', 'Riyadh', 'King Fahd Road'),
-  ('Home Decor Hub', 'Decoration', 'Jeddah', 'Corniche Street');
+('Amman Tools', 'Hardware', 'Amman', 'Gardens Street'),
+('Irbid Home Store', 'Plumbing Supplies', 'Irbid', 'University Street'),
+('Zarqa Electric', 'Electrical Supplies', 'Zarqa', 'Main Market'),
+('Aqaba Builders', 'Construction', 'Aqaba', 'Port Area');
 
-INSERT INTO ratings (user_id, technician_id, rating, comment)
-VALUES
-  (1, 1, 5, 'Very professional and fast.'),
-  (2, 1, 4, 'Good work but arrived late.');
-
+-- MESSAGES
 INSERT INTO messages (sender_id, receiver_id, message)
 VALUES
-  (1, 3, 'Hello, can you come earlier?'),
-  (3, 1, 'Sure, I can arrive 30 minutes earlier.');
+(1, 3, 'Hello, are you available tomorrow?'),
+(3, 1, 'Yes, I am available from 10 AM.');
 
-INSERT INTO notifications (user_id, message, is_read)
+-- NOTIFICATIONS
+INSERT INTO notifications (user_id, message)
 VALUES
-  (1, 'Your request has been received.', FALSE),
-  (1, 'Technician assigned: Omar Technician.', FALSE);
+(1, 'Your maintenance request has been confirmed.'),
+(3, 'You have a new maintenance request.');
+
+-- RATINGS
+INSERT INTO ratings (user_id, technician_id, rating, comment)
+VALUES
+(1, 1, 5, 'Very professional and fast service'),
+(2, 2, 4, 'Good work but arrived late');

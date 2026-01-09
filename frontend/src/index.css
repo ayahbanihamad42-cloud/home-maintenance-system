@@ -19,13 +19,14 @@ body {
 .navbar {
   background: #cfe0ea; 
   padding: 14px 32px;
-  justify-content: space-between;
   display: flex;
+  justify-content: space-between;
   align-items: center;
   border-radius: 0;
   border-bottom: 1px solid #b7c9d6;
 }
-navbar-brand {
+
+.navbar-brand {
   font-weight: 700;
   color: #0f4c5c;
   font-size: 20px;
@@ -36,6 +37,7 @@ navbar-brand {
   align-items: center;
   gap: 18px;
 }
+
 .navbar a {
     color: #0f4c5c; 
   text-decoration: none;
@@ -66,7 +68,7 @@ navbar-brand {
 }
 .logout-btn {
   background: #0f4c5c;
-  color: #fff;
+  color: #0a0a0a;
   border: none;
   padding: 8px 14px;
   border-radius: 8px;

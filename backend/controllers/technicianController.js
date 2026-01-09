@@ -1,5 +1,19 @@
 import db from "../database/connection.js";
+
+
 export const getTechniciansByService = (req, res) => {
+  const { service } = req.params;
+
+  const q = `
+    SELECT 
+      t.id AS technicianId, 
+      u.name, 
+      t.service, 
+      t.experience
+    FROM technicians t
+    JOIN users u ON t.user_id = u.id
+    WHERE LOWER(t.service) = LOWER(?)
+  `;
 
   db.query(q, [service], (err, rows) => {
     if (err) return res.status(500).json(err);
@@ -59,6 +73,27 @@ export const getTechnicianProfile = (req, res) => {
   `;
 
   db.query(q, [id], (err, rows) => {
+    if (err) return res.status(500).json(err);
+    if (!rows.length) return res.status(404).json({ message: "Technician not found" });
+    res.json(rows[0]);
+  });
+};
+
+export const getTechnicianByUserId = (req, res) => {
+  const { userId } = req.params;
+  const q = `
+    SELECT 
+      t.id AS technicianId,
+      t.user_id,
+      u.name,
+      t.service,
+      t.experience
+    FROM technicians t
+    JOIN users u ON t.user_id = u.id
+    WHERE t.user_id = ?
+  `;
+
+  db.query(q, [userId], (err, rows) => {
     if (err) return res.status(500).json(err);
     if (!rows.length) return res.status(404).json({ message: "Technician not found" });
     res.json(rows[0]);

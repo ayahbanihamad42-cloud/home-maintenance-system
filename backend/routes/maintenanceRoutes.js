@@ -7,6 +7,8 @@ const router = express.Router();
 router.post("/", auth, ctrl.createRequest);
 router.get("/my", auth, ctrl.getHistory);
 router.get("/:id", auth, ctrl.getRequestById);
+router.patch("/:id/status", auth, ctrl.updateRequestStatus);
+
 
 
 export default router;
