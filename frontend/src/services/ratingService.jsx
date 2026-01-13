@@ -1,7 +1,3 @@
-/*
- Submits and fetches ratings for technicians.
- */
-
 import API from "./api";
 
 export const submitRating = async (data) => {
@@ -9,7 +5,7 @@ export const submitRating = async (data) => {
   return res.data;
 };
 
-export const getRatingsByTechnician = async (technicianId) => {
-  const res = await API.get(`/ratings/technician/${technicianId}`);
+export const getRatingByRequest = async (requestId) => {
+  const res = await API.get(`/ratings/request/${requestId}`);
   return res.data;
 };

@@ -1,8 +1,3 @@
-/*
- Handles communication between user and technician
- for a specific maintenance request.
- */
-
 import API from "./api";
 
 export const getChatMessages = async (userId) => {

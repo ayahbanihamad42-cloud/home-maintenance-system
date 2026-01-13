@@ -1,11 +1,5 @@
-/**
- * MaintenanceRequest Page (Improved)
- * --------------------------------
- * Fetches available time slots dynamically
- */
-
 import { useState, useEffect, useMemo } from "react";
-import { useParams,Link } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
 import Header from "../../components/common/Header";
 import { getTechnicians, getAvailability } from "../../services/technicianService";
 import { createMaintenanceRequest } from "../../services/maintenanceService";
@@ -13,6 +7,7 @@ import API from "../../services/api";
 
 function MaintenanceRequest() {
   const { technicianId: initialTechnicianId } = useParams();
+  const navigate = useNavigate();
   const [service, setService] = useState("");
   const [technicians, setTechnicians] = useState([]);
   const [technicianId, setTechnicianId] = useState(initialTechnicianId || "");
@@ -79,7 +74,7 @@ function MaintenanceRequest() {
 
   const submit = async () => {
     if (!service || !technicianId || !date || !time) return;
-    await createMaintenanceRequest({
+    const response = await createMaintenanceRequest({
       technician_id: technicianId,
       description,
       scheduled_date: date,
@@ -88,6 +83,10 @@ function MaintenanceRequest() {
       location_note: locationNote,
       city: ""
     });
+    if (response?.id) {
+      navigate(`/review/${response.id}`);
+      return;
+    }
     alert("Request submitted");
   };
 
@@ -107,7 +106,7 @@ function MaintenanceRequest() {
         ) : (
           <>
             <div className="input-group">
-              <label>Service Type:</label>
+              <label>Service Type</label>
               <select value={service} onChange={(e) => setService(e.target.value)}>
                 <option value="">Select service</option>
                 <option value="Electrical">Electrical</option>
@@ -118,7 +117,7 @@ function MaintenanceRequest() {
             </div>
 
             <div className="input-group">
-              <label>Technician:</label>
+              <label>Technician</label>
               <select value={technicianId} onChange={(e) => setTechnicianId(e.target.value)}>
                 <option value="">Select technician</option>
                 {technicians.map((tech) => (
@@ -175,7 +174,7 @@ function MaintenanceRequest() {
           </div>
         </div>
 
-        <button className="primary" onClick={submit} >Submit</button>
+        <button className="primary" onClick={submit}>Submit</button>
       </div>
     </>
   );

@@ -7,11 +7,11 @@ import "../index.css";
 function Chat() {
   const { userId } = useParams();
   const { user } = useContext(AuthContext);
-  const [messages, sendChatMessages] = useState([]);
+  const [messages, setMessages] = useState([]);
   const [text, setText] = useState("");
 
   const loadMessages = () => {
-    getChatMessages(userId).then(res => sendChatMessages(res.data));
+    getChatMessages(userId).then((data) => setMessages(data || []));
   };
 
   useEffect(() => {
@@ -22,6 +22,12 @@ function Chat() {
 
   const handleSend = async () => {
     if (!text.trim()) return;
+    const pending = {
+      sender_id: user?.id,
+      receiver_id: Number(userId),
+      message: text
+    };
+    setMessages((prev) => [...prev, pending]);
     await sendChatMessage({ receiver_id: userId, message: text });
     setText("");
     loadMessages();
@@ -29,21 +35,31 @@ function Chat() {
 
   return (
     <div className="chat-wrapper">
-      <div className="messages-container">
-        {messages.map((m, i) => (
-          <div key={i} className={`message-bubble ${m.sender_id === user.id ? "my-message" : "other-message"}`}>
-            {m.message}
+      <div className="chat-shell">
+        <div className="chat-header-bar">
+          <div className="chat-avatar">👷</div>
+          <div className="chat-title-block">
+            <h3>Technician Chat</h3>
+            <span>Online</span>
           </div>
-        ))}
-      </div>
-      <div className="chat-input-area">
-        <input 
-          placeholder="Type a message..." 
-          value={text} 
-          onChange={e => setText(e.target.value)} 
-          onKeyPress={(e) => e.key === 'Enter' && handleSend()}
-        />
-        <button className="send-btn" onClick={handleSend}>Send</button>
+        </div>
+        <div className="messages-container">
+          {messages.map((m, i) => (
+            <div key={i} className={`message-bubble ${m.sender_id === user?.id ? "my-message" : "other-message"}`}>
+              {m.message}
+            </div>
+          ))}
+        </div>
+        <div className="chat-input-area">
+          <input
+            className="chat-input"
+            placeholder="Type a message..."
+            value={text}
+            onChange={e => setText(e.target.value)}
+            onKeyPress={(e) => e.key === "Enter" && handleSend()}
+          />
+          <button className="send-btn" onClick={handleSend}>Send</button>
+        </div>
       </div>
     </div>
   );

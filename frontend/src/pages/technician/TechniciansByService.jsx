@@ -5,6 +5,7 @@ import StoreCard from "../../components/cards/StoreCard";
 import { getTechnicians } from "../../services/technicianService";
 import { getStoresByService } from "../../services/storeService";
 import Header from "../../components/common/Header";
+
 function TechniciansByService() {
   const { service } = useParams();
   const [technicians, setTechnicians] = useState([]);
@@ -19,8 +20,8 @@ function TechniciansByService() {
       getStoresByService(service)
     ])
       .then(([techs, storeList]) => {
-        console.log("Technicians:", techs);       // ← هنا بتشوفي الفنيين
-        console.log("Stores:", storeList);         // ← وهنا المتاجر
+        console.log("Technicians:", techs);
+        console.log("Stores:", storeList);
         setTechnicians(techs);
         setStores(storeList);
       })
@@ -44,11 +45,13 @@ function TechniciansByService() {
       <Header />
       <div className="container">
         <h2>{service} Options</h2>
+
         <select value={filter} onChange={(e) => setFilter(e.target.value)}>
           <option value="all">All</option>
           <option value="technician">Technicians</option>
           <option value="store">Stores</option>
         </select>
+
         {loading ? (
           <p>Loading {service} options...</p>
         ) : list.length === 0 ? (
@@ -68,4 +71,5 @@ function TechniciansByService() {
     </>
   );
 }
+
 export default TechniciansByService;

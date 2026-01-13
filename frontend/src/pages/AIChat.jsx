@@ -1,7 +1,8 @@
-import React, { useState } from "react";
+import React, {useEffect, useState } from "react";
 import { chatWithAI } from "../services/aiService";
 import Header from "../components/common/Header";
 import "../index.css";
+import aiimage from "../images/aiassistant.png";
 
 function AIChat() {
   const [messages, setMessages] = useState([
@@ -11,11 +12,9 @@ function AIChat() {
 
   const handleSend = async () => {
     if(!input) return;
-    setMessages([...messages, { role: "user", text: input }]);
     const outgoing = input;
     setMessages((prev) => [...prev, { role: "user", text: outgoing }]);
     setInput("");
-    // هنا يتم استدعاء خدمة الـ AI لاحقاً
     try {
       const response = await chatWithAI(outgoing);
       setMessages((prev) => [...prev, { role: "ai", text: response.reply }]);
@@ -25,23 +24,36 @@ function AIChat() {
   };
 
   return (
-   
     <>
       <Header />
-      <div className="container chat-screen">
-        <div style={{ flex: 1, overflowY: "auto", display: "flex", flexDirection: "column" }}>
-          {messages.map((m, i) => (
-            <div key={i} className={`chat-bubble ${m.role === "ai" ? "ai-bubble" : "user-bubble"}`}>
-              {m.text}
+      <div className="chat-wrapper">
+        <div className="chat-shell chat-shell--ai">
+          <div className="chat-header-bar">
+            <div className="chat-avatar"><img src={aiimage} alt="AI Assistant" /></div>
+            <div className="chat-title-block">
+              <h3>AI Assistant</h3>
+              <span>Always available</span>
             </div>
-          ))}
-        </div>
-        <div className="chat-input-bar">
-          <input placeholder="Ask me anything..." value={input} onChange={e => setInput(e.target.value)} />
-          <button onClick={handleSend} style={{ background: "none", border: "none", cursor: "pointer", fontSize: "20px" }}>➤</button>
+          </div>
+          <div className="messages-container">
+            {messages.map((m, i) => (
+              <div key={i} className={`message-bubble ${m.role === "ai" ? "other-message" : "my-message"}`}>
+                {m.text}
+              </div>
+            ))}
+          </div>
+          <div className="chat-input-area">
+            <input
+              className="chat-input"
+              placeholder="Ask me anything..."
+              value={input}
+              onChange={e => setInput(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && handleSend()}
+            />
+            <button className="send-btn" onClick={handleSend}>Send</button>
+          </div>
         </div>
       </div>
-      
     </>
   );
 }

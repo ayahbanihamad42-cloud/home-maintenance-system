@@ -1,16 +1,36 @@
 import React, { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
 import { getRequestById } from "../../services/maintenanceService";
+import { getRatingByRequest, submitRating } from "../../services/ratingService";
 import Header from "../../components/common/Header";
 import API from "../../services/api";
-
+import proileimage from "../../images/profileaht.png";
+<image></image>
 function ReviewRequest() {
   const { requestId } = useParams();
   const [req, setReq] = useState(null);
   const [technicianName, setTechnicianName] = useState("");
+  const [rating, setRating] = useState(5);
+  const [comment, setComment] = useState("");
+  const [submitMessage, setSubmitMessage] = useState("");
+  const [existingRating, setExistingRating] = useState(null);
 
   useEffect(() => {
     getRequestById(requestId).then(data => setReq(data));
+  }, [requestId]);
+
+  useEffect(() => {
+    getRatingByRequest(requestId)
+      .then((data) => {
+        if (data) {
+          setExistingRating(data);
+          setRating(data.rating);
+          setComment(data.comment || "");
+        }
+      })
+      .catch(() => {
+        setExistingRating(null);
+      });
   }, [requestId]);
 
   useEffect(() => {
@@ -35,7 +55,7 @@ function ReviewRequest() {
           <p><b>Description:</b> {req.description || "Not specified"}</p>
           
           <div style={{ display: 'flex', alignItems: 'center', background: '#cfd8dc', padding: '10px', borderRadius: '10px', margin: '15px 0' }}>
-            <span style={{ flex: 1 }}>👤 Technician: {technicianName || "Assigned technician"}</span>
+            <span style={{ flex: 1 }}><img src={proileimage} alt="Technician" style={{ width: '30px', height: '30px', borderRadius: '50%', marginRight: '10px' }} />Technician: {technicianName || "Assigned technician"}</span>
             <button className="primary-btn" style={{ padding: '5px 15px' }}>Chat</button>
           </div>
 
@@ -46,11 +66,51 @@ function ReviewRequest() {
             <div className="timeline-item">Completed</div>
           </div>
 
-          <div style={{ textAlign: 'center', marginTop: '20px' }}>
+          <div style={{ textAlign: "center", marginTop: "20px" }}>
             <p>Rate your experience:</p>
-            <div style={{ fontSize: '25px', color: '#f1c40f' }}>⭐⭐⭐⭐⭐</div>
-            <textarea placeholder="Leave a comment..." style={{ width: '100%', marginTop: '10px', borderRadius: '10px', padding: '10px' }} />
-            <button className="primary-btn" style={{ width: '100%', marginTop: '10px' }}>Submit Review</button>
+            <select
+              value={rating}
+              onChange={(e) => setRating(Number(e.target.value))}
+              style={{ padding: "8px", borderRadius: "8px" }}
+              disabled={Boolean(existingRating)}
+            >
+              {[5, 4, 3, 2, 1].map((value) => (
+                <option key={value} value={value}>
+                  {value} Stars
+                </option>
+              ))}
+            </select>
+            <textarea
+              placeholder="Leave a comment..."
+              value={comment}
+              onChange={(e) => setComment(e.target.value)}
+              style={{ width: "100%", marginTop: "10px", borderRadius: "10px", padding: "10px" }}
+              disabled={Boolean(existingRating)}
+            />
+            {submitMessage ? <p>{submitMessage}</p> : null}
+            <button
+              className="primary-btn"
+              style={{ width: "100%", marginTop: "10px" }}
+              disabled={Boolean(existingRating)}
+              onClick={() => {
+                if (!req?.technician_id) return;
+                submitRating({
+                  technician_id: req.technician_id,
+                  request_id: req.id,
+                  rating,
+                  comment
+                })
+                  .then(() => {
+                    setSubmitMessage("Review submitted.");
+                    setExistingRating({ rating, comment });
+                  })
+                  .catch(() => {
+                    setSubmitMessage("Failed to submit review.");
+                  });
+              }}
+            >
+              Submit Review
+            </button>
           </div>
         </div>
       </div>

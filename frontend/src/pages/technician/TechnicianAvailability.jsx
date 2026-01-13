@@ -7,6 +7,7 @@
 import { useState } from "react";
 import API from "../../services/api";
 import Header from "../../components/common/Header";
+
 function TechnicianAvailability() {
   const [form, setForm] = useState({
     day: "",
@@ -49,6 +50,5 @@ function TechnicianAvailability() {
     </>
   );
 }
-
 
 export default TechnicianAvailability;

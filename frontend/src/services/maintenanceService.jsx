@@ -1,7 +1,3 @@
-/*
-  Handles maintenance request operations for users.
- */
-
 import API from "./api";
 
 export const createMaintenanceRequest = async (data) => {

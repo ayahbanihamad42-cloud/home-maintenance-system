@@ -5,7 +5,7 @@ import electricalImg from "../../images/electrical.png";
 import paintingImg from "../../images/Painting.png";
 import decorationImg from "../../images/Decoration.png";
 import Header from "../../components/common/Header.jsx";
-
+import "../../index.css";
 function Home() {
   const navigate = useNavigate();
 
@@ -18,7 +18,7 @@ function Home() {
 
   return (
     <>
-      <Header /> {/* ← الهيدر يظهر فوق الصفحة */}
+      <Header /> 
 
       <h2 className="home-title">Welcome to our services:</h2>
 

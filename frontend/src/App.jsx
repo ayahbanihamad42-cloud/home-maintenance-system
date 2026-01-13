@@ -1,5 +1,9 @@
+import React from "react";
+import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
+
 import Login from "./pages/auth/Login.jsx";
 import Register from "./pages/auth/Register.jsx";
+import ForgotPassword from "./pages/auth/ForgotPassword.jsx";
 import Home from "./pages/user/Home.jsx";
 import Welcome from "./pages/user/Welcome.jsx";
 import Profile from "./pages/user/UserProfile.jsx";
@@ -14,7 +18,7 @@ import Review from "./pages/user/Review.jsx";
 import TechnicianAvailability from "./pages/technician/TechnicianAvailability.jsx";
 import TechnicianRequests from "./pages/technician/TechnicianRequests.jsx";
 import TechnicianDashboard from "./pages/technician/TechnicianDashboard.jsx";
-import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
+import ProtectedRoute from "./components/ProtectedRoute.jsx";
 
 function App() {
   return (
@@ -29,21 +33,48 @@ function App() {
 
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
+        <Route path="/forgot-password" element={<ForgotPassword />} />
 
-        {/* الفنيين حسب الخدمة */}
         <Route path="/services/:service" element={<TechniciansByService />} />
-        {/* بروفايل الفني */}
         <Route path="/technician/:technicianId" element={<TechnicianProfile />} />
 
-        <Route path="/admin" element={<AdminDashboard />} />
+        <Route
+          path="/admin"
+          element={
+            <ProtectedRoute allowedRoles={["admin"]}>
+              <AdminDashboard />
+            </ProtectedRoute>
+          }
+        />
 
         <Route path="/ai-chat" element={<AIChat />} />
         <Route path="/chat/:userId" element={<Chat />} />
 
         <Route path="/review/:requestId" element={<Review />} />
-        <Route path="/technician/availability" element={<TechnicianAvailability />} />
-        <Route path="/technician/requests" element={<TechnicianRequests />} />
-        <Route path="/technician/dashboard" element={<TechnicianDashboard />} />
+        <Route
+          path="/technician/availability"
+          element={
+            <ProtectedRoute allowedRoles={["technician"]}>
+              <TechnicianAvailability />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/technician/requests"
+          element={
+            <ProtectedRoute allowedRoles={["technician"]}>
+              <TechnicianRequests />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/technician/dashboard"
+          element={
+            <ProtectedRoute allowedRoles={["technician"]}>
+              <TechnicianDashboard />
+            </ProtectedRoute>
+          }
+        />
       </Routes>
     </Router>
   );

@@ -9,5 +9,5 @@ export const getAvailability = async (techId, date) => {
   const res = await api.get(`/technicians/${techId}/availability`, {
     params: { date }
   });
-    return res.data;
+  return res.data;
 };
