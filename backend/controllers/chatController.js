@@ -9,9 +9,10 @@ export const sendMessage = (req, res) => {
 };
 
 export const getMessages = (req, res) => {
-    const { chatWith } = req.params;
+    const { userId } = req.params;
     const q = "SELECT * FROM messages WHERE (sender_id=? AND receiver_id=?) OR (sender_id=? AND receiver_id=?) ORDER BY created_at ASC";
-    db.query(q, [req.user.id, chatWith, chatWith, req.user.id], (err, r) => {
+    db.query(q, [req.user.id, userId, userId, req.user.id], (err, r) => {
+        if (err) return res.status(500).json(err);
         res.json(r || []);
     });
 };

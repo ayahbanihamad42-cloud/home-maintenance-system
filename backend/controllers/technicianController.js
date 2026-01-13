@@ -1,6 +1,5 @@
 import db from "../database/connection.js";
 
-
 export const getTechniciansByService = (req, res) => {
   const { service } = req.params;
 
@@ -21,7 +20,6 @@ export const getTechniciansByService = (req, res) => {
   });
 };
 
-// جلب توفر الفني
 export const getAvailability = (req, res) => {
   const { id } = req.params;
   const { date } = req.query;

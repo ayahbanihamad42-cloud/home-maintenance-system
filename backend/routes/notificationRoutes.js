@@ -5,6 +5,7 @@ import auth from "../utils/authMiddleware.js";
 const router = express.Router();
 
 router.get("/", auth, notif.getUserNotifications);
+router.get("/feed", auth, notif.getNotificationFeed);
 
 router.put("/:id", auth, notif.markAsRead);
 

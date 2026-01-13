@@ -1,13 +1,24 @@
 import db from "../database/connection.js";
 export const createRequest = (req, res) => {
-    const { technician_id, description, scheduled_date, scheduled_time, city = null, service, location_note } = req.body;
-    const q = "INSERT INTO maintenance_requests (user_id, technician_id, description, scheduled_date, scheduled_time, city, service, location_note) VALUES (?,?,?,?,?,?,?,?)";
-    db.query(q, [req.user.id, technician_id, description, scheduled_date, scheduled_time, city, service, location_note], (err, r) => {
-        if (err) return res.status(500).json(err);
-        // تحديث الوقت المحجوز لكي لا يظهر لمستخدم آخر (اللوجيك الناقص)
-        db.query("UPDATE technician_availability SET is_booked = TRUE WHERE technician_id = ? AND available_date = ? AND start_time = ?", 
+    const { technician_id, description, scheduled_date, scheduled_time, city = null, service, location_note = null } = req.body;
+    const qWithLocation = "INSERT INTO maintenance_requests (user_id, technician_id, description, scheduled_date, scheduled_time, city, service, location_note) VALUES (?,?,?,?,?,?,?,?)";
+    const qWithoutLocation = "INSERT INTO maintenance_requests (user_id, technician_id, description, scheduled_date, scheduled_time, city, service) VALUES (?,?,?,?,?,?,?)";
+
+    const finalizeRequest = (result) => {
+        db.query("UPDATE technician_availability SET is_booked = TRUE WHERE technician_id = ? AND available_date = ? AND start_time = ?",
         [technician_id, scheduled_date, scheduled_time]);
-        res.json({ message: "Request created", id: r.insertId });
+        res.json({ message: "Request created", id: result.insertId });
+    };
+
+    db.query(qWithLocation, [req.user.id, technician_id, description, scheduled_date, scheduled_time, city, service, location_note], (err, r) => {
+        if (err && err.code === "ER_BAD_FIELD_ERROR") {
+            return db.query(qWithoutLocation, [req.user.id, technician_id, description, scheduled_date, scheduled_time, city, service], (fallbackErr, fallbackResult) => {
+                if (fallbackErr) return res.status(500).json(fallbackErr);
+                return finalizeRequest(fallbackResult);
+            });
+        }
+        if (err) return res.status(500).json(err);
+        finalizeRequest(r);
     });
 };
 

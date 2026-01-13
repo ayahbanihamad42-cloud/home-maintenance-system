@@ -12,11 +12,6 @@ import storeRoutes from "./routes/storeRoutes.js";
 import adminRoutes from "./routes/adminRoutes.js";
 import userRoutes from "./routes/userRoutes.js";
 
-
-
-
-
-
 const app = express();
 app.use(express.json());
 app.use(cors({ origin: "http://localhost:3000" }));
