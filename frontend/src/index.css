@@ -56,12 +56,73 @@ body {
   gap: 12px;
 }
 
+.notification-wrapper {
+  position: relative;
+}
+
 .icon-button {
   background: transparent;
   border: none;
   font-size: 20px;
   cursor: pointer;
   color: #0f4c5c;
+}
+
+.notification-dropdown {
+  position: absolute;
+  top: 44px;
+  right: 0;
+  width: 280px;
+  background: #ffffff;
+  border-radius: 12px;
+  box-shadow: 0 16px 32px rgba(15, 23, 42, 0.2);
+  padding: 12px;
+  z-index: 20;
+}
+
+.notification-title {
+  font-weight: 700;
+  color: #0f4c5c;
+  margin-bottom: 8px;
+}
+
+.notification-dropdown ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 8px;
+}
+
+.notification-item {
+  width: 100%;
+  text-align: left;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  padding: 10px;
+  background: #f8fafc;
+  cursor: pointer;
+}
+
+.notification-item:hover {
+  background: #e0edf4;
+}
+
+.notification-item-title {
+  font-weight: 600;
+  color: #0f4c5c;
+  margin-bottom: 4px;
+}
+
+.notification-item-body {
+  font-size: 13px;
+  color: #475569;
+}
+
+.notification-empty {
+  font-size: 13px;
+  color: #6b7280;
+  padding: 6px 0;
 }
 
 .logout-btn {
@@ -641,10 +702,11 @@ body {
 }
 .services-container {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-  gap: 40px;
+  grid-template-columns: repeat(2, minmax(200px, 1fr));
+  gap: 32px 40px;
   justify-items: center;
-  margin-top: 40px;
+  margin: 40px auto 0;
+  max-width: 520px;
 }
 
 .service-item {
