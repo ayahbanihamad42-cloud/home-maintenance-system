@@ -1,17 +1,17 @@
 import axios from "axios";
-
+// Send a message to the AI assistant and return the reply
 export const chatAI = async (req, res) => {
   const { message } = req.body;
 
   if (!message || !message.trim()) {
     return res.status(400).json({ reply: "الرجاء كتابة رسالة أولاً." });
   }
-
+  // Gemini API key from environment
   const geminiKey = process.env.GEMINI_API_KEY;
 
   const fallbackReply =
     "حالياً المساعد غير متاح بسبب إعدادات الخدمة. تقدر تسألني سؤال ثاني أو جرّب لاحقاً.";
-
+// Ensure key is present before calling the service
   if (!geminiKey) {
     console.warn("AI service unavailable: missing GEMINI_API_KEY");
     return res.json({ reply: fallbackReply });

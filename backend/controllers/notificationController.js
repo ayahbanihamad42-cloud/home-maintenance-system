@@ -1,5 +1,5 @@
 import db from "../database/connection.js";
-
+// Fetch user notifications
 export const getUserNotifications = (req, res) => {
   db.query(
     "SELECT * FROM notifications WHERE user_id=? ORDER BY id DESC",
@@ -10,7 +10,7 @@ export const getUserNotifications = (req, res) => {
     }
   );
 };
-
+// Mark notification as read
 export const markAsRead = (req, res) => {
   const { id } = req.params;
 
@@ -24,17 +24,18 @@ export const markAsRead = (req, res) => {
   );
 };
 
+// Create a new notification (internal helper)
 export const createNotification = (userId, message) => {
   db.query(
     "INSERT INTO notifications (user_id, message) VALUES (?,?)",
     [userId, message]
   );
 };
-
+// Build notification feed combining messages and requests
 export const getNotificationFeed = (req, res) => {
   const userId = req.user.id;
   const userRole = req.user.role;
-
+  // Fetch latest user messages
   const fetchMessages = () =>
     new Promise((resolve, reject) => {
       db.query(
@@ -46,7 +47,7 @@ export const getNotificationFeed = (req, res) => {
         }
       );
     });
-
+ // Fetch latest technician requests
   const fetchRequestsForTechnician = () =>
     new Promise((resolve, reject) => {
       const q = `
@@ -63,6 +64,7 @@ export const getNotificationFeed = (req, res) => {
       });
     });
 
+  // Fetch latest user requests
   const fetchRequestsForUser = () =>
     new Promise((resolve, reject) => {
       db.query(

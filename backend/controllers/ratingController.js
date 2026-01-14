@@ -1,5 +1,5 @@
 import db from "../database/connection.js";
-
+// Add a technician rating
 export const addRating = (req, res) => {
   const { technician_id, request_id, rating, comment } = req.body;
 
@@ -17,7 +17,7 @@ export const addRating = (req, res) => {
     }
   );
 };
-
+// Fetch all ratings for a technician
 export const getTechnicianRatings = (req, res) => {
   const { technicianId } = req.params;
 
@@ -30,7 +30,7 @@ export const getTechnicianRatings = (req, res) => {
     }
   );
 };
-
+// Fetch rating for a specific request
 export const getRatingByRequest = (req, res) => {
   const { requestId } = req.params;
 

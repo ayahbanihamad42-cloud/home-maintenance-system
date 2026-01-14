@@ -1,5 +1,5 @@
 import db from "../database/connection.js";
-
+// Fetch stores by service type
 export const getStoresByService = (req, res) => {
   const { service } = req.query;
 

@@ -1,6 +1,6 @@
 import db from "../database/connection.js";
 import bcrypt from "bcryptjs";
-
+// Fetch all users
 export const getAllUsers = (req, res) => {
     db.query("SELECT id, name, email, phone, city, role FROM users", (e, r) => {
         if (e) return res.status(500).json(e);
@@ -8,6 +8,7 @@ export const getAllUsers = (req, res) => {
     });
 };
 
+// Fetch all technicians
 export const getAllTechnicians = (req, res) => {
     const q = `SELECT t.id AS technicianId, u.id AS userId, u.name, u.email, u.phone, u.city, t.service, t.experience FROM users u 
                JOIN technicians t ON u.id = t.user_id`;
@@ -16,7 +17,7 @@ export const getAllTechnicians = (req, res) => {
         res.json(r || []);
     });
 };
-
+// Create a new user from admin panel
 export const createUser = async (req, res) => {
     const { name, email, phone, city, password, role } = req.body;
 
@@ -41,7 +42,7 @@ export const createUser = async (req, res) => {
         );
     });
 };
-
+// Create a new technician from admin panel
 export const createTechnician = async (req, res) => {
     const { name, email, phone, city, password, service, experience } = req.body;
 
@@ -74,7 +75,7 @@ export const createTechnician = async (req, res) => {
         );
     });
 };
-
+// Delete a user
 export const deleteUser = (req, res) => {
     const { id } = req.params;
 
@@ -94,7 +95,7 @@ export const deleteUser = (req, res) => {
         });
     });
 };
-
+// Delete a technician
 export const deleteTechnician = (req, res) => {
     const { id } = req.params;
 

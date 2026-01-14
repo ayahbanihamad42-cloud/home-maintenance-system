@@ -1,7 +1,7 @@
 import express from "express";
 import * as notif from "../controllers/notificationController.js";
 import auth from "../utils/authMiddleware.js";
-
+// Create router for notification routes
 const router = express.Router();
 
 router.get("/", auth, notif.getUserNotifications);

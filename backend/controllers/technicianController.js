@@ -1,6 +1,7 @@
 import db from "../database/connection.js";
 
 
+// Fetch technicians by service
 export const getTechniciansByService = (req, res) => {
   const { service } = req.params;
 
@@ -20,8 +21,7 @@ export const getTechniciansByService = (req, res) => {
     res.json(rows || []);
   });
 };
-
-// جلب توفر الفني
+// Fetch technician availability
 export const getAvailability = (req, res) => {
   const { id } = req.params;
   const { date } = req.query;
@@ -39,7 +39,7 @@ export const getAvailability = (req, res) => {
     res.json(result || []);
   });
 };
-
+// Create or update technician availability
 export const createAvailability = (req, res) => {
   const { technician_id, day, start_time, end_time } = req.body;
   const q = `
@@ -91,7 +91,7 @@ export const createAvailability = (req, res) => {
     }
   );
 };
-
+// Fetch technician profile with rating
 export const getTechnicianProfile = (req, res) => {
   const { id } = req.params;
   const q = `
@@ -118,7 +118,7 @@ export const getTechnicianProfile = (req, res) => {
     res.json(rows[0]);
   });
 };
-
+// Fetch technician by user ID
 export const getTechnicianByUserId = (req, res) => {
   const { userId } = req.params;
   const q = `
@@ -139,7 +139,7 @@ export const getTechnicianByUserId = (req, res) => {
     res.json(rows[0]);
   });
 };
-
+// Fetch maintenance requests for technician
 export const getTechnicianRequests = (req, res) => {
   const { id } = req.params;
   db.query(

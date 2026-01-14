@@ -1,6 +1,6 @@
 import db from "../database/connection.js";
 import bcrypt from "bcryptjs";
-
+// Fetch user profile
 export const getUserProfile = (req, res) => {
   const { id } = req.params;
   db.query(
@@ -14,6 +14,7 @@ export const getUserProfile = (req, res) => {
   );
 };
 
+// Update user password
 export const updateUserPassword = async (req, res) => {
   const { id } = req.params;
   const { password } = req.body;
@@ -41,7 +42,7 @@ export const updateUserPassword = async (req, res) => {
     res.status(500).json({ message: "Password update failed" });
   }
 };
-
+// Update core user profile data
 export const updateUserProfile = (req, res) => {
   const { id } = req.params;
   const { email, phone } = req.body;

@@ -1,4 +1,5 @@
 import db from "../database/connection.js";
+// Create a new maintenance request
 export const createRequest = (req, res) => {
     const { technician_id, description, scheduled_date, scheduled_time, city = null, service, location_note = null } = req.body;
     const qWithLocation = "INSERT INTO maintenance_requests (user_id, technician_id, description, scheduled_date, scheduled_time, city, service, location_note) VALUES (?,?,?,?,?,?,?,?)";
@@ -21,13 +22,14 @@ export const createRequest = (req, res) => {
         finalizeRequest(r);
     });
 };
-
+// Fetch user request history
 export const getHistory = (req, res) => {
     db.query("SELECT * FROM maintenance_requests WHERE user_id = ? ORDER BY created_at DESC", [req.user.id], (err, r) => {
-        res.json(r || []); // مصفوفة فارغة تمنع الـ Crash بالفرونت
+        res.json(r || []); // Empty array prevents frontend crash
+
     });
 };
-
+// Fetch a specific request for the user
 export const getRequestById = (req, res) => {
     const { id } = req.params;
     db.query(
@@ -40,7 +42,7 @@ export const getRequestById = (req, res) => {
         }
     );
 };
-
+// Update maintenance request status
 export const updateRequestStatus = (req, res) => {
     const { id } = req.params;
     const { status } = req.body;
