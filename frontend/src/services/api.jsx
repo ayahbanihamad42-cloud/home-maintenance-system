@@ -1,21 +1,26 @@
-/*
-  Central place to configure API base URL
- and attach Authorization token automatically.
- */
-
+// Import axios library for making HTTP requests
 import axios from "axios";
-import { getToken } from "./auth.service";
 
+// Create a custom Axios instance with a base API URL
 const API = axios.create({
   baseURL: "http://localhost:5000/api"
 });
 
-API.interceptors.request.use(req => {
-  const token = getToken();
+// Add a request interceptor
+// This runs before every request is sent
+API.interceptors.request.use(config => {
+  // Get the authentication token from localStorage
+  const token = localStorage.getItem("token");
+
+  // If a token exists, attach it to the Authorization header
   if (token) {
-    req.headers.Authorization = `Bearer ${token}`;
+    config.headers.Authorization = `Bearer ${token}`;
   }
-  return req;
+
+  // Return the modified config to continue the request
+  return config;
 });
 
+// Export the configured Axios instance
 export default API;
+

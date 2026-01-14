@@ -1,11 +1,10 @@
+// Import the shared Axios API instance
 import API from "./api";
 
-export const getChatMessages = async (userId) => {
-  const res = await API.get(`/chat/${userId}`);
-  return res.data;
-};
+// Fetch all chat messages related to a specific request
+export const getChatMessages = request_id =>
+  API.get(`/chat/request/${request_id}`).then(r => r.data);
 
-export const sendChatMessage = async (data) => {
-  const res = await API.post("/chat", data);
-  return res.data;
-};
+// Send a new chat message to the backend
+export const sendChatMessage = data =>
+  API.post("/chat", data).then(r => r.data);

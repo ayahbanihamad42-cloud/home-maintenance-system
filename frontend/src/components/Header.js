@@ -1,45 +1,31 @@
-
-  // React library and hooks
 import React, { useEffect, useRef, useState } from "react";
-
- // Routing utilities
 import { Link, useNavigate } from "react-router-dom";
-
- // Notification service
 import { getNotificationFeed } from "../../services/notificationService.jsx";
 
- // Header / Navbar component
+function normalizeRole(role) {
+  return role ? String(role).trim().toLowerCase() : "";
+}
+
 function Header() {
-  // Navigation handler
   const navigate = useNavigate();
-  // Get logged-in user from localStorage
   const user = JSON.parse(localStorage.getItem("user"));
-  // User role (technician or customer)
-  const role = user?.role;
-  // Toggle notification dropdown
+  const role = normalizeRole(user?.role);
   const [showNotifications, setShowNotifications] = useState(false);
-  // Store notification list
   const [notificationFeed, setNotificationFeed] = useState([]);
-  //Store last chat user id
   const [latestChatUserId, setLatestChatUserId] = useState(null);
-  // Reference to notification dropdown
   const notificationRef = useRef(null);
 
-   // Handle user logout
   const handleLogout = () => {
     localStorage.clear();
     navigate("/");
   };
 
   useEffect(() => {
-  // Fetch notifications on load
     if (!user) return;
     getNotificationFeed()
       .then((data) => {
         const feed = data || [];
         setNotificationFeed(feed);
-
-  // Find latest chat notification
         const latestMessage = feed.find((item) => item.type === "message" && item.chatUserId);
         setLatestChatUserId(latestMessage?.chatUserId || null);
       })
@@ -47,7 +33,6 @@ function Header() {
   }, [user]);
 
   useEffect(() => {
-  // Close notifications when clicking outside
     const handleClickOutside = (event) => {
       if (notificationRef.current && !notificationRef.current.contains(event.target)) {
         setShowNotifications(false);
@@ -61,31 +46,19 @@ function Header() {
 
   return (
     <div className="navbar">
-        {/* App name */}
       <div className="navbar-brand">Maintenance System</div>
       {user ? (
         <>
-        {/* Navigation links */}
           <div className="navbar-links">
             {role === "technician" ? (
               <>
                 <Link to="/technician/dashboard">Dashboard</Link>
                 <Link to="/technician/requests">Requests</Link>
                 <Link to="/technician/availability">Availability</Link>
-
-                   {/* Go to latest chat */}
-                <button
-                  type="button"
-                  className="link-button"
-                  onClick={() => {
-                    if (latestChatUserId) {
-                      navigate(`/chat/${latestChatUserId}`);
-                    }
-                  }}
-                >
-                  Chat
-                </button>
+                
               </>
+            ) : role === "admin" ? (
+              <Link to="/admin">Admin Dashboard</Link>
             ) : (
               <>
                 <Link to="/home">Home</Link>
@@ -95,21 +68,16 @@ function Header() {
               </>
             )}
           </div>
-
-           {/* Actions area */}
           <div className="navbar-actions">
             <div className="notification-wrapper" ref={notificationRef}>
-
-               {/* Notification toggle */}
               <button
                 className="icon-button"
                 type="button"
-                aria-label="Notificat ions"
+                aria-label="Notifications"
                 onClick={() => setShowNotifications((prev) => !prev)}
               >
                 🔔
               </button>
-            {/* Notification dropdown */}
               {showNotifications ? (
                 <div className="notification-dropdown">
                   <div className="notification-title">Notifications</div>
@@ -124,8 +92,6 @@ function Header() {
                             className="notification-item"
                             onClick={() => {
                               setShowNotifications(false);
-
-                              // Navigate based on notification type
                               if (item.type === "message" && item.chatUserId) {
                                 navigate(`/chat/${item.chatUserId}`);
                               } else if (item.type === "request") {
@@ -147,7 +113,6 @@ function Header() {
                 </div>
               ) : null}
             </div>
-              {/* Logout button */}
             <button className="logout-btn" onClick={handleLogout}>Log Out</button>
           </div>
         </>
@@ -157,5 +122,5 @@ function Header() {
     </div>
   );
 }
-  // Export component
+
 export default Header;

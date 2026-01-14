@@ -19,24 +19,101 @@ import TechnicianAvailability from "./pages/technician/TechnicianAvailability.js
 import TechnicianRequests from "./pages/technician/TechnicianRequests.jsx";
 import TechnicianDashboard from "./pages/technician/TechnicianDashboard.jsx";
 import ProtectedRoute from "./components/ProtectedRoute.jsx";
-
+import AdminRedirect from "./components/common/AdminRedirect.jsx";
 function App() {
   return (
     <Router>
       <Routes>
-        <Route path="/" element={<Welcome />} />
-        <Route path="/home" element={<Home />} />
-        <Route path="/profile" element={<Profile />} />
-        <Route path="/history" element={<MaintenanceHistory />} />
-        <Route path="/request" element={<MaintenanceRequest />} />
-        <Route path="/request/:technicianId" element={<MaintenanceRequest />} />
+        <Route
+          path="/"
+          element={
+            <AdminRedirect>
+              <Welcome />
+            </AdminRedirect>
+          }
+        />
+        <Route
+          path="/home"
+          element={
+            <AdminRedirect>
+              <Home />
+            </AdminRedirect>
+          }
+        />
+        <Route
+          path="/profile"
+          element={
+            <AdminRedirect>
+              <Profile />
+            </AdminRedirect>
+          }
+        />
+        <Route
+          path="/history"
+          element={
+            <AdminRedirect>
+              <MaintenanceHistory />
+            </AdminRedirect>
+          }
+        />
+        <Route
+          path="/request"
+          element={
+            <AdminRedirect>
+              <MaintenanceRequest />
+            </AdminRedirect>
+          }
+        />
+        <Route
+          path="/request/:technicianId"
+          element={
+            <AdminRedirect>
+              <MaintenanceRequest />
+            </AdminRedirect>
+          }
+        />
 
-        <Route path="/login" element={<Login />} />
-        <Route path="/register" element={<Register />} />
-        <Route path="/forgot-password" element={<ForgotPassword />} />
+        <Route
+          path="/login"
+          element={
+            <AdminRedirect>
+              <Login />
+            </AdminRedirect>
+          }
+        />
+        <Route
+          path="/register"
+          element={
+            <AdminRedirect>
+              <Register />
+            </AdminRedirect>
+          }
+        />
+        <Route
+          path="/forgot-password"
+          element={
+            <AdminRedirect>
+              <ForgotPassword />
+            </AdminRedirect>
+          }
+        />
 
-        <Route path="/services/:service" element={<TechniciansByService />} />
-        <Route path="/technician/:technicianId" element={<TechnicianProfile />} />
+        <Route
+          path="/services/:service"
+          element={
+            <AdminRedirect>
+              <TechniciansByService />
+            </AdminRedirect>
+          }
+        />
+        <Route
+          path="/technician/:technicianId"
+          element={
+            <AdminRedirect>
+              <TechnicianProfile />
+            </AdminRedirect>
+          }
+        />
 
         <Route
           path="/admin"
@@ -47,32 +124,59 @@ function App() {
           }
         />
 
-        <Route path="/ai-chat" element={<AIChat />} />
-        <Route path="/chat/:userId" element={<Chat />} />
+        <Route
+          path="/ai-chat"
+          element={
+            <AdminRedirect>
+              <AIChat />
+            </AdminRedirect>
+          }
+        />
+        <Route
+          path="/chat/:userId"
+          element={
+            <AdminRedirect>
+              <Chat />
+            </AdminRedirect>
+          }
+        />
 
-        <Route path="/review/:requestId" element={<Review />} />
+        <Route
+          path="/review/:requestId"
+          element={
+            <AdminRedirect>
+              <Review />
+            </AdminRedirect>
+          }
+        />
         <Route
           path="/technician/availability"
           element={
-            <ProtectedRoute allowedRoles={["technician"]}>
-              <TechnicianAvailability />
-            </ProtectedRoute>
+            <AdminRedirect>
+              <ProtectedRoute allowedRoles={["technician"]}>
+                <TechnicianAvailability />
+              </ProtectedRoute>
+            </AdminRedirect>
           }
         />
         <Route
           path="/technician/requests"
           element={
-            <ProtectedRoute allowedRoles={["technician"]}>
-              <TechnicianRequests />
-            </ProtectedRoute>
+            <AdminRedirect>
+              <ProtectedRoute allowedRoles={["technician"]}>
+                <TechnicianRequests />
+              </ProtectedRoute>
+            </AdminRedirect>
           }
         />
         <Route
           path="/technician/dashboard"
           element={
-            <ProtectedRoute allowedRoles={["technician"]}>
-              <TechnicianDashboard />
-            </ProtectedRoute>
+            <AdminRedirect>
+              <ProtectedRoute allowedRoles={["technician"]}>
+                <TechnicianDashboard />
+              </ProtectedRoute>
+            </AdminRedirect>
           }
         />
       </Routes>

@@ -1,19 +1,11 @@
-/*
- Fetches and updates user notifications.
- */
-
+// Import the shared Axios API instance
 import API from "./api";
 
-export const getNotifications = async () => {
-  const res = await API.get("/notifications");
-  return res.data;
-};
+// Fetch all notifications for a specific user
+export const getNotifications = user_id =>
+  API.get(`/notifications/user/${user_id}`);
 
-export const markAsRead = async (id) => {
-  await API.put(`/notifications/${id}`);
-};
+// Send a new notification
+export const sendNotification = data =>
+  API.post("/notifications", data);
 
-export const getNotificationFeed = async () => {
-  const res = await API.get("/notifications/feed");
-  return res.data;
-};
