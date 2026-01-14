@@ -2,7 +2,7 @@ import db from "../database/connection.js";
 import bcrypt from "bcryptjs";
 
 export const getAllUsers = (req, res) => {
-    db.query("SELECT id, name, email, city, role FROM users", (e, r) => {
+    db.query("SELECT id, name, email, phone, city, role FROM users", (e, r) => {
         if (e) return res.status(500).json(e);
         res.json(r || []);
     });
@@ -72,5 +72,49 @@ export const createTechnician = async (req, res) => {
                 );
             }
         );
+    });
+};
+
+export const deleteUser = (req, res) => {
+    const { id } = req.params;
+
+    if (!id) {
+        return res.status(400).json({ message: "Missing user id" });
+    }
+
+    db.query("DELETE FROM technicians WHERE user_id = ?", [id], (techErr) => {
+        if (techErr) return res.status(500).json({ message: "Database error", error: techErr });
+
+        db.query("DELETE FROM users WHERE id = ?", [id], (userErr, result) => {
+            if (userErr) return res.status(500).json({ message: "Database error", error: userErr });
+            if (!result.affectedRows) {
+                return res.status(404).json({ message: "User not found" });
+            }
+            res.json({ message: "User deleted" });
+        });
+    });
+};
+
+export const deleteTechnician = (req, res) => {
+    const { id } = req.params;
+
+    if (!id) {
+        return res.status(400).json({ message: "Missing technician id" });
+    }
+
+    db.query("SELECT user_id FROM technicians WHERE id = ?", [id], (findErr, rows) => {
+        if (findErr) return res.status(500).json({ message: "Database error", error: findErr });
+        if (!rows.length) {
+            return res.status(404).json({ message: "Technician not found" });
+        }
+
+        const userId = rows[0].user_id;
+        db.query("DELETE FROM technicians WHERE id = ?", [id], (techErr) => {
+            if (techErr) return res.status(500).json({ message: "Database error", error: techErr });
+            db.query("DELETE FROM users WHERE id = ?", [userId], (userErr) => {
+                if (userErr) return res.status(500).json({ message: "Database error", error: userErr });
+                res.json({ message: "Technician deleted" });
+            });
+        });
     });
 };

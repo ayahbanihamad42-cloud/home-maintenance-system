@@ -1,5 +1,6 @@
 import db from "../database/connection.js";
 
+
 export const getTechniciansByService = (req, res) => {
   const { service } = req.params;
 
@@ -20,6 +21,7 @@ export const getTechniciansByService = (req, res) => {
   });
 };
 
+// جلب توفر الفني
 export const getAvailability = (req, res) => {
   const { id } = req.params;
   const { date } = req.query;
@@ -44,10 +46,50 @@ export const createAvailability = (req, res) => {
     INSERT INTO technician_availability (technician_id, available_date, start_time, end_time)
     VALUES (?,?,?,?)
   `;
-  db.query(q, [technician_id, day, start_time, end_time], (err, result) => {
-    if (err) return res.status(500).json(err);
-    res.json({ message: "Availability saved", id: result.insertId });
-  });
+
+  const insertAvailability = (resolvedTechnicianId) => {
+    db.query(q, [resolvedTechnicianId, day, start_time, end_time], (err, result) => {
+      if (err) return res.status(500).json(err);
+      res.json({ message: "Availability saved", id: result.insertId });
+    });
+  };
+
+  const createTechnicianForUser = () => {
+    db.query(
+      "SELECT id FROM users WHERE id = ?",
+      [req.user.id],
+      (userErr, userRows) => {
+        if (userErr) return res.status(500).json(userErr);
+        if (!userRows.length) return res.status(404).json({ message: "User not found" });
+        db.query(
+          "INSERT INTO technicians (user_id, service, experience) VALUES (?,?,?)",
+          [req.user.id, "General", 0],
+          (techErr, techResult) => {
+            if (techErr) return res.status(500).json(techErr);
+            insertAvailability(techResult.insertId);
+          }
+        );
+      }
+    );
+  };
+
+  if (technician_id) {
+    insertAvailability(technician_id);
+    return;
+  }
+
+  db.query(
+    "SELECT id FROM technicians WHERE user_id = ?",
+    [req.user.id],
+    (err, rows) => {
+      if (err) return res.status(500).json(err);
+      if (!rows.length) {
+        createTechnicianForUser();
+        return;
+      }
+      insertAvailability(rows[0].id);
+    }
+  );
 };
 
 export const getTechnicianProfile = (req, res) => {
