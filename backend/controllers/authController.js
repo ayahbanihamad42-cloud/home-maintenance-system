@@ -7,15 +7,16 @@ import dotenv from "dotenv";
 
 dotenv.config();
 
-// إعداد مرسل الإيميلات باستخدام بيانات من .env
+// Configure email sender using .env settings
 const transporter = nodemailer.createTransport({
   service: "gmail",
   auth: {
-    user: process.env.EMAIL_USER,   // إيميل المرسل (ثابت)
-    pass: process.env.EMAIL_PASS    // App Password من جوجل
+    user: process.env.EMAIL_USER,    // Sender email (fixed)
+    pass: process.env.EMAIL_PASS      // App password from Google
   }
 });
 
+// Register a new user
 export const register = async (req, res) => {
   const { name, email, phone, dob, city, password, role } = req.body;
 
@@ -34,13 +35,13 @@ export const register = async (req, res) => {
       const verificationToken = crypto.randomBytes(32).toString("hex");
 
       db.query(
-        // حذف التحقق من البريد مؤقتًا
+         // Temporarily remove email verification
         "INSERT INTO users (name, email, phone, dob, city, password, role) VALUES (?, ?, ?, ?, ?, ?, ?)",
         [name, email, phone, dob, city, hash, role || "user"],
         async (err, result) => {
           if (err) return res.status(500).json({ message: "Database error", error: err });
 
-          // تعليق إرسال الإيميل والتحقق
+            // Commented out email sending and verification
           /*
           const url = `http://localhost:3000/verify/${verificationToken}`;
           try {
@@ -57,7 +58,7 @@ export const register = async (req, res) => {
           }
           */
 
-          // الرد المباشر بدون تحقق
+      // Direct response without verificationi
           res.json({ message: "Registered successfully." });
         }
       );
@@ -114,7 +115,7 @@ export const forgotPassword = async (req, res) => {
     try {
       await transporter.sendMail({
         from: process.env.EMAIL_USER,
-        to: email, // إيميل المستخدم اللي طلب الاسترجاع
+        to: email, // User email requesting reset
         subject: "Password Reset Request",
         html: `<p>Click <a href="${url}">here</a> to reset your password.</p>`
       });
