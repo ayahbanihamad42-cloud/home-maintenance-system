@@ -16,7 +16,6 @@ import API from "../../services/api";
 
 // Component for creating a new maintenance request
 function MaintenanceRequest() {
-
   // Get technicianId from URL if provided
   const { technicianId: initialTechnicianId } = useParams();
 
@@ -40,17 +39,14 @@ function MaintenanceRequest() {
 
   // Build map query using coordinates if available, otherwise location note
   const mapQuery = useMemo(() => {
-    if (geoCoords) {
-      return `${geoCoords.lat},${geoCoords.lng}`;
-    }
+    if (geoCoords) return `${geoCoords.lat},${geoCoords.lng}`;
     return encodeURIComponent(locationNote || "Riyadh");
   }, [geoCoords, locationNote]);
 
   // Fetch technicians when service changes
   useEffect(() => {
     if (!service) return;
-
-    getTechnicians(service).then((data) => setTechnicians(data));
+    getTechnicians(service).then((data) => setTechnicians(data || [])).catch(() => setTechnicians([]));
   }, [service]);
 
   // Fetch technician details when technicianId changes
@@ -62,8 +58,8 @@ function MaintenanceRequest() {
 
     API.get(`/technicians/${technicianId}`)
       .then((res) => {
-        setService(res.data.service);
-        setTechnicianName(res.data.name);
+        setService(res.data?.service || "");
+        setTechnicianName(res.data?.name || "");
       })
       .catch(() => {
         setTechnicianName("");
@@ -72,10 +68,10 @@ function MaintenanceRequest() {
 
   // Fetch available time slots for selected technician and date
   useEffect(() => {
-    if (date && technicianId) {
-      getAvailability(technicianId, date)
-        .then((data) => setSlots(data));
-    }
+    if (!date || !technicianId) return;
+    getAvailability(technicianId, date)
+      .then((data) => setSlots(data || []))
+      .catch(() => setSlots([]));
   }, [date, technicianId]);
 
   // Get user's current location on component mount
@@ -87,10 +83,7 @@ function MaintenanceRequest() {
 
     navigator.geolocation.getCurrentPosition(
       (pos) => {
-        setGeoCoords({
-          lat: pos.coords.latitude,
-          lng: pos.coords.longitude
-        });
+        setGeoCoords({ lat: pos.coords.latitude, lng: pos.coords.longitude });
       },
       () => {
         setGeoError("Unable to access your location.");
@@ -100,25 +93,32 @@ function MaintenanceRequest() {
 
   // Submit maintenance request
   const submit = async () => {
-    if (!service || !technicianId || !date || !time) return;
-
-    const response = await createMaintenanceRequest({
-      technician_id: technicianId,
-      description,
-      scheduled_date: date,
-      scheduled_time: time,
-      service,
-      location_note: locationNote,
-      city: ""
-    });
-
-    // Navigate to review page if request is created successfully
-    if (response?.id) {
-      navigate(`/review/${response.id}`);
+    if (!service || !technicianId || !date || !time) {
+      alert("Please fill Service, Technician, Date, and Time.");
       return;
     }
 
-    alert("Request submitted");
+    try {
+      const response = await createMaintenanceRequest({
+        technician_id: technicianId,
+        description,
+        scheduled_date: date,
+        scheduled_time: time,
+        service,
+        location_note: locationNote,
+        city: ""
+      });
+
+      // Navigate to review page if request is created successfully
+      if (response?.id) {
+        navigate(`/review/${response.id}`);
+        return;
+      }
+
+      alert("Request submitted, but no id returned.");
+    } catch (e) {
+      alert("Failed to submit request.");
+    }
   };
 
   return (
@@ -170,15 +170,19 @@ function MaintenanceRequest() {
         {/* Date selection */}
         <div className="input-group">
           <label>Date</label>
-          <input type="date" onChange={e=>setDate(e.target.value)} />
+          <input
+            type="date"
+            value={date}
+            onChange={(e) => setDate(e.target.value)}
+          />
         </div>
 
         {/* Time slot selection */}
         <div className="input-group">
           <label>Time Slot</label>
-          <select value={time} onChange={e=>setTime(e.target.value)}>
+          <select value={time} onChange={(e) => setTime(e.target.value)}>
             <option value="">Select time</option>
-            {slots.map(slot => (
+            {slots.map((slot) => (
               <option key={slot.id} value={slot.start_time}>
                 {slot.start_time}
               </option>
@@ -192,14 +196,18 @@ function MaintenanceRequest() {
           <input
             placeholder="Add address details or landmark"
             value={locationNote}
-            onChange={e=>setLocationNote(e.target.value)}
+            onChange={(e) => setLocationNote(e.target.value)}
           />
         </div>
 
         {/* Problem description */}
         <div className="input-group">
           <label>Description</label>
-          <textarea rows="3" value={description} onChange={e=>setDescription(e.target.value)} />
+          <textarea
+            rows="3"
+            value={description}
+            onChange={(e) => setDescription(e.target.value)}
+          />
         </div>
 
         {/* Map preview */}
@@ -218,7 +226,9 @@ function MaintenanceRequest() {
         </div>
 
         {/* Submit button */}
-        <button className="primary" onClick={submit}>Submit</button>
+        <button className="primary" onClick={submit}>
+          Submit
+        </button>
       </div>
     </>
   );

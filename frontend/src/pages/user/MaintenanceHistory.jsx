@@ -13,7 +13,6 @@ import Header from "../../components/common/Header";
 
 // Component to display user's maintenance request history
 function MaintenanceHistory() {
-
   // State to store maintenance requests
   const [requests, setRequests] = useState([]);
 
@@ -28,7 +27,9 @@ function MaintenanceHistory() {
     if (!user) return;
 
     // Get all requests created by the user
-    getUserRequests().then(res => setRequests(res));
+    getUserRequests()
+      .then((data) => setRequests(data || []))
+      .catch(() => setRequests([]));
   }, [user]);
 
   // Fetch ratings for each maintenance request
@@ -49,7 +50,6 @@ function MaintenanceHistory() {
           }))
       )
     ).then((results) => {
-
       // Build an object mapping requestId -> rating
       const nextRatings = {};
       results.forEach(({ requestId, rating }) => {
@@ -71,7 +71,7 @@ function MaintenanceHistory() {
         <h2>Request History</h2>
 
         {/* Render maintenance cards with their ratings */}
-        {requests.map(r => (
+        {requests.map((r) => (
           <MaintenanceCard
             key={r.id}
             request={r}
@@ -85,4 +85,3 @@ function MaintenanceHistory() {
 
 // Export component
 export default MaintenanceHistory;
-

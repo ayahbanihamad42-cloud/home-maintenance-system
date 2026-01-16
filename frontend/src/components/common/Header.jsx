@@ -1,71 +1,91 @@
-
-  // React library and hooks
+// React library and hooks
 import React, { useEffect, useRef, useState } from "react";
 
- // Routing utilities
+// Routing utilities
 import { Link, useNavigate } from "react-router-dom";
 
- // Notification service
-import { getNotificationFeed } from "../../services/notificationService.jsx";
+// Notification service
+import { getNotifications } from "../../services/notificationService.jsx";
 
- // Header / Navbar component
+// Header / Navbar component
 function Header() {
   // Navigation handler
   const navigate = useNavigate();
+
   // Get logged-in user from localStorage
   const user = JSON.parse(localStorage.getItem("user"));
+
   // User role (technician or customer)
   const role = user?.role;
+
   // Toggle notification dropdown
   const [showNotifications, setShowNotifications] = useState(false);
+
   // Store notification list
   const [notificationFeed, setNotificationFeed] = useState([]);
-  //Store last chat user id
+
+  // Store last chat user id
   const [latestChatUserId, setLatestChatUserId] = useState(null);
+
   // Reference to notification dropdown
   const notificationRef = useRef(null);
 
-   // Handle user logout
+  // Handle user logout
   const handleLogout = () => {
     localStorage.clear();
     navigate("/");
   };
 
   useEffect(() => {
-  // Fetch notifications on load
+    // Fetch notifications on load
     if (!user) return;
-    getNotificationFeed()
-      .then((data) => {
-        const feed = data || [];
+
+    // Call notification feed API service
+    const req = getNotifications();
+
+    // Safety: prevent crash if service returns undefined
+    if (!req || typeof req.then !== "function") {
+      setNotificationFeed([]);
+      return;
+    }
+
+    req
+      .then((res) => {
+        const feed = res?.data || [];
         setNotificationFeed(feed);
 
-  // Find latest chat notification
-        const latestMessage = feed.find((item) => item.type === "message" && item.chatUserId);
+        // Find latest chat notification
+        const latestMessage = feed.find(
+          (item) => item.type === "message" && item.chatUserId
+        );
         setLatestChatUserId(latestMessage?.chatUserId || null);
       })
       .catch(() => setNotificationFeed([]));
   }, [user]);
 
   useEffect(() => {
-  // Close notifications when clicking outside
+    // Close notifications when clicking outside
     const handleClickOutside = (event) => {
       if (notificationRef.current && !notificationRef.current.contains(event.target)) {
         setShowNotifications(false);
       }
     };
+
     if (showNotifications) {
       document.addEventListener("mousedown", handleClickOutside);
     }
+
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, [showNotifications]);
 
   return (
     <div className="navbar">
-        {/* App name */}
+      {/* App name */}
       <div className="navbar-brand">Maintenance System</div>
+
       {user ? (
         <>
-        {/* Navigation links */}
+          {/* Navigation links */}
           <div className="navbar-links">
             {role === "technician" ? (
               <>
@@ -73,18 +93,18 @@ function Header() {
                 <Link to="/technician/requests">Requests</Link>
                 <Link to="/technician/availability">Availability</Link>
 
-                   {/* Go to latest chat */}
-                <button
-                  type="button"
-                  className="link-button"
-                  onClick={() => {
-                    if (latestChatUserId) {
-                      navigate(`/chat/${latestChatUserId}`);
-                    }
-                  }}
-                >
-                  Chat
-                </button>
+                {/* Chat link */}
+                {latestChatUserId ? (
+                  <Link to={`/chat/${latestChatUserId}`}>Chat</Link>
+                ) : (
+                  <button
+                    type="button"
+                    className="link-button"
+                    onClick={() => alert("No chats yet")}
+                  >
+                    Chat
+                  </button>
+                )}
               </>
             ) : (
               <>
@@ -96,23 +116,24 @@ function Header() {
             )}
           </div>
 
-           {/* Actions area */}
+          {/* Actions area */}
           <div className="navbar-actions">
             <div className="notification-wrapper" ref={notificationRef}>
-
-               {/* Notification toggle */}
+              {/* Notification toggle */}
               <button
                 className="icon-button"
                 type="button"
-                aria-label="Notificat ions"
+                aria-label="Notifications"
                 onClick={() => setShowNotifications((prev) => !prev)}
               >
                 🔔
               </button>
-            {/* Notification dropdown */}
+
+              {/* Notification dropdown */}
               {showNotifications ? (
                 <div className="notification-dropdown">
                   <div className="notification-title">Notifications</div>
+
                   {notificationFeed.length === 0 ? (
                     <div className="notification-empty">No notifications yet.</div>
                   ) : (
@@ -147,8 +168,11 @@ function Header() {
                 </div>
               ) : null}
             </div>
-              {/* Logout button */}
-            <button className="logout-btn" onClick={handleLogout}>Log Out</button>
+
+            {/* Logout button */}
+            <button className="logout-btn" onClick={handleLogout}>
+              Log Out
+            </button>
           </div>
         </>
       ) : (
@@ -157,5 +181,6 @@ function Header() {
     </div>
   );
 }
-  // Export component
+
+// Export component
 export default Header;

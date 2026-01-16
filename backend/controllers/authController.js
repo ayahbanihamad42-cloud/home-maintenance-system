@@ -1,3 +1,4 @@
+// backend/controllers/authController.js
 import db from "../database/connection.js";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
@@ -7,16 +8,24 @@ import dotenv from "dotenv";
 
 dotenv.config();
 
-// Configure email sender using .env settings
+/**
+ * Gmail SMTP transporter
+ * لازم EMAIL_USER و EMAIL_PASS (App Password) في .env
+ */
 const transporter = nodemailer.createTransport({
-  service: "gmail",
+  host: "smtp.gmail.com",
+  port: 465,
+  secure: true,
   auth: {
-    user: process.env.EMAIL_USER,    // Sender email (fixed)
-    pass: process.env.EMAIL_PASS      // App password from Google
-  }
+    user: process.env.EMAIL_USER,
+    pass: process.env.EMAIL_PASS,
+  },
 });
 
-// Register a new user
+/**
+ * REGISTER
+ * role  (افتراضي user)
+ */
 export const register = async (req, res) => {
   const { name, email, phone, dob, city, password, role } = req.body;
 
@@ -25,104 +34,151 @@ export const register = async (req, res) => {
   }
 
   try {
-    db.query("SELECT * FROM users WHERE email = ?", [email], async (err, result) => {
+    db.query("SELECT id FROM users WHERE email = ?", [email], async (err, rows) => {
       if (err) return res.status(500).json({ message: "Database error", error: err });
-      if (result.length) {
-        return res.status(400).json({ message: "Email already registered" });
-      }
+      if (rows.length) return res.status(400).json({ message: "Email already registered" });
 
       const hash = await bcrypt.hash(password, 10);
-      const verificationToken = crypto.randomBytes(32).toString("hex");
 
       db.query(
-         // Temporarily remove email verification
-        "INSERT INTO users (name, email, phone, dob, city, password, role) VALUES (?, ?, ?, ?, ?, ?, ?)",
-        [name, email, phone, dob, city, hash, role || "user"],
-        async (err, result) => {
-          if (err) return res.status(500).json({ message: "Database error", error: err });
-
-            // Commented out email sending and verification
-          /*
-          const url = `http://localhost:3000/verify/${verificationToken}`;
-          try {
-            await transporter.sendMail({
-              from: process.env.EMAIL_USER,
-              to: email,
-              subject: "Verify Your Account",
-              html: `<h3>Welcome ${name}!</h3><p>Please click <a href="${url}">here</a> to verify your email.</p>`
-            });
-            res.json({ message: "Registered successfully. Please check your email to verify account." });
-          } catch (mailErr) {
-            console.error("Email send failed:", mailErr.message);
-            res.json({ message: "Registered successfully, but email not sent. Contact support." });
-          }
-          */
-
-      // Direct response without verificationi
-          res.json({ message: "Registered successfully." });
+        "INSERT INTO users (name, email, phone, dob, city, password, role, is_verified) VALUES (?,?,?,?,?,?,?,TRUE)",
+        [name, email, phone || null, dob || null, city || null, hash, role || "user"],
+        (err2) => {
+          if (err2) return res.status(500).json({ message: "Database error", error: err2 });
+          return res.json({ message: "Registered successfully." });
         }
       );
     });
-  } catch (error) {
-  console.error("Unexpected error in register:", error);
-  res.status(500).json({ message: "Server error", error });
-}
-
+  } catch (e) {
+    console.error("register error:", e);
+    return res.status(500).json({ message: "Server error" });
+  }
 };
 
-/*// VERIFY EMAIL
-export const verifyEmail = (req, res) => {
-  const { token } = req.params;
-
-  db.query("UPDATE users SET is_verified = TRUE WHERE verification_token = ?", [token], (err, result) => {
-    if (err) return res.status(500).json({ message: "Database error", error: err });
-    if (result.affectedRows === 0) return res.status(400).json({ message: "Invalid or expired token" });
-
-    res.json({ message: "Email verified successfully. You can now login." });
-  });
-};*/
-
-// LOGIN
+/**
+ * LOGIN
+ */
 export const login = (req, res) => {
   const { email, password } = req.body;
 
-  db.query("SELECT * FROM users WHERE email = ?", [email], async (err, result) => {
+  if (!email || !password) return res.status(400).json({ message: "Missing email/password" });
+
+  db.query("SELECT * FROM users WHERE email = ?", [email], async (err, rows) => {
     if (err) return res.status(500).json({ message: "Database error", error: err });
+    if (!rows.length) return res.status(401).json({ message: "Email not found" });
 
-    if (!result.length) return res.status(401).json({ message: "Email not found" });
+    const user = rows[0];
 
-    const user = result[0];
+    const ok = await bcrypt.compare(password, user.password);
+    if (!ok) return res.status(401).json({ message: "Incorrect password" });
 
-   // if (!user.is_verified) return res.status(403).json({ message: "Please verify your email first" });
+    const token = jwt.sign(
+      { id: user.id, role: user.role },
+      process.env.JWT_SECRET,
+      { expiresIn: "7d" }
+    );
 
-    const match = await bcrypt.compare(password, user.password);
-    if (!match) return res.status(401).json({ message: "Incorrect password" });
+    const safeUser = { ...user };
+    delete safeUser.password;
+    delete safeUser.reset_token;
+    delete safeUser.reset_token_expiry;
 
-    const token = jwt.sign({ id: user.id, role: user.role }, process.env.JWT_SECRET);
-    res.json({ token, user });
+    return res.json({ token, user: safeUser });
   });
 };
 
-// FORGOT PASSWORD
-export const forgotPassword = async (req, res) => {
+/**
+ * FORGOT PASSWORD
+ */
+export const forgotPassword = (req, res) => {
   const { email } = req.body;
-  const token = crypto.randomBytes(20).toString("hex");
+  if (!email) return res.status(400).json({ message: "Email is required" });
 
-  db.query("UPDATE users SET reset_token = ? WHERE email = ?", [token, email], async (err, result) => {
-    if (err || result.affectedRows === 0) return res.status(404).json({ message: "User not found" });
+  db.query("SELECT id, name, email FROM users WHERE email = ?", [email], async (err, rows) => {
+    if (err) return res.status(500).json({ message: "Database error", error: err });
+    if (!rows.length) return res.status(404).json({ message: "User not found" });
 
-    const url = `http://localhost:3000/reset-password/${token}`;
-    try {
-      await transporter.sendMail({
-        from: process.env.EMAIL_USER,
-        to: email, // User email requesting reset
-        subject: "Password Reset Request",
-        html: `<p>Click <a href="${url}">here</a> to reset your password.</p>`
-      });
-      res.json({ message: "Reset link sent to your email" });
-    } catch (mailErr) {
-      console.error("Reset email failed:", mailErr.message);
-      res.json({ message: "Reset token generated, but email not sent. Contact support." });
-    }
+    const user = rows[0];
+
+    const token = crypto.randomBytes(32).toString("hex");
+    const expiry = new Date(Date.now() + 1000 * 60 * 30); // 30 minutes
+
+    db.query(
+      "UPDATE users SET reset_token=?, reset_token_expiry=? WHERE id=?",
+      [token, expiry, user.id],
+      async (err2) => {
+        if (err2) return res.status(500).json({ message: "Database error", error: err2 });
+
+        const resetUrl = `http://localhost:3001/reset-password/${token}`;
+
+        try {
+          await transporter.sendMail({
+            from: process.env.EMAIL_USER,
+            to: user.email,
+            subject: "Password Reset Request",
+            html: `
+              <p>Hello ${user.name || ""},</p>
+              <p>Click the link below to reset your password (valid for 30 minutes):</p>
+              <p><a href="${resetUrl}">${resetUrl}</a></p>
+              <p>If you didn’t request this, ignore this email.</p>
+            `,
+          });
+
+          return res.json({ message: "Reset link sent to your email" });
+        } catch (mailErr) {
+          console.error("Reset email failed:", mailErr?.message || mailErr);
+          // حتى لو الايميل فشل، التوكن موجود
+          return res.status(500).json({
+            message: "Reset token created but email failed. Check EMAIL_USER/EMAIL_PASS (App Password).",
+          });
+        }
+      }
+    );
   });
+};
+
+/**
+ * RESET PASSWORD
+ * endpoint: POST /api/auth/reset-password/:token
+ * body: { password }
+ */
+export const resetPassword = async (req, res) => {
+  const { token } = req.params;
+  const { password } = req.body;
+
+  if (!token) return res.status(400).json({ message: "Token is required" });
+  if (!password || password.length < 6) {
+    return res.status(400).json({ message: "Password must be at least 6 characters" });
+  }
+
+  db.query(
+    "SELECT id, reset_token_expiry FROM users WHERE reset_token = ?",
+    [token],
+    async (err, rows) => {
+      if (err) return res.status(500).json({ message: "Database error", error: err });
+      if (!rows.length) return res.status(400).json({ message: "Invalid token" });
+
+      const user = rows[0];
+
+      if (!user.reset_token_expiry) {
+        return res.status(400).json({ message: "Token expiry missing" });
+      }
+
+      const isExpired = new Date(user.reset_token_expiry).getTime() < Date.now();
+      if (isExpired) {
+        return res.status(400).json({ message: "Token expired" });
+      }
+
+      const hash = await bcrypt.hash(password, 10);
+
+      db.query(
+        "UPDATE users SET password=?, reset_token=NULL, reset_token_expiry=NULL WHERE id=?",
+        [hash, user.id],
+        (err2) => {
+          if (err2) return res.status(500).json({ message: "Database error", error: err2 });
+          return res.json({ message: "Password updated successfully" });
+        }
+      );
+    }
+  );
 };

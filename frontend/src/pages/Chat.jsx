@@ -1,4 +1,4 @@
-  // Import React and required hooks
+// Import React and required hooks
 import React, { useEffect, useState, useContext } from "react";
 
 // Import URL parameters hook
@@ -15,7 +15,6 @@ import "../index.css";
 
 // Chat component
 function Chat() {
-
   // Get userId from URL (chat partner)
   const { userId } = useParams();
 
@@ -30,9 +29,9 @@ function Chat() {
 
   // Function to load chat messages from the server
   const loadMessages = () => {
-    getChatMessages(userId).then((data) =>
-      setMessages(data || [])
-    );
+    getChatMessages(userId)
+      .then((data) => setMessages(data || []))
+      .catch(() => setMessages([]));
   };
 
   // Load messages initially and poll every 3 seconds
@@ -48,7 +47,6 @@ function Chat() {
 
   // Function to send a new message
   const handleSend = async () => {
-
     // Prevent sending empty messages
     if (!text.trim()) return;
 
@@ -63,10 +61,15 @@ function Chat() {
     setMessages((prev) => [...prev, pending]);
 
     // Send message to the backend
-    await sendChatMessage({
-      receiver_id: userId,
-      message: text
-    });
+    try {
+      await sendChatMessage({
+        receiver_id: Number(userId),
+        message: text
+      });
+    } catch (e) {
+      // If send fails, keep UI but you can alert if you want
+      console.error(e);
+    }
 
     // Clear input field
     setText("");
@@ -78,7 +81,6 @@ function Chat() {
   return (
     <div className="chat-wrapper">
       <div className="chat-shell">
-
         {/* Chat header section */}
         <div className="chat-header-bar">
           <div className="chat-avatar">👷</div>
@@ -94,9 +96,7 @@ function Chat() {
             <div
               key={i}
               className={`message-bubble ${
-                m.sender_id === user?.id
-                  ? "my-message"
-                  : "other-message"
+                m.sender_id === user?.id ? "my-message" : "other-message"
               }`}
             >
               {m.message}
@@ -111,17 +111,12 @@ function Chat() {
             placeholder="Type a message..."
             value={text}
             onChange={(e) => setText(e.target.value)}
-
-            // Send message when Enter key is pressed
-            onKeyPress={(e) =>
-              e.key === "Enter" && handleSend()
-            }
+            onKeyDown={(e) => e.key === "Enter" && handleSend()}
           />
           <button className="send-btn" onClick={handleSend}>
             Send
           </button>
         </div>
-
       </div>
     </div>
   );

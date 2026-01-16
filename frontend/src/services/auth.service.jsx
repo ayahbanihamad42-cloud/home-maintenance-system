@@ -1,12 +1,40 @@
-// Import the configured Axios instance
-import API from "./api";
+import axios from "./api"; // ملف api.js موجود عندك
 
-// Send login request to the backend with user credentials
-export const login = data =>
-  API.post("/auth/login", data);
+// حفظ واسترجاع التوكن واليوزر
+export const setToken = (token) => localStorage.setItem("token", token);
+export const getToken = () => localStorage.getItem("token");
+export const removeToken = () => localStorage.removeItem("token");
 
-// Send register request to the backend with new user information
-export const register = data =>
-  API.post("/auth/register", data);
+export const setUser = (user) => localStorage.setItem("user", JSON.stringify(user));
+export const getUser = () => {
+  const user = localStorage.getItem("user");
+  return user ? JSON.parse(user) : null;
+};
+export const removeUser = () => localStorage.removeItem("user");
+
+// LOGIN
+export const login = async (credentials) => {
+  if (!credentials || !credentials.email || !credentials.password) {
+    throw new Error("Missing email or password");
+  }
+
+  const { email, password } = credentials;
+
+  const res = await axios.post("/auth/login", { email, password });
+  setToken(res.data.token);
+  setUser(res.data.user);
+  return res.data;
+};
+
+// REGISTER
+export const register = async (data) => {
+  const res = await axios.post("/auth/register", data);
+  return res.data;
+};
 
 
+// LOGOUT
+export const logout = () => {
+  removeToken();
+  removeUser();
+};

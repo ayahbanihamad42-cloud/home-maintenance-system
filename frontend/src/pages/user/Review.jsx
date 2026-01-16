@@ -16,7 +16,6 @@ import API from "../../services/api";
 
 // Component to review a maintenance request
 function ReviewRequest() {
-
   // Get requestId from URL
   const { requestId } = useParams();
 
@@ -40,7 +39,9 @@ function ReviewRequest() {
 
   // Fetch maintenance request details
   useEffect(() => {
-    getRequestById(requestId).then((data) => setReq(data));
+    getRequestById(requestId)
+      .then((data) => setReq(data))
+      .catch(() => setReq(null));
   }, [requestId]);
 
   // Fetch existing rating for this request (if any)
@@ -64,8 +65,8 @@ function ReviewRequest() {
 
     API.get(`/technicians/${req.technician_id}`)
       .then((res) => {
-        setTechnicianName(res.data.name);
-        setTechnicianUserId(res.data.user_id);
+        setTechnicianName(res.data?.name || "");
+        setTechnicianUserId(res.data?.user_id || null);
       })
       .catch(() => {
         setTechnicianName("");
@@ -86,7 +87,7 @@ function ReviewRequest() {
       confirmed: 0,
       on_the_way: 1,
       in_progress: 2,
-      completed: 3,
+      completed: 3
     };
 
     const normalizedStatus = String(req?.status || "").trim().toLowerCase();
@@ -97,8 +98,17 @@ function ReviewRequest() {
   const isCompleted =
     String(req?.status || "").trim().toLowerCase() === "completed";
 
-  // Show loading state until request is fetched
-  if (!req) return <p>Loading...</p>;
+  // Loading state
+  if (!req) {
+    return (
+      <>
+        <Header />
+        <div className="container">
+          <p>Loading...</p>
+        </div>
+      </>
+    );
+  }
 
   return (
     <>
@@ -107,7 +117,6 @@ function ReviewRequest() {
 
       <div className="container">
         <div className="glass-card">
-
           {/* Request basic information */}
           <h3>Request ID: #{req.id}</h3>
           <p><b>Service Type:</b> {req.service || "Not specified"}</p>
@@ -124,7 +133,7 @@ function ReviewRequest() {
               background: "#cfd8dc",
               padding: "10px",
               borderRadius: "10px",
-              margin: "15px 0",
+              margin: "15px 0"
             }}
           >
             <span style={{ flex: 1 }}>
@@ -139,9 +148,7 @@ function ReviewRequest() {
                   navigate(`/chat/${technicianUserId}`);
                   return;
                 }
-                setSubmitMessage(
-                  "Chat will be available once a technician is assigned."
-                );
+                setSubmitMessage("Chat will be available once a technician is assigned.");
               }}
             >
               Chat
@@ -153,9 +160,7 @@ function ReviewRequest() {
             {timelineSteps.map((step, index) => (
               <div
                 key={step}
-                className={`timeline-item ${
-                  activeIndex >= index ? "active" : ""
-                }`}
+                className={`timeline-item ${activeIndex >= index ? "active" : ""}`}
               >
                 {step}
               </div>
@@ -190,7 +195,7 @@ function ReviewRequest() {
                   width: "100%",
                   marginTop: "10px",
                   borderRadius: "10px",
-                  padding: "10px",
+                  padding: "10px"
                 }}
                 disabled={Boolean(existingRating)}
               />
@@ -209,7 +214,7 @@ function ReviewRequest() {
                     technician_id: req.technician_id,
                     request_id: req.id,
                     rating,
-                    comment,
+                    comment
                   })
                     .then(() => {
                       setSubmitMessage("Review submitted.");

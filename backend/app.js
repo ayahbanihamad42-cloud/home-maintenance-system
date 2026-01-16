@@ -15,7 +15,10 @@ import userRoutes from "./routes/userRoutes.js";
 const app = express();
 app.use(express.json());
 // Enable CORS for the frontend
-app.use(cors({ origin: "http://localhost:3000" }));
+app.use(cors({
+  origin: ["http://localhost:3000", "http://localhost:3001"],
+  credentials: true
+}));
 
 app.use("/api/auth", authRoutes);
 
