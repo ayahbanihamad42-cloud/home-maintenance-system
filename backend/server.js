@@ -27,8 +27,9 @@ import app from "./app.js";
 const PORT = process.env.PORT || 5000;
 
 // Start the server and listen for incoming requests
-app.listen(PORT, () => {
-  console.log("Server running on port " + PORT);
+app.listen(PORT, "0.0.0.0", () => {
+  console.log(`Server running on port ${PORT}`);
+  console.log(`Web: http://localhost:${PORT}`);
 });
 
 

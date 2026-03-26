@@ -16,7 +16,15 @@ const app = express();
 app.use(express.json());
 // Enable CORS for the frontend
 app.use(cors({
-  origin: ["http://localhost:3000", "http://localhost:3001"],
+  
+ origin: [
+    "http://localhost:3000",
+    "http://localhost:3001",
+
+    // Expo 
+    "exp://192.168.1.30:8081",
+    " http://localhost:8081"
+  ],
   credentials: true
 }));
 
