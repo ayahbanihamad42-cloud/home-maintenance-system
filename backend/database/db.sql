@@ -1,84 +1,77 @@
 CREATE TABLE users (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    name VARCHAR(100) NOT NULL,
-    email VARCHAR(100) UNIQUE NOT NULL,
-    phone VARCHAR(20),
+    id NUMBER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    name VARCHAR2(100) NOT NULL,
+    email VARCHAR2(100) UNIQUE NOT NULL,
+    phone VARCHAR2(20),
     dob DATE,
-    city VARCHAR(50),
-    password VARCHAR(255) NOT NULL,
-    role ENUM('user', 'technician', 'admin', 'store_owner') DEFAULT 'user',
-    is_verified BOOLEAN DEFAULT TRUE,
-    verification_token VARCHAR(255),
-    reset_token VARCHAR(255)
+    city VARCHAR2(50),
+    password VARCHAR2(255) NOT NULL,
+    role VARCHAR2(20) DEFAULT 'user',
+    is_verified NUMBER(1) DEFAULT 1,
+    verification_token VARCHAR2(255),
+    reset_token VARCHAR2(255)
 );
-
 CREATE TABLE technicians (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    user_id INT,
-    service VARCHAR(50),
-    experience INT,
+    id NUMBER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    user_id NUMBER,
+    service VARCHAR2(50),
+    experience NUMBER,
     FOREIGN KEY (user_id) REFERENCES users(id)
 );
-
 CREATE TABLE technician_availability (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    technician_id INT,
+    id NUMBER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    technician_id NUMBER,
     available_date DATE,
-    start_time TIME,
-    end_time TIME,
-    is_booked BOOLEAN DEFAULT FALSE,
+    start_time VARCHAR2(10),
+    end_time VARCHAR2(10),
+    is_booked NUMBER(1) DEFAULT 0,
     FOREIGN KEY (technician_id) REFERENCES technicians(id)
 );
-
 CREATE TABLE maintenance_requests (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    user_id INT,
-    technician_id INT,
-    description TEXT,
-    city VARCHAR(50),
-    service VARCHAR(50),
+    id NUMBER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    user_id NUMBER,
+    technician_id NUMBER,
+    description CLOB,
+    city VARCHAR2(50),
+    service VARCHAR2(50),
     scheduled_date DATE,
-    scheduled_time TIME,
-    status ENUM('pending', 'confirmed', 'completed') DEFAULT 'pending',
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    scheduled_time VARCHAR2(10),
+    status VARCHAR2(20) DEFAULT 'pending',
+    created_at DATE DEFAULT SYSDATE,
     FOREIGN KEY (user_id) REFERENCES users(id),
     FOREIGN KEY (technician_id) REFERENCES technicians(id)
 );
-
 CREATE TABLE stores (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    store_name VARCHAR(100),
-    category VARCHAR(50),
-    city VARCHAR(50),
-    address TEXT
+    id NUMBER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    store_name VARCHAR2(100),
+    category VARCHAR2(50),
+    city VARCHAR2(50),
+    address CLOB
 );
-
 CREATE TABLE messages (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    sender_id INT,
-    receiver_id INT,
-    message TEXT,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    id NUMBER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    sender_id NUMBER,
+    receiver_id NUMBER,
+    message CLOB,
+    created_at DATE DEFAULT SYSDATE,
     FOREIGN KEY (sender_id) REFERENCES users(id),
     FOREIGN KEY (receiver_id) REFERENCES users(id)
 );
-
 CREATE TABLE notifications (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    user_id INT,
-    message TEXT,
-    is_read BOOLEAN DEFAULT FALSE,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    id NUMBER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    user_id NUMBER,
+    message CLOB,
+    is_read NUMBER(1) DEFAULT 0,
+    created_at DATE DEFAULT SYSDATE,
     FOREIGN KEY (user_id) REFERENCES users(id)
 );
-
 CREATE TABLE ratings (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    user_id INT,
-    technician_id INT,
-    rating INT NOT NULL,
-    comment TEXT,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    id NUMBER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    user_id NUMBER,
+    technician_id NUMBER,
+    rating NUMBER NOT NULL,
+    review_comment CLOB,
+    created_at DATE DEFAULT SYSDATE,
     FOREIGN KEY (user_id) REFERENCES users(id),
     FOREIGN KEY (technician_id) REFERENCES technicians(id)
 );

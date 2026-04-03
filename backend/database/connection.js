@@ -1,13 +1,15 @@
 import mysql from "mysql2";
 import dotenv from "dotenv";
-dotenv.config();
-// Create database connection using .env settings
-const db = mysql.createConnection({
-  host: process.env.DB_HOST,
-  user: process.env.DB_USER,
-  password: process.env.DB_PASSWORD,
-  database: process.env.DB_NAME
-});
+
+import oracledb from "oracledb";
+
+export async function connectDB() {
+  return await oracledb.getConnection({
+    user: "YOUR_USERNAME",
+    password: "YOUR_PASSWORD",
+    connectString: "YOUR_DB_CONNECTION"
+  });
+}
 // Attempt DB connection and log result
 db.connect(err => {
   if (err) {
