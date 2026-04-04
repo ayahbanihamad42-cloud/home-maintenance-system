@@ -1,4 +1,4 @@
-import db from "../database/connection.js";
+import {db} from "../database/connection.js";
 // Send a new message
 export const sendMessage = (req, res) => {
     const { receiver_id, message } = req.body;

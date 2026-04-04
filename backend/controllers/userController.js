@@ -1,4 +1,4 @@
-import db from "../database/connection.js";
+import {db} from "../database/connection.js";
 import bcrypt from "bcryptjs";
 // Fetch user profile
 export const getUserProfile = (req, res) => {

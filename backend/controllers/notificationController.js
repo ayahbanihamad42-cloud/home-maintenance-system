@@ -1,4 +1,4 @@
-import db from "../database/connection.js";
+import {db} from "../database/connection.js";
 // Fetch user notifications
 export const getUserNotifications = (req, res) => {
   db.query(

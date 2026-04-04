@@ -1,4 +1,4 @@
-import db from "../database/connection.js";
+import {db} from "../database/connection.js";
 // Create a new maintenance request
 export const createRequest = (req, res) => {
     const { technician_id, description, scheduled_date, scheduled_time, city = null, service, location_note = null } = req.body;

@@ -1,6 +1,4 @@
-import db from "../database/connection.js";
-
-
+import {db} from "../database/connection.js";
 // Fetch technicians by service
 export const getTechniciansByService = (req, res) => {
   const { service } = req.params;

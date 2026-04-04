@@ -1,5 +1,5 @@
 // backend/controllers/authController.js
-import db from "../database/connection.js";
+import {db} from "../database/connection.js";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import nodemailer from "nodemailer";

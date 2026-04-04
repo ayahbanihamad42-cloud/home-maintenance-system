@@ -1,4 +1,4 @@
-import db from "../database/connection.js";
+import {db} from "../database/connection.js";
 // Add a technician rating
 export const addRating = (req, res) => {
   const { technician_id, request_id, rating, comment } = req.body;
