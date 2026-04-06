@@ -1,121 +1,177 @@
-import {db} from "../database/connection.js";
+import { db } from "../database/connection.js";
 import bcrypt from "bcryptjs";
-// Fetch all users
+
 export const getAllUsers = (req, res) => {
-    db.query("SELECT id, name, email, phone, city, role FROM users", (e, r) => {
-        if (e) return res.status(500).json(e);
-        res.json(r || []);
-    });
+  db.query("SELECT id, name, email, phone, city, role FROM users", (err, rows) => {
+    if (err) {
+      console.error("getAllUsers error:", err);
+      return res.status(500).json({ message: "Server error" });
+    }
+
+    res.json(rows || []);
+  });
 };
 
-// Fetch all technicians
 export const getAllTechnicians = (req, res) => {
-    const q = `SELECT t.id AS technicianId, u.id AS userId, u.name, u.email, u.phone, u.city, t.service, t.experience FROM users u 
-               JOIN technicians t ON u.id = t.user_id`;
-    db.query(q, (e, r) => {
-        if (e) return res.status(500).json(e);
-        res.json(r || []);
-    });
+  const q = `
+    SELECT 
+      t.id AS technicianId,
+      u.id AS userId,
+      u.name,
+      u.email,
+      u.phone,
+      u.city,
+      t.service,
+      t.experience
+    FROM users u
+    JOIN technicians t ON u.id = t.user_id
+  `;
+
+  db.query(q, (err, rows) => {
+    if (err) {
+      console.error("getAllTechnicians error:", err);
+      return res.status(500).json({ message: "Server error" });
+    }
+
+    res.json(rows || []);
+  });
 };
-// Create a new user from admin panel
+
 export const createUser = async (req, res) => {
-    const { name, email, phone, city, password, role } = req.body;
+  const { name, email, phone, city, password, role } = req.body;
 
-    if (!name || !email || !password) {
-        return res.status(400).json({ message: "Missing required fields" });
-    }
+  if (!name || !email || !password) {
+    return res.status(400).json({ message: "Missing required fields" });
+  }
 
-    db.query("SELECT id FROM users WHERE email = ?", [email], async (err, result) => {
-        if (err) return res.status(500).json({ message: "Database error", error: err });
-        if (result.length) {
-            return res.status(400).json({ message: "Email already registered" });
+  try {
+    db.query("SELECT id FROM users WHERE email = ?", [email], async (err, rows) => {
+      if (err) {
+        console.error("createUser check error:", err);
+        return res.status(500).json({ message: "Server error" });
+      }
+
+      if (rows.length) {
+        return res.status(400).json({ message: "Email already registered" });
+      }
+
+      const hash = await bcrypt.hash(password, 10);
+
+      db.query(
+        "INSERT INTO users (name, email, phone, city, password, role) VALUES (?, ?, ?, ?, ?, ?)",
+        [name, email, phone || null, city || null, hash, role || "user"],
+        (insertErr, result) => {
+          if (insertErr) {
+            console.error("createUser insert error:", insertErr);
+            return res.status(500).json({ message: "Server error" });
+          }
+
+          res.json({ message: "User created", id: result.insertId });
         }
-
-        const hash = await bcrypt.hash(password, 10);
-        db.query(
-            "INSERT INTO users (name, email, phone, city, password, role) VALUES (?, ?, ?, ?, ?, ?)",
-            [name, email, phone, city, hash, role || "user"],
-            (insertErr, insertResult) => {
-                if (insertErr) return res.status(500).json({ message: "Database error", error: insertErr });
-                res.json({ message: "User created", id: insertResult.insertId });
-            }
-        );
+      );
     });
+  } catch (error) {
+    console.error("createUser error:", error);
+    res.status(500).json({ message: "Server error" });
+  }
 };
-// Create a new technician from admin panel
+
 export const createTechnician = async (req, res) => {
-    const { name, email, phone, city, password, service, experience } = req.body;
+  const { name, email, phone, city, password, service, experience } = req.body;
 
-    if (!name || !email || !password || !service) {
-        return res.status(400).json({ message: "Missing required fields" });
-    }
+  if (!name || !email || !password || !service) {
+    return res.status(400).json({ message: "Missing required fields" });
+  }
 
-    db.query("SELECT id FROM users WHERE email = ?", [email], async (err, result) => {
-        if (err) return res.status(500).json({ message: "Database error", error: err });
-        if (result.length) {
-            return res.status(400).json({ message: "Email already registered" });
-        }
+  try {
+    db.query("SELECT id FROM users WHERE email = ?", [email], async (err, rows) => {
+      if (err) {
+        console.error("createTechnician check error:", err);
+        return res.status(500).json({ message: "Server error" });
+      }
 
-        const hash = await bcrypt.hash(password, 10);
-        db.query(
-            "INSERT INTO users (name, email, phone, city, password, role) VALUES (?, ?, ?, ?, ?, ?)",
-            [name, email, phone, city, hash, "technician"],
-            (insertErr, insertResult) => {
-                if (insertErr) return res.status(500).json({ message: "Database error", error: insertErr });
+      if (rows.length) {
+        return res.status(400).json({ message: "Email already registered" });
+      }
 
-                db.query(
-                    "INSERT INTO technicians (user_id, service, experience) VALUES (?, ?, ?)",
-                    [insertResult.insertId, service, experience || 0],
-                    (techErr, techResult) => {
-                        if (techErr) return res.status(500).json({ message: "Database error", error: techErr });
-                        res.json({ message: "Technician created", technicianId: techResult.insertId });
-                    }
-                );
+      const hash = await bcrypt.hash(password, 10);
+
+      db.query(
+        "INSERT INTO users (name, email, phone, city, password, role) VALUES (?, ?, ?, ?, ?, 'technician')",
+        [name, email, phone || null, city || null, hash],
+        (insertErr, userResult) => {
+          if (insertErr) {
+            console.error("createTechnician user insert error:", insertErr);
+            return res.status(500).json({ message: "Server error" });
+          }
+
+          db.query(
+            "INSERT INTO technicians (user_id, service, experience) VALUES (?, ?, ?)",
+            [userResult.insertId, service, experience || 0],
+            (techErr, techResult) => {
+              if (techErr) {
+                console.error("createTechnician tech insert error:", techErr);
+                return res.status(500).json({ message: "Server error" });
+              }
+
+              res.json({ message: "Technician created", id: techResult.insertId });
             }
-        );
+          );
+        }
+      );
     });
+  } catch (error) {
+    console.error("createTechnician error:", error);
+    res.status(500).json({ message: "Server error" });
+  }
 };
-// Delete a user
+
 export const deleteUser = (req, res) => {
-    const { id } = req.params;
+  const { id } = req.params;
 
-    if (!id) {
-        return res.status(400).json({ message: "Missing user id" });
+  db.query("DELETE FROM users WHERE id = ?", [id], (err, result) => {
+    if (err) {
+      console.error("deleteUser error:", err);
+      return res.status(500).json({ message: "Server error" });
     }
 
-    db.query("DELETE FROM technicians WHERE user_id = ?", [id], (techErr) => {
-        if (techErr) return res.status(500).json({ message: "Database error", error: techErr });
+    if (!result.affectedRows) {
+      return res.status(404).json({ message: "User not found" });
+    }
 
-        db.query("DELETE FROM users WHERE id = ?", [id], (userErr, result) => {
-            if (userErr) return res.status(500).json({ message: "Database error", error: userErr });
-            if (!result.affectedRows) {
-                return res.status(404).json({ message: "User not found" });
-            }
-            res.json({ message: "User deleted" });
-        });
-    });
+    res.json({ message: "User deleted" });
+  });
 };
-// Delete a technician
-export const deleteTechnician = (req, res) => {
-    const { id } = req.params;
 
-    if (!id) {
-        return res.status(400).json({ message: "Missing technician id" });
+export const deleteTechnician = (req, res) => {
+  const { id } = req.params;
+
+  db.query("SELECT user_id FROM technicians WHERE id = ?", [id], (err, rows) => {
+    if (err) {
+      console.error("deleteTechnician select error:", err);
+      return res.status(500).json({ message: "Server error" });
     }
 
-    db.query("SELECT user_id FROM technicians WHERE id = ?", [id], (findErr, rows) => {
-        if (findErr) return res.status(500).json({ message: "Database error", error: findErr });
-        if (!rows.length) {
-            return res.status(404).json({ message: "Technician not found" });
+    if (!rows.length) {
+      return res.status(404).json({ message: "Technician not found" });
+    }
+
+    const userId = rows[0].user_id;
+
+    db.query("DELETE FROM technicians WHERE id = ?", [id], (techErr) => {
+      if (techErr) {
+        console.error("deleteTechnician delete tech error:", techErr);
+        return res.status(500).json({ message: "Server error" });
+      }
+
+      db.query("DELETE FROM users WHERE id = ?", [userId], (userErr) => {
+        if (userErr) {
+          console.error("deleteTechnician delete user error:", userErr);
+          return res.status(500).json({ message: "Server error" });
         }
 
-        const userId = rows[0].user_id;
-        db.query("DELETE FROM technicians WHERE id = ?", [id], (techErr) => {
-            if (techErr) return res.status(500).json({ message: "Database error", error: techErr });
-            db.query("DELETE FROM users WHERE id = ?", [userId], (userErr) => {
-                if (userErr) return res.status(500).json({ message: "Database error", error: userErr });
-                res.json({ message: "Technician deleted" });
-            });
-        });
+        res.json({ message: "Technician deleted" });
+      });
     });
+  });
 };

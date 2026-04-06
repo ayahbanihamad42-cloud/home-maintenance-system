@@ -1,5 +1,5 @@
-import {db} from "../database/connection.js";
-// Add a technician rating
+import { db } from "../database/connection.js";
+
 export const addRating = (req, res) => {
   const { technician_id, request_id, rating, comment } = req.body;
 
@@ -8,37 +8,49 @@ export const addRating = (req, res) => {
   }
 
   db.query(
-    `INSERT INTO ratings (user_id,technician_id,request_id,rating,comment)
-     VALUES (?,?,?,?,?)`,
-    [req.user.id, technician_id, request_id, rating, comment],
+    `INSERT INTO ratings (user_id, technician_id, request_id, rating, comment)
+     VALUES (?, ?, ?, ?, ?)`,
+    [req.user.id, technician_id, request_id, rating, comment || null],
     (err) => {
-      if (err) return res.status(500).json(err);
+      if (err) {
+        console.error("addRating error:", err);
+        return res.status(500).json({ message: "Server error" });
+      }
+
       res.json({ message: "Rating added" });
     }
   );
 };
-// Fetch all ratings for a technician
+
 export const getTechnicianRatings = (req, res) => {
   const { technicianId } = req.params;
 
   db.query(
-    "SELECT rating,comment FROM ratings WHERE technician_id=?",
+    "SELECT rating, comment FROM ratings WHERE technician_id = ?",
     [technicianId],
     (err, rows) => {
-      if (err) return res.status(500).json(err);
-      res.json(rows);
+      if (err) {
+        console.error("getTechnicianRatings error:", err);
+        return res.status(500).json({ message: "Server error" });
+      }
+
+      res.json(rows || []);
     }
   );
 };
-// Fetch rating for a specific request
+
 export const getRatingByRequest = (req, res) => {
   const { requestId } = req.params;
 
   db.query(
-    "SELECT rating,comment FROM ratings WHERE request_id = ? AND user_id = ?",
+    "SELECT rating, comment FROM ratings WHERE request_id = ? AND user_id = ?",
     [requestId, req.user.id],
     (err, rows) => {
-      if (err) return res.status(500).json(err);
+      if (err) {
+        console.error("getRatingByRequest error:", err);
+        return res.status(500).json({ message: "Server error" });
+      }
+
       res.json(rows[0] || null);
     }
   );

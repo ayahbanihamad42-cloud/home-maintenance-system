@@ -16,15 +16,28 @@ const app = express();
 app.use(express.json());
 // Enable CORS for the frontend
 app.use(cors({
-  
- origin: [
-    "http://localhost:3000",
-    "http://localhost:3001",
+  origin: function (origin, callback) {
 
-    // Expo 
-    "exp://192.168.1.30:8081",
-    " http://localhost:8081"
-  ],
+    // Allow requests with no origin (like mobile apps or curl requests)
+    if (!origin) return callback(null, true);
+
+    const allowedOrigins = [
+      "http://localhost:3000",
+      "http://localhost:3001",
+
+      // Expo 
+      "exp://192.168.1.30:8081",
+
+      // Expo web
+      "http://localhost:8081"
+    ];
+
+    if (allowedOrigins.includes(origin)) {
+      return callback(null, true);
+    } else {
+      return callback(null, false);
+    }
+  },
   credentials: true
 }));
 

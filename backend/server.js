@@ -9,8 +9,8 @@ const __dirname = path.dirname(__filename);
 dotenv.config({ path: path.join(__dirname, ".env") });
 
 // اختبار سريع
-console.log("DB_USER =", process.env.DB_USER);
-console.log("HAS_DB_PASSWORD =", !!process.env.DB_PASSWORD);
+//console.log("DB_USER =", process.env.DB_USER);
+//console.log("HAS_DB_PASSWORD =", !!process.env.DB_PASSWORD);
 
 import app from "./app.js";
 

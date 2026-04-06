@@ -1,20 +1,31 @@
-import {db} from "../database/connection.js";
+import { db } from "../database/connection.js";
 import bcrypt from "bcryptjs";
-// Fetch user profile
+
 export const getUserProfile = (req, res) => {
   const { id } = req.params;
+
+  if (Number(req.user.id) !== Number(id) && req.user.role !== "admin") {
+    return res.status(403).json({ message: "Not authorized" });
+  }
+
   db.query(
     "SELECT id, name, email, phone, city, dob, role FROM users WHERE id = ?",
     [id],
     (err, rows) => {
-      if (err) return res.status(500).json(err);
-      if (!rows.length) return res.status(404).json({ message: "User not found" });
+      if (err) {
+        console.error("getUserProfile error:", err);
+        return res.status(500).json({ message: "Server error" });
+      }
+
+      if (!rows.length) {
+        return res.status(404).json({ message: "User not found" });
+      }
+
       res.json(rows[0]);
     }
   );
 };
 
-// Update user password
 export const updateUserPassword = async (req, res) => {
   const { id } = req.params;
   const { password } = req.body;
@@ -29,20 +40,29 @@ export const updateUserPassword = async (req, res) => {
 
   try {
     const hash = await bcrypt.hash(password, 10);
+
     db.query(
       "UPDATE users SET password = ? WHERE id = ?",
       [hash, id],
       (err, result) => {
-        if (err) return res.status(500).json(err);
-        if (!result.affectedRows) return res.status(404).json({ message: "User not found" });
+        if (err) {
+          console.error("updateUserPassword error:", err);
+          return res.status(500).json({ message: "Server error" });
+        }
+
+        if (!result.affectedRows) {
+          return res.status(404).json({ message: "User not found" });
+        }
+
         res.json({ message: "Password updated" });
       }
     );
   } catch (error) {
-    res.status(500).json({ message: "Password update failed" });
+    console.error("updateUserPassword exception:", error);
+    res.status(500).json({ message: "Server error" });
   }
 };
-// Update core user profile data
+
 export const updateUserProfile = (req, res) => {
   const { id } = req.params;
   const { email, phone } = req.body;
@@ -56,15 +76,28 @@ export const updateUserProfile = (req, res) => {
   }
 
   db.query("SELECT id FROM users WHERE email = ? AND id != ?", [email, id], (checkErr, rows) => {
-    if (checkErr) return res.status(500).json(checkErr);
-    if (rows.length) return res.status(400).json({ message: "Email already in use." });
+    if (checkErr) {
+      console.error("updateUserProfile check error:", checkErr);
+      return res.status(500).json({ message: "Server error" });
+    }
+
+    if (rows.length) {
+      return res.status(400).json({ message: "Email already in use." });
+    }
 
     db.query(
       "UPDATE users SET email = ?, phone = ? WHERE id = ?",
       [email, phone || null, id],
       (err, result) => {
-        if (err) return res.status(500).json(err);
-        if (!result.affectedRows) return res.status(404).json({ message: "User not found" });
+        if (err) {
+          console.error("updateUserProfile update error:", err);
+          return res.status(500).json({ message: "Server error" });
+        }
+
+        if (!result.affectedRows) {
+          return res.status(404).json({ message: "User not found" });
+        }
+
         res.json({ message: "Profile updated" });
       }
     );

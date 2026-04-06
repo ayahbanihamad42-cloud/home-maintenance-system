@@ -1,4 +1,6 @@
 import express from "express";
+import auth from "../utils/authMiddleware.js";
+import requireRole from "../utils/requireRole.js";
 import {
   createTechnician,
   createUser,
@@ -7,18 +9,17 @@ import {
   getAllTechnicians,
   getAllUsers
 } from "../controllers/adminController.js";
-// Create router for admin routes
-const router = express.Router();    
-// Fetch all technicians
+
+const router = express.Router();
+// All routes in this router require authentication and admin role
+router.use(auth, requireRole("admin"));
+//fetch all technicians and users
 router.get("/technicians", getAllTechnicians);
-// Fetch all technicians
 router.get("/users", getAllUsers);
- //Create a new user
+//create technician and user accaounts and delete them
 router.post("/users", createUser);
-// Create a new technician
 router.post("/technicians", createTechnician);
-// Delete a user
 router.delete("/users/:id", deleteUser);
-// Delete a technician
 router.delete("/technicians/:id", deleteTechnician);
+
 export default router;
