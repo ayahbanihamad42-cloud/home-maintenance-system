@@ -1,22 +1,23 @@
-import React, { useEffect } from "react";
-import { getUser } from "../../services/auth.service.jsx";
+import { useEffect } from "react";
+import { useNavigation } from "@react-navigation/native";
+import { getUser, getToken } from "../services/auth.service";
 
 function normalizeRole(role) {
   return role ? String(role).trim().toLowerCase() : "";
 }
 
-function AdminRedirect({ children, navigation, routeName }) {
-
-  const user = getUser();
-  const role = normalizeRole(user?.role);
+export default function AdminRedirect() {
+  const navigation = useNavigation();
 
   useEffect(() => {
-    if (role === "admin" && routeName !== "Admin") {
-      navigation.replace("Admin");
+    const user = getUser();
+    const token = getToken();
+    const role = normalizeRole(user?.role);
+
+    if (user && token && role === "admin") {
+      navigation.replace("Admin"); // اسم شاشة الأدمن
     }
-  }, [role]);
+  }, []);
 
-  return children;
+  return null;
 }
-
-export default AdminRedirect;
