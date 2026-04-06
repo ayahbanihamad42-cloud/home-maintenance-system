@@ -1,36 +1,47 @@
-// React library
-import React from "react";
+import { createContext, useMemo, useState } from "react";
+import { logout as clearAuthStorage } from "../../services/auth.service";
 
-// Routing utilities
-import { Navigate, useLocation } from "react-router-dom";
+export const AuthContext = createContext();
 
-// Auth helper (read stored user)
-import { getUser } from "../../services/auth.service.jsx";
+export const AuthProvider = ({ children }) => {
+  const [user, setUser] = useState(() => {
+    const raw = localStorage.getItem("user");
+    return raw ? JSON.parse(raw) : null;
+  });
 
-// Normalize role text to avoid case/space issues
-function normalizeRole(role) {
-  return role ? String(role).trim().toLowerCase() : "";
-}
+  const login = (data) => {
+    if (!data?.token || !data?.user) return;
 
-// Admin redirect wrapper component
-function AdminRedirect({ children }) {
-  // Get current location
-  const location = useLocation();
+    localStorage.setItem("token", data.token);
+    localStorage.setItem(
+      "user",
+      JSON.stringify({
+        id: data.user.id,
+        name: data.user.name,
+        email: data.user.email,
+        role: data.user.role,
+        phone: data.user.phone || null,
+        city: data.user.city || null
+      })
+    );
 
-  // Get logged-in user from storage
-  const user = getUser();
+    setUser({
+      id: data.user.id,
+      name: data.user.name,
+      email: data.user.email,
+      role: data.user.role,
+      phone: data.user.phone || null,
+      city: data.user.city || null
+    });
+  };
 
-  // Extract normalized role
-  const role = normalizeRole(user?.role);
+  const logout = () => {
+    clearAuthStorage();
+    setUser(null);
+  };
 
-  // Redirect admin users to admin dashboard (if they are not already there)
-  if (role === "admin" && location.pathname !== "/admin") {
-    return <Navigate to="/admin" replace />;
-  }
+  const value = useMemo(() => ({ user, login, logout }), [user]);
 
-  // Render the wrapped page normally for other roles
-  return children;
-}
-
-// Export component
-export default AdminRedirect;
+  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
+};
+export default AuthProvider;
