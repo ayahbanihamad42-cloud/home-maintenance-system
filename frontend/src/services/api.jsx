@@ -1,26 +1,76 @@
-// Import axios library for making HTTP requests
-import axios from "axios";
+mobile/src/services/auth.service.js
 
-// Create a custom Axios instance with a base API URL
-const API = axios.create({
-  baseURL: "http://localhost:5000/api"
-});
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import api from "./api";
 
-// Add a request interceptor
-// This runs before every request is sent
-API.interceptors.request.use(config => {
-  // Get the authentication token from localStorage
-  const token = localStorage.getItem("token");
+export const setToken = async (token) => {
+  await AsyncStorage.setItem("token", token);
+};
 
-  // If a token exists, attach it to the Authorization header
-  if (token) {
-    config.headers.Authorization = `Bearer ${token}`;
+export const getToken = async () => {
+  return await AsyncStorage.getItem("token");
+};
+
+export const removeToken = async () => {
+  await AsyncStorage.removeItem("token");
+};
+
+export const setUser = async (user) => {
+  if (!user) return;
+
+  const safeUser = {
+    id: user.id,
+    name: user.name,
+    email: user.email,
+    role: user.role,
+    phone: user.phone || null,
+    city: user.city || null
+  };
+
+  await AsyncStorage.setItem("user", JSON.stringify(safeUser));
+};
+
+export const getUser = async () => {
+  const raw = await AsyncStorage.getItem("user");
+  return raw ? JSON.parse(raw) : null;
+};
+
+export const removeUser = async () => {
+  await AsyncStorage.removeItem("user");
+};
+
+export const login = async (credentials) => {
+  if (!credentials?.email || !credentials?.password) {
+    throw new Error("Missing email or password");
   }
 
-  // Return the modified config to continue the request
-  return config;
-});
+  const res = await api.post("/auth/login", {
+    email: credentials.email,
+    password: credentials.password
+  });
 
-// Export the configured Axios instance
-export default API;
+  await setToken(res.data.token);
+  await setUser(res.data.user);
+
+  return res.data;
+};
+
+export const register = async (data) => {
+  const payload = {
+    name: data.name,
+    email: data.email,
+    phone: data.phone || "",
+    dob: data.dob || "",
+    city: data.city || "",
+    password: data.password
+  };
+
+  const res = await api.post("/auth/register", payload);
+  return res.data;
+};
+
+export const logout = async () => {
+  await removeToken();
+  await removeUser();
+};
 
