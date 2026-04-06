@@ -1,14 +1,24 @@
-// Import the shared Axios API instance
-import API from "./api";
+mobile/src/services/notificationService.js
 
-// Fetch notification feed (messages + requests) for logged-in user
-export const getNotifications = () => API.get("/notifications/feed");
+import api from "./api";
 
-// Fetch raw notifications table for the logged-in user (optional)
-export const getUserNotifications = () => API.get("/notifications");
+export const getNotifications = async () => {
+  const res = await api.get("/notifications/feed");
+  return res.data;
+};
 
-// Mark a notification as read
-export const markNotificationAsRead = (id) => API.put(`/notifications/${id}`);
+export const getUserNotifications = async () => {
+  const res = await api.get("/notifications");
+  return res.data;
+};
 
-// Send a new notification (if your backend supports POST /notifications)
-export const sendNotification = (data) => API.post("/notifications", data);
+export const markNotificationAsRead = async (id) => {
+  const res = await api.put(`/notifications/${id}`);
+  return res.data;
+};
+
+export const sendNotification = async (data) => {
+  const res = await api.post("/notifications", data);
+  return res.data;
+};
+
