@@ -1,18 +1,24 @@
-// Import the shared Axios API instance
-import API from "./api";
+mobile/src/services/maintenanceService.js
 
-// Create a new maintenance request
-export const createMaintenanceRequest = (data) =>
-  API.post("/maintenance", data).then((res) => res.data);
+import api from "./api";
 
-// Get all maintenance requests for the logged-in user
-export const getUserRequests = () =>
-  API.get("/maintenance/my").then((res) => res.data);
+export const createMaintenanceRequest = async (data) => {
+  const res = await api.post("/maintenance", data);
+  return res.data;
+};
 
-// Get details of a single maintenance request by its ID
-export const getRequestById = (id) =>
-  API.get(`/maintenance/${id}`).then((res) => res.data);
+export const getUserRequests = async () => {
+  const res = await api.get("/maintenance/my");
+  return res.data;
+};
 
-// Update request status (if you use it in technician/admin flows)
-export const updateRequestStatus = (id, data) =>
-  API.patch(`/maintenance/${id}/status`, data).then((res) => res.data);
+export const getRequestById = async (id) => {
+  const res = await api.get(`/maintenance/${id}`);
+  return res.data;
+};
+
+export const updateRequestStatus = async (id, data) => {
+  const res = await api.patch(`/maintenance/${id}/status`, data);
+  return res.data;
+};
+
