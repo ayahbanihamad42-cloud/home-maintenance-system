@@ -1,6 +1,4 @@
-mobile/src/services/technicianService.js
-
-import api from "./api";
+import api from "../services/api";
 
 export const getTechnicians = async (service) => {
   const res = await api.get(`/technicians/service/${service}`);
