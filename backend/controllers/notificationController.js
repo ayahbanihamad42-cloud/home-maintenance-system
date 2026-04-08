@@ -1,15 +1,21 @@
-import {db} from "../database/connection.js";
+import { db } from "../database/connection.js";
+
 // Fetch user notifications
 export const getUserNotifications = (req, res) => {
   db.query(
     "SELECT * FROM notifications WHERE user_id=? ORDER BY id DESC",
     [req.user.id],
     (err, result) => {
-      if (err) return res.status(500).json(err);
-      res.json(result);
+      if (err) {
+        console.error("getUserNotifications error:", err);
+        return res.status(500).json({ message: "Server error" });
+      }
+
+      res.json(result || []);
     }
   );
 };
+
 // Mark notification as read
 export const markAsRead = (req, res) => {
   const { id } = req.params;
@@ -18,7 +24,11 @@ export const markAsRead = (req, res) => {
     "UPDATE notifications SET is_read=1 WHERE id=? AND user_id=?",
     [id, req.user.id],
     (err) => {
-      if (err) return res.status(500).json(err);
+      if (err) {
+        console.error("markAsRead error:", err);
+        return res.status(500).json({ message: "Server error" });
+      }
+
       res.json({ message: "Notification marked as read" });
     }
   );
@@ -28,14 +38,20 @@ export const markAsRead = (req, res) => {
 export const createNotification = (userId, message) => {
   db.query(
     "INSERT INTO notifications (user_id, message) VALUES (?,?)",
-    [userId, message]
+    [userId, message],
+    (err) => {
+      if (err) {
+        console.error("createNotification error:", err);
+      }
+    }
   );
 };
+
 // Build notification feed combining messages and requests
 export const getNotificationFeed = (req, res) => {
   const userId = req.user.id;
   const userRole = req.user.role;
-  // Fetch latest user messages
+
   const fetchMessages = () =>
     new Promise((resolve, reject) => {
       db.query(
@@ -47,7 +63,7 @@ export const getNotificationFeed = (req, res) => {
         }
       );
     });
- // Fetch latest technician requests
+
   const fetchRequestsForTechnician = () =>
     new Promise((resolve, reject) => {
       const q = `
@@ -58,13 +74,13 @@ export const getNotificationFeed = (req, res) => {
         ORDER BY r.created_at DESC
         LIMIT 5
       `;
+
       db.query(q, [userId], (err, rows) => {
         if (err) return reject(err);
         resolve(rows || []);
       });
     });
 
-  // Fetch latest user requests
   const fetchRequestsForUser = () =>
     new Promise((resolve, reject) => {
       db.query(
@@ -90,6 +106,7 @@ export const getNotificationFeed = (req, res) => {
         chatUserId: item.sender_id,
         created_at: item.created_at
       }));
+
       const requestItems = requests.map((item) => ({
         id: `req-${item.id}`,
         type: "request",
@@ -102,7 +119,11 @@ export const getNotificationFeed = (req, res) => {
       const feed = [...messageItems, ...requestItems].sort(
         (a, b) => new Date(b.created_at) - new Date(a.created_at)
       );
+
       res.json(feed);
     })
-    .catch((err) => res.status(500).json(err));
+    .catch((err) => {
+      console.error("getNotificationFeed error:", err);
+      res.status(500).json({ message: "Server error" });
+    });
 };

@@ -12,3 +12,4 @@ export const getRatingByRequest = async (requestId) => {
   const res = await API.get(`/ratings/request/${requestId}`); // Fetch rating by request ID
   return res.data; // Return rating data
 };
+

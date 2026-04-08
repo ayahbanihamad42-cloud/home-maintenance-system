@@ -1,47 +1,26 @@
-import { createContext, useMemo, useState } from "react";
-import { logout as clearAuthStorage } from "../../services/auth.service";
+import React from "react";
+import { Navigate, useLocation } from "react-router-dom";
+import { getUser, getToken } from "../../services/auth.service";
 
-export const AuthContext = createContext();
+function normalizeRole(role) {
+  return role ? String(role).trim().toLowerCase() : "";
+}
 
-export const AuthProvider = ({ children }) => {
-  const [user, setUser] = useState(() => {
-    const raw = localStorage.getItem("user");
-    return raw ? JSON.parse(raw) : null;
-  });
+function AdminRedirect({ children }) {
+  const location = useLocation();
+  const user = getUser();
+  const token = getToken();
+  const role = normalizeRole(user?.role);
 
-  const login = (data) => {
-    if (!data?.token || !data?.user) return;
+  if (!user || !token) {
+    return children;
+  }
 
-    localStorage.setItem("token", data.token);
-    localStorage.setItem(
-      "user",
-      JSON.stringify({
-        id: data.user.id,
-        name: data.user.name,
-        email: data.user.email,
-        role: data.user.role,
-        phone: data.user.phone || null,
-        city: data.user.city || null
-      })
-    );
+  if (role === "admin" && location.pathname !== "/admin") {
+    return <Navigate to="/admin" replace />;
+  }
 
-    setUser({
-      id: data.user.id,
-      name: data.user.name,
-      email: data.user.email,
-      role: data.user.role,
-      phone: data.user.phone || null,
-      city: data.user.city || null
-    });
-  };
+  return children;
+}
 
-  const logout = () => {
-    clearAuthStorage();
-    setUser(null);
-  };
-
-  const value = useMemo(() => ({ user, login, logout }), [user]);
-
-  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
-};
-export default AuthProvider;
+export default AdminRedirect;
