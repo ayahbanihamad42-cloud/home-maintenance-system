@@ -1,13 +1,10 @@
-mobile/src/services/chatService.js
+// Import the shared Axios API instance
+import API from "./api";
 
-import api from "./api";
+// Fetch all chat messages between logged-in user and another user
+export const getChatMessages = (userId) =>
+  API.get(`/chat/${userId}`).then((r) => r.data);
 
-export const getChatMessages = async (userId) => {
-  const res = await api.get(`/chat/${userId}`);
-  return res.data;
-};
-
-export const sendChatMessage = async (data) => {
-  const res = await api.post("/chat", data);
-  return res.data;
-};
+// Send a new chat message to the backend
+export const sendChatMessage = (data) =>
+  API.post("/chat", data).then((r) => r.data);

@@ -1,10 +1,6 @@
- mobile/src/services/storeService.js
-
-import api from "./api";
+import API from "./api";
 
 export const getStoresByService = async (service) => {
-  const res = await api.get(`/stores?service=${service}`);
+  const res = await API.get(`/stores?service=${service}`);
   return res.data;
 };
-
-
