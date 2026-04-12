@@ -1,14 +1,14 @@
-mobile/src/services/aiService.js
+mobile/src/services/chatService.js
 
 import api from "./api";
 
-export const chatWithAI = async (message) => {
-  const res = await api.post("/ai/chat", { message });
+export const getChatMessages = async (userId) => {
+  const res = await api.get(`/chat/${userId}`);
   return res.data;
 };
 
-export const getAIResponses = async (userId) => {
-  const res = await api.get(`/ai/${userId}`);
+export const sendChatMessage = async (data) => {
+  const res = await api.post("/chat", data);
   return res.data;
 };
 
