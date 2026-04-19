@@ -1,128 +1,100 @@
-// Import React and required hooks
-import React, { useEffect, useState } from "react";
-
-// Import AI chat service
-import { chatWithAI } from "../services/aiService";
-
-// Import shared Header component
+import React, { useEffect, useState, useRef } from "react";
+import { chatWithAI, generateAIImage } from "../services/aiService";
 import Header from "../components/common/Header";
-
-// Import global styles
 import "../index.css";
-
-// Import AI assistant image
 import aiimage from "../images/aiassistant.png";
 
-// AI Chat page component
 function AIChat() {
-
-  // State to store chat messages (user and AI)
   const [messages, setMessages] = useState([
     {
       role: "ai",
-      text: "Hello! I'm your ServiceHub AI assistant. How can I help you today?"
+      text: "Hello! I'm your ServiceHub AI assistant. I can chat and generate images for you!"
     }
   ]);
-
-  // State to store user input text
   const [input, setInput] = useState("");
+  const [loading, setLoading] = useState(false);
+  const fileInputRef = useRef(null);
 
-  // Fallback message if AI service fails
-  const fallbackMessage =
-    "حالياً ما قدرت أوصل للخدمة، جرّب ترجع لي بعد شوي.";
+  const fallbackMessage = "حالياً ما قدرت أوصل للخدمة، جرّب ترجع لي بعد شوي.";
 
-  // Function to send user message and get AI response
-  const handleSend = async () => {
+  const handleSend = async (content = null, type = "text") => {
+    const messageValue = content || input;
+    if (!messageValue.trim()) return;
 
-    // Prevent sending empty messages
-    if (!input) return;
-
-    // Store current input
-    const outgoing = input;
-
-    // Add user message to chat
-    setMessages((prev) => [
-      ...prev,
-      { role: "user", text: outgoing }
-    ]);
-
-    // Clear input field
-    setInput("");
+    setMessages((prev) => [...prev, { role: "user", text: type === "text" ? messageValue : "Sent an image", image: type === "image" ? messageValue : null }]);
+    if (type === "text") setInput("");
+    setLoading(true);
 
     try {
-      // Call AI service with user message
-      const response = await chatWithAI(outgoing);
-
-      // Add AI reply to chat
-      setMessages((prev) => [
-        ...prev,
-        { role: "ai", text: response.reply }
-      ]);
+      if (messageValue.toLowerCase().startsWith("/draw")) {
+        const prompt = messageValue.replace("/draw", "").trim();
+        const response = await generateAIImage(prompt);
+        setMessages((prev) => [...prev, { role: "ai", text: `Here is your image for: ${prompt}`, image: response.url }]);
+      } else {
+        const response = await chatWithAI(messageValue);
+        setMessages((prev) => [...prev, { role: "ai", text: response.reply }]);
+      }
     } catch (error) {
-      // Show fallback message if request fails
-      setMessages((prev) => [
-        ...prev,
-        { role: "ai", text: fallbackMessage }
-      ]);
+      setMessages((prev) => [...prev, { role: "ai", text: fallbackMessage }]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleFileUpload = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        handleSend(reader.result, "image");
+      };
+      reader.readAsDataURL(file);
     }
   };
 
   return (
     <>
-      {/* Display main header */}
       <Header />
-
-      {/* Chat page wrapper */}
       <div className="chat-wrapper">
-
-        {/* Chat container styled for AI */}
         <div className="chat-shell chat-shell--ai">
-
-          {/* Chat header section */}
           <div className="chat-header-bar">
-
-            {/* AI avatar */}
             <div className="chat-avatar">
               <img src={aiimage} alt="AI Assistant" />
             </div>
-
-            {/* Chat title and subtitle */}
             <div className="chat-title-block">
               <h3>AI Assistant</h3>
-              <span>Availability depends on service status</span>
+              <span>Ask for "/draw [prompt]" to generate images</span>
             </div>
           </div>
 
-          {/* Messages display area */}
           <div className="messages-container">
             {messages.map((m, i) => (
-              <div
-                key={i}
-                className={`message-bubble ${
-                  m.role === "ai" ? "other-message" : "my-message"
-                }`}
-              >
-                {m.text}
+              <div key={i} className={`message-bubble ${m.role === "ai" ? "other-message" : "my-message"}`}>
+                {m.image && <img src={m.image} alt="content" style={{ maxWidth: '100%', borderRadius: '8px', marginBottom: '5px' }} />}
+                <p>{m.text}</p>
               </div>
             ))}
+            {loading && <div className="message-bubble other-message">Thinking...</div>}
           </div>
 
-          {/* Chat input and send button */}
           <div className="chat-input-area">
-
-            {/* Text input field */}
+            <input 
+              type="file" 
+              accept="image/*" 
+              style={{ display: 'none' }} 
+              ref={fileInputRef} 
+              onChange={handleFileUpload} 
+            />
+            <button className="icon-btn" onClick={() => fileInputRef.current.click()}>📷</button>
+            
             <input
               className="chat-input"
-              placeholder="Ask me anything..."
+              placeholder="Ask anything or use /draw..."
               value={input}
               onChange={(e) => setInput(e.target.value)}
-              onKeyDown={(e) =>
-                e.key === "Enter" && handleSend()
-              }
+              onKeyDown={(e) => e.key === "Enter" && handleSend()}
             />
-
-            {/* Send message button */}
-            <button className="send-btn" onClick={handleSend}>
+            <button className="send-btn" onClick={() => handleSend()}>
               Send
             </button>
           </div>
@@ -132,5 +104,5 @@ function AIChat() {
   );
 }
 
-// Export AIChat component
 export default AIChat;
+
