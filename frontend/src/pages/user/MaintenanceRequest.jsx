@@ -8,7 +8,10 @@ import { useNavigate, useParams } from "react-router-dom";
 import Header from "../../components/common/Header";
 
 // Import technician and maintenance services
-import { getTechnicians, getAvailability } from "../../services/technicianService";
+import {
+  getTechnicians,
+  getAvailability,
+} from "../../services/technicianService";
 import { createMaintenanceRequest } from "../../services/maintenanceService";
 
 // Import API instance
@@ -46,7 +49,10 @@ function MaintenanceRequest() {
   // Fetch technicians when service changes
   useEffect(() => {
     if (!service) return;
-    getTechnicians(service).then((data) => setTechnicians(data || [])).catch(() => setTechnicians([]));
+
+    getTechnicians(service)
+      .then((data) => setTechnicians(data || []))
+      .catch(() => setTechnicians([]));
   }, [service]);
 
   // Fetch technician details when technicianId changes
@@ -69,6 +75,7 @@ function MaintenanceRequest() {
   // Fetch available time slots for selected technician and date
   useEffect(() => {
     if (!date || !technicianId) return;
+
     getAvailability(technicianId, date)
       .then((data) => setSlots(data || []))
       .catch(() => setSlots([]));
@@ -83,7 +90,10 @@ function MaintenanceRequest() {
 
     navigator.geolocation.getCurrentPosition(
       (pos) => {
-        setGeoCoords({ lat: pos.coords.latitude, lng: pos.coords.longitude });
+        setGeoCoords({
+          lat: pos.coords.latitude,
+          lng: pos.coords.longitude,
+        });
       },
       () => {
         setGeoError("Unable to access your location.");
@@ -106,10 +116,9 @@ function MaintenanceRequest() {
         scheduled_time: time,
         service,
         location_note: locationNote,
-        city: ""
+        city: "",
       });
 
-      // Navigate to review page if request is created successfully
       if (response?.id) {
         navigate(`/review/${response.id}`);
         return;
@@ -123,109 +132,116 @@ function MaintenanceRequest() {
 
   return (
     <>
-      {/* Page header */}
       <Header />
 
-      <div className="container">
+      <div className="container request-container">
         <h2>Maintenance Request</h2>
 
-        {/* If technician is preselected, show readonly fields */}
-        {technicianId ? (
+        <div className="request-grid">
+          {technicianId ? (
+            <>
+              <div className="input-group">
+                <label>Service</label>
+                <div className="readonly-field">{service || "Loading..."}</div>
+              </div>
+
+              <div className="input-group">
+                <label>Technician</label>
+                <div className="readonly-field">
+                  {technicianName || "Loading..."}
+                </div>
+              </div>
+            </>
+          ) : (
+            <>
+              <div className="input-group">
+                <label>Service Type</label>
+                <select
+                  value={service}
+                  onChange={(e) => setService(e.target.value)}
+                >
+                  <option value="">Select service</option>
+                  <option value="Electrical">Electrical</option>
+                  <option value="Plumbing">Plumbing</option>
+                  <option value="Painting">Painting</option>
+                  <option value="Decoration">Decoration</option>
+                </select>
+              </div>
+
+              <div className="input-group">
+                <label>Technician</label>
+                <select
+                  value={technicianId}
+                  onChange={(e) => setTechnicianId(e.target.value)}
+                >
+                  <option value="">Select technician</option>
+                  {technicians.map((tech) => (
+                    <option
+                      key={tech.technicianId}
+                      value={tech.technicianId}
+                    >
+                      {tech.name} - {tech.experience} yrs
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </>
+          )}
+
           <div className="input-group">
-            <label>Service</label>
-            <div className="readonly-field">{service || "Loading..."}</div>
-
-            <label>Technician</label>
-            <div className="readonly-field">{technicianName || "Loading..."}</div>
-          </div>
-        ) : (
-          <>
-            {/* Service selection */}
-            <div className="input-group">
-              <label>Service Type</label>
-              <select value={service} onChange={(e) => setService(e.target.value)}>
-                <option value="">Select service</option>
-                <option value="Electrical">Electrical</option>
-                <option value="Plumbing">Plumbing</option>
-                <option value="Painting">Painting</option>
-                <option value="Decoration">Decoration</option>
-              </select>
-            </div>
-
-            {/* Technician selection */}
-            <div className="input-group">
-              <label>Technician</label>
-              <select value={technicianId} onChange={(e) => setTechnicianId(e.target.value)}>
-                <option value="">Select technician</option>
-                {technicians.map((tech) => (
-                  <option key={tech.technicianId} value={tech.technicianId}>
-                    {tech.name} - {tech.experience} yrs
-                  </option>
-                ))}
-              </select>
-            </div>
-          </>
-        )}
-
-        {/* Date selection */}
-        <div className="input-group">
-          <label>Date</label>
-          <input
-            type="date"
-            value={date}
-            onChange={(e) => setDate(e.target.value)}
-          />
-        </div>
-
-        {/* Time slot selection */}
-        <div className="input-group">
-          <label>Time Slot</label>
-          <select value={time} onChange={(e) => setTime(e.target.value)}>
-            <option value="">Select time</option>
-            {slots.map((slot) => (
-              <option key={slot.id} value={slot.start_time}>
-                {slot.start_time}
-              </option>
-            ))}
-          </select>
-        </div>
-
-        {/* Location notes */}
-        <div className="input-group">
-          <label>Location Note</label>
-          <input
-            placeholder="Add address details or landmark"
-            value={locationNote}
-            onChange={(e) => setLocationNote(e.target.value)}
-          />
-        </div>
-
-        {/* Problem description */}
-        <div className="input-group">
-          <label>Description</label>
-          <textarea
-            rows="3"
-            value={description}
-            onChange={(e) => setDescription(e.target.value)}
-          />
-        </div>
-
-        {/* Map preview */}
-        <div className="input-group">
-          <label>Map Location</label>
-          {geoError ? <p className="helper-text">{geoError}</p> : null}
-
-          <div className="map-embed">
-            <iframe
-              title="map"
-              src={`https://maps.google.com/maps?q=${mapQuery}&z=14&output=embed`}
-              loading="lazy"
-              referrerPolicy="no-referrer-when-downgrade"
+            <label>Date</label>
+            <input
+              type="date"
+              value={date}
+              onChange={(e) => setDate(e.target.value)}
             />
           </div>
+
+          <div className="input-group">
+            <label>Time Slot</label>
+            <select value={time} onChange={(e) => setTime(e.target.value)}>
+              <option value="">Select time</option>
+              {slots.map((slot) => (
+                <option key={slot.id} value={slot.start_time}>
+                  {slot.start_time}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div className="input-group full-width">
+            <label>Location Note</label>
+            <input
+              placeholder="Add address details or landmark"
+              value={locationNote}
+              onChange={(e) => setLocationNote(e.target.value)}
+            />
+          </div>
+
+          <div className="input-group full-width">
+            <label>Description</label>
+            <textarea
+              rows="3"
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+            />
+          </div>
+
+          <div className="input-group full-width">
+            <label>Map Location</label>
+            {geoError ? <p className="helper-text">{geoError}</p> : null}
+
+            <div className="map-embed">
+              <iframe
+                title="map"
+                src={`https://maps.google.com/maps?q=${mapQuery}&z=14&output=embed`}
+                loading="lazy"
+                referrerPolicy="no-referrer-when-downgrade"
+              />
+            </div>
+          </div>
         </div>
 
-        {/* Submit button */}
         <button className="primary" onClick={submit}>
           Submit
         </button>
@@ -234,5 +250,4 @@ function MaintenanceRequest() {
   );
 }
 
-// Export component
 export default MaintenanceRequest;
