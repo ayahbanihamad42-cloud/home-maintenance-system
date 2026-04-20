@@ -1,87 +1,80 @@
-// Import React and required hooks
-import React, { useEffect, useState, useContext } from "react";
-
-// Import URL parameters hook
+import React, { useEffect, useState, useContext, useRef } from "react";
 import { useParams } from "react-router-dom";
-
-// Import authentication context
 import { AuthContext } from "../Context/AuthContext";
-
-// Import chat services for sending and fetching messages
 import { sendChatMessage, getChatMessages } from "../services/chatService.jsx";
-
-// Import global styles
 import "../index.css";
 
-// Chat component
 function Chat() {
-  // Get userId from URL (chat partner)
   const { userId } = useParams();
-
-  // Get logged-in user from AuthContext
   const { user } = useContext(AuthContext);
-
-  // State to store chat messages
   const [messages, setMessages] = useState([]);
-
-  // State to store current input text
   const [text, setText] = useState("");
+  const fileInputRef = useRef(null);
 
-  // Function to load chat messages from the server
   const loadMessages = () => {
     getChatMessages(userId)
       .then((data) => setMessages(data || []))
       .catch(() => setMessages([]));
   };
 
-  // Load messages initially and poll every 3 seconds
   useEffect(() => {
     loadMessages();
-
-    // Refresh messages periodically
     const interval = setInterval(loadMessages, 3000);
-
-    // Clear interval when component unmounts
     return () => clearInterval(interval);
   }, [userId]);
 
-  // Function to send a new message
-  const handleSend = async () => {
-    // Prevent sending empty messages
-    if (!text.trim()) return;
+  const handleSend = async (content = null, type = "text") => {
+    const messageValue = content || text;
+    if (!messageValue.trim() && type === "text") return;
 
-    // Create a temporary message object for instant UI update
     const pending = {
       sender_id: user?.id,
       receiver_id: Number(userId),
-      message: text
+      message: messageValue,
+      type: type 
     };
 
-    // Optimistically add message to UI
     setMessages((prev) => [...prev, pending]);
 
-    // Send message to the backend
     try {
       await sendChatMessage({
         receiver_id: Number(userId),
-        message: text
+        message: messageValue,
+        type: type
       });
     } catch (e) {
-      // If send fails, keep UI but you can alert if you want
       console.error(e);
     }
 
-    // Clear input field
-    setText("");
-
-    // Reload messages to sync with server
+    if (type === "text") setText("");
     loadMessages();
+  };
+
+  const handleImageUpload = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        handleSend(reader.result, "image");
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const shareLocation = () => {
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition((pos) => {
+        const locString = `https://google.com{pos.coords.latitude},${pos.coords.longitude}`;
+        handleSend(locString, "location");
+      }, () => {
+        alert("Unable to access location");
+      });
+    }
   };
 
   return (
     <div className="chat-wrapper">
       <div className="chat-shell">
-        {/* Chat header section */}
         <div className="chat-header-bar">
           <div className="chat-avatar">👷</div>
           <div className="chat-title-block">
@@ -90,22 +83,37 @@ function Chat() {
           </div>
         </div>
 
-        {/* Messages list */}
         <div className="messages-container">
           {messages.map((m, i) => (
             <div
               key={i}
-              className={`message-bubble ${
-                m.sender_id === user?.id ? "my-message" : "other-message"
-              }`}
+              className={`message-bubble ${m.sender_id === user?.id ? "my-message" : "other-message"}`}
             >
-              {m.message}
+              {m.type === "image" ? (
+                <img src={m.message} alt="sent" style={{ maxWidth: '200px', borderRadius: '8px' }} />
+              ) : m.type === "location" ? (
+                <a href={m.message} target="_blank" rel="noreferrer" style={{ color: 'inherit' }}>
+                  📍 My Location
+                </a>
+              ) : (
+                m.message
+              )}
             </div>
           ))}
         </div>
 
-        {/* Chat input and send button */}
         <div className="chat-input-area">
+          <input
+            type="file"
+            accept="image/*"
+            style={{ display: 'none' }}
+            ref={fileInputRef}
+            onChange={handleImageUpload}
+          />
+          
+          <button className="icon-btn" onClick={() => fileInputRef.current.click()}>📷</button>
+          <button className="icon-btn" onClick={shareLocation}>📍</button>
+
           <input
             className="chat-input"
             placeholder="Type a message..."
@@ -113,14 +121,12 @@ function Chat() {
             onChange={(e) => setText(e.target.value)}
             onKeyDown={(e) => e.key === "Enter" && handleSend()}
           />
-          <button className="send-btn" onClick={handleSend}>
-            Send
-          </button>
+          <button className="send-btn" onClick={() => handleSend()}>Send</button>
         </div>
       </div>
     </div>
   );
 }
 
-// Export Chat component
 export default Chat;
+

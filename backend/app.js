@@ -28,7 +28,7 @@ app.use(
       const allowedOrigins = [
         "http://localhost:3000",
         "http://localhost:3001",
-        "exp://192.168.1.30:8081",
+        "exp://172.28.24.249:8081",
         "http://localhost:8081"
       ];
 
