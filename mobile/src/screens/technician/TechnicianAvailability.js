@@ -9,7 +9,7 @@ import {
   TouchableOpacity,
   ScrollView,
   SafeAreaView,
-} from "react-native-safe-area-context";
+} from "react-native";
 import appStyles from "../../styles/mobileStyles";
 
 function TechnicianAvailability() {
