@@ -9,7 +9,7 @@ import {
   ScrollView,
   Image,
   TextInput,
-} from "react-native-safe-area-context";
+} from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as ImagePicker from "expo-image-picker";
 import API from "../../services/api";
