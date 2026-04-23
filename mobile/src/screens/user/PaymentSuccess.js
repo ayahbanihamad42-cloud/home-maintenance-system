@@ -1,5 +1,5 @@
 import React from "react";
-import { SafeAreaView, View, Text, TouchableOpacity } from "react-native-safe-area-context";
+import { SafeAreaView, View, Text, TouchableOpacity } from "react-native";
 import Header from "../../components/Common/Header";
 import { useNavigation, useRoute } from "@react-navigation/native";
 import appStyles from "../../styles/mobileStyles";
