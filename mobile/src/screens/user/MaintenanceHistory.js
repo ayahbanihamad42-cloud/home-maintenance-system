@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react-native";
-import { View, Text, StyleSheet, FlatList, SafeAreaView } from 
-  ";
+import { View, Text, StyleSheet, FlatList, SafeAreaView } from " 
+ react-native ";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
 import { getUserRequests } from "../../services/maintenanceService";
