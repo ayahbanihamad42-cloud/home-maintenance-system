@@ -5,7 +5,7 @@ import {
   Text,
   TouchableOpacity,
   View,
-} from "react-native-safe-area-context";
+} from "react-native";
 import Header from "../components/Common/Header";
 import { getChatConversations } from "../services/chatService";
 import appStyles from "../styles/mobileStyles";
