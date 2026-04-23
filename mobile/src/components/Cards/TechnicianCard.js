@@ -39,14 +39,4 @@ function TechnicianCard({ technician }) {
   );
 }
 
-export default TechnicianCard;        }
-        style={{ marginTop: 10, backgroundColor: "gray", padding: 10 }}
-      >
-        <Text style={{ color: "#fff" }}>View Profile</Text>
-      </Pressable>
-
-    </View>
-  );
-}
-
 export default TechnicianCard;
