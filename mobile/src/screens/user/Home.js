@@ -1,5 +1,5 @@
 import React from "react";
-import { View, Text, Image, StyleSheet, TouchableOpacity, SafeAreaView } from "react-native-safe-area-context";
+import { View, Text, Image, StyleSheet, TouchableOpacity, SafeAreaView } from "react-native";
 import { useNavigation } from "@react-navigation/native";
 
 import plumbingImg from "../../assets/plumbing.png";
