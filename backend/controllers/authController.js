@@ -67,35 +67,57 @@ export const login = (req, res) => {
       return res.status(500).json({ message: "Server error" });
     }
 
+    console.log("LOGIN EMAIL:", email);
+    console.log("ROWS LENGTH:", rows?.length);
+
     if (!rows.length) {
       return res.status(401).json({ message: "Invalid email or password" });
     }
 
-    const user = rows[0];
-    const ok = await bcrypt.compare(password, user.password);
+    try {
+      const user = rows[0];
 
-    if (!ok) {
-      return res.status(401).json({ message: "Invalid email or password" });
-    }
-
-    const token = jwt.sign(
-      { id: user.id, role: user.role },
-      process.env.JWT_SECRET,
-      { expiresIn: "7d" }
-    );
-
-    res.json({
-      token,
-      user: {
+      console.log("DB USER:", {
         id: user.id,
-        name: user.name,
         email: user.email,
-        phone: user.phone,
-        dob: user.dob,
-        city: user.city,
         role: user.role,
-      },
-    });
+        hasPassword: !!user.password,
+      });
+
+      const ok = await bcrypt.compare(password, user.password);
+      console.log("BCRYPT RESULT:", ok);
+
+      if (!ok) {
+        return res.status(401).json({ message: "Invalid email or password" });
+      }
+
+      if (!process.env.JWT_SECRET) {
+        console.error("JWT_SECRET is missing");
+        return res.status(500).json({ message: "Server configuration error" });
+      }
+
+      const token = jwt.sign(
+        { id: user.id, role: user.role },
+        process.env.JWT_SECRET,
+        { expiresIn: "7d" }
+      );
+
+      return res.json({
+        token,
+        user: {
+          id: user.id,
+          name: user.name,
+          email: user.email,
+          phone: user.phone,
+          dob: user.dob,
+          city: user.city,
+          role: user.role,
+        },
+      });
+    } catch (error) {
+      console.error("login error:", error);
+      return res.status(500).json({ message: "Server error" });
+    }
   });
 };
 

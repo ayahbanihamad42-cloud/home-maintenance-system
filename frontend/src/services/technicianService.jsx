@@ -11,3 +11,13 @@ export const getAvailability = async (techId, date) => {
   });
   return res.data;
 };
+
+export const getTechnicianProfile = async (technicianId) => {
+  const res = await api.get(`/technicians/${technicianId}`);
+  return res.data;
+};
+
+export const updateTechnicianPrice = async (price_per_hour) => {
+  const res = await api.put(`/technicians/price`, { price_per_hour });
+  return res.data;
+};

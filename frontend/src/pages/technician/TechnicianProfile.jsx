@@ -1,58 +1,35 @@
 import React, { useEffect, useState } from "react";
-// React and hooks
-
 import { useParams, useNavigate } from "react-router-dom";
-// Route parameters and navigation hooks
-
-import API from "../../services/api";
-// Axios API instance
-
 import Header from "../../components/common/Header";
-// Header component
+import API from "../../services/api";
 
-// Technician profile page
 function TechnicianProfile() {
-
-  // Get technician ID from URL
   const { technicianId } = useParams();
-
-  // Navigation hook
   const navigate = useNavigate();
-
-  // Technician data state
   const [tech, setTech] = useState(null);
 
-  // Fetch technician details on component mount
   useEffect(() => {
-
-    // Request technician data from backend
     API.get(`/technicians/${technicianId}`)
-      .then(res => setTech(res.data));
-
+      .then(res => setTech(res.data))
+      .catch(err => {
+        console.error("TechnicianProfile error:", err);
+      });
   }, [technicianId]);
 
-  // Show loading indicator while data is loading
   if (!tech) return <div className="loader">Loading...</div>;
 
   return (
     <>
-      {/* Page header */}
       <Header />
 
       <div className="profile-container">
-
-        {/* Technician profile card */}
         <div className="tech-card">
-
-          {/* Technician name */}
           <h2>{tech.name}</h2>
 
-          {/* Technician specialty */}
           <p className="specialty">
             {tech.service} Specialist
           </p>
 
-          {/* Technician stats */}
           <div className="tech-stats">
             <span>
               <b>Experience:</b> {tech.experience} Years
@@ -60,9 +37,11 @@ function TechnicianProfile() {
             <span>
               <b>Rating:</b> ⭐ {Number(tech.rating).toFixed(1)}
             </span>
+            <span>
+              <b>Price / hour:</b> {Number(tech.price_per_hour || 0).toFixed(2)} JOD
+            </span>
           </div>
 
-          {/* Contact information */}
           <div className="contact-list">
             <span>
               <b>City:</b> {tech.city || "Not provided"}
@@ -75,15 +54,11 @@ function TechnicianProfile() {
             </span>
           </div>
 
-          {/* Technician bio */}
           <p className="bio">
             {tech.bio || "Experienced technician ready to help."}
           </p>
 
-          {/* Action buttons */}
           <div className="actions">
-
-            {/* Navigate to chat with technician */}
             <button
               className="primary-btn"
               onClick={() => navigate(`/chat/${tech.user_id}`)}
@@ -91,6 +66,12 @@ function TechnicianProfile() {
               Send Message
             </button>
 
+            <button
+              className="primary-btn"
+              onClick={() => navigate(`/request/${tech.technicianId}`)}
+            >
+              Book Now
+            </button>
           </div>
         </div>
       </div>
@@ -98,6 +79,4 @@ function TechnicianProfile() {
   );
 }
 
-// Export component
 export default TechnicianProfile;
-

@@ -14,7 +14,7 @@ import ratingRoutes from "./routes/ratingRoutes.js";
 import storeRoutes from "./routes/storeRoutes.js";
 import adminRoutes from "./routes/adminRoutes.js";
 import userRoutes from "./routes/userRoutes.js";
-
+import paymentRoutes from "./routes/paymentRoutes.js";
 const app = express();
 
 app.use(helmet({ crossOriginResourcePolicy: false }));
@@ -61,5 +61,5 @@ app.use("/api/ratings", ratingRoutes);
 app.use("/api/stores", storeRoutes);
 app.use("/api/admin", adminRoutes);
 app.use("/api/users", userRoutes);
-
+app.use("/api/payments", paymentRoutes);
 export default app;

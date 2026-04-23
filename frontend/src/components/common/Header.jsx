@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { getNotifications } from "../../services/notificationService.jsx";
 
@@ -9,8 +9,6 @@ function Header() {
 
   const [showNotifications, setShowNotifications] = useState(false);
   const [notificationFeed, setNotificationFeed] = useState([]);
-  const [latestChatUserId, setLatestChatUserId] = useState(null);
-  const [showChatInfo, setShowChatInfo] = useState(false);
 
   const notificationRef = useRef(null);
 
@@ -33,12 +31,6 @@ function Header() {
       .then((res) => {
         const feed = res?.data || res || [];
         setNotificationFeed(feed);
-
-        const latestMessage = feed.find(
-          (item) => item.type === "message" && item.chatUserId
-        );
-
-        setLatestChatUserId(latestMessage?.chatUserId || null);
       })
       .catch(() => setNotificationFeed([]));
   }, [user]);
@@ -62,136 +54,96 @@ function Header() {
   }, [showNotifications]);
 
   return (
-    <>
-      <div className="navbar">
-        <div className="navbar-brand">Maintenance System</div>
+    <div className="navbar">
+      <div className="navbar-brand">Maintenance System</div>
 
-        {user ? (
-          <>
-            <div className="navbar-links">
-              {role === "technician" ? (
-                <>
-                  <Link to="/technician/dashboard">Dashboard</Link>
-                  <Link to="/profile">Profile</Link>
-                  <Link to="/ai-chat">AI Assistant</Link>
-
-                  {latestChatUserId ? (
-                    <Link to={`/chat/${latestChatUserId}`}>Chat</Link>
-                  ) : (
-                    <button
-                      type="button"
-                      className="link-button"
-                      onClick={() => setShowChatInfo(true)}
-                    >
-                      Chat
-                    </button>
-                  )}
-                </>
-              ) : (
-                <>
-                  <Link to="/home">Home</Link>
-                  <Link to="/history">Requests History</Link>
-                  <Link to="/profile">Profile</Link>
-                  <Link to="/ai-chat">AI Assistant</Link>
-                </>
-              )}
-            </div>
-
-            <div className="navbar-actions">
-              <div className="notification-wrapper" ref={notificationRef}>
-                <button
-                  className="icon-button"
-                  type="button"
-                  aria-label="Notifications"
-                  onClick={() => setShowNotifications((prev) => !prev)}
-                >
-                  🔔
-                </button>
-
-                {showNotifications ? (
-                  <div className="notification-dropdown">
-                    <div className="notification-title">Notifications</div>
-
-                    {notificationFeed.length === 0 ? (
-                      <div className="notification-empty">
-                        No notifications yet.
-                      </div>
-                    ) : (
-                      <ul>
-                        {notificationFeed.map((item) => (
-                          <li key={item.id}>
-                            <button
-                              type="button"
-                              className="notification-item"
-                              onClick={() => {
-                                setShowNotifications(false);
-
-                                if (
-                                  item.type === "message" &&
-                                  item.chatUserId
-                                ) {
-                                  navigate(`/chat/${item.chatUserId}`);
-                                } else if (item.type === "request") {
-                                  if (role === "technician") {
-                                    navigate("/technician/requests");
-                                  } else if (item.requestId) {
-                                    navigate(`/review/${item.requestId}`);
-                                  }
-                                }
-                              }}
-                            >
-                              <div className="notification-item-title">
-                                {item.title}
-                              </div>
-                              <div className="notification-item-body">
-                                {item.body}
-                              </div>
-                            </button>
-                          </li>
-                        ))}
-                      </ul>
-                    )}
-                  </div>
-                ) : null}
-              </div>
-
-              <button className="logout-btn" onClick={handleLogout}>
-                Log Out
-              </button>
-            </div>
-          </>
-        ) : (
+      {user ? (
+        <>
           <div className="navbar-links">
-            Welcome to our Home Maintenance System
+            {role === "technician" ? (
+              <>
+                <Link to="/technician/dashboard">Dashboard</Link>
+                <Link to="/profile">Profile</Link>
+                <Link to="/ai-chat">AI Assistant</Link>
+                <Link to="/chat">Chat</Link>
+              </>
+            ) : (
+              <>
+                <Link to="/home">Home</Link>
+                <Link to="/history">Requests History</Link>
+                <Link to="/profile">Profile</Link>
+                <Link to="/ai-chat">AI Assistant</Link>
+                <Link to="/chat">Chat</Link>
+              </>
+            )}
           </div>
-        )}
-      </div>
 
-      {showChatInfo ? (
-        <div className="modal-overlay" onClick={() => setShowChatInfo(false)}>
-          <div
-            className="modal chat-info-modal"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <h3>No chats yet</h3>
-            <p>
-              When a user sends you a message, or you start a conversation, it
-              will appear here.
-            </p>
-
-            <div className="modal-actions">
+          <div className="navbar-actions">
+            <div className="notification-wrapper" ref={notificationRef}>
               <button
+                className="icon-button"
                 type="button"
-                className="primary"
-                onClick={() => setShowChatInfo(false)}
+                aria-label="Notifications"
+                onClick={() => setShowNotifications((prev) => !prev)}
               >
-                Got it
+                🔔
               </button>
+
+              {showNotifications ? (
+                <div className="notification-dropdown">
+                  <div className="notification-title">Notifications</div>
+
+                  {notificationFeed.length === 0 ? (
+                    <div className="notification-empty">
+                      No notifications yet.
+                    </div>
+                  ) : (
+                    <ul>
+                      {notificationFeed.map((item) => (
+                        <li key={item.id}>
+                          <button
+                            type="button"
+                            className="notification-item"
+                            onClick={() => {
+                              setShowNotifications(false);
+
+                              if (item.type === "message" && item.chatUserId) {
+                                navigate(`/chat/${item.chatUserId}`);
+                              } else if (item.type === "request") {
+                                if (role === "technician") {
+                                  navigate("/technician/requests");
+                                } else if (item.requestId) {
+                                  navigate(`/review/${item.requestId}`);
+                                }
+                              }
+                            }}
+                          >
+                            <div className="notification-item-title">
+                              {item.title}
+                            </div>
+                            <div className="notification-item-body">
+                              {item.body}
+                            </div>
+                          </button>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+              ) : null}
             </div>
+
+            <button className="logout-btn" onClick={handleLogout}>
+              Log Out
+            </button>
           </div>
+        </>
+      ) : (
+        <div className="navbar-links">
+          Welcome to our Home Maintenance System
         </div>
-      ) : null}
-    </>
+      )}
+    </div>
   );
 }
 

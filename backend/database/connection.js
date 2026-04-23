@@ -1,25 +1,33 @@
 import mysql from "mysql2";
 import dotenv from "dotenv";
+import fs from "fs";
+import path from "path";
+import { fileURLToPath } from "url";
 
 dotenv.config();
 
-export const db = mysql.createPool({
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+// مسار ملف الشهادة
+const caPath = "D:/gp1ayah/certs/tidb-ca.pem";
+
+export const db = mysql.createConnection({
   host: process.env.DB_HOST,
   user: process.env.DB_USER,
   password: process.env.DB_PASSWORD,
   database: process.env.DB_NAME,
-  port: process.env.DB_PORT,
-  waitForConnections: true,
-  connectionLimit: 10,
-  enableKeepAlive: true,
-  keepAliveInitialDelay: 0
+  port: Number(process.env.DB_PORT),
+  ssl: {
+    ca: fs.readFileSync(caPath),
+    rejectUnauthorized: true,
+  },
 });
 
-db.getConnection((err, connection) => {
+db.connect((err) => {
   if (err) {
     console.error("DB connection failed:", err);
   } else {
     console.log("DB connected successfully");
-    connection.release();
   }
 });
