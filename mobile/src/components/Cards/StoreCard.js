@@ -23,12 +23,7 @@ function StoreCard({ store }) {
         <Text style={styles.primaryBtnText}>Booking</Text>
       </Pressable>
 
-      <Pressable
-        onPress={() =>
-          navigation.navigate("StoreProfile", { id: store.storeId })
-        }
-        style={styles.secondaryBtn}
-      >
+      <Pressable style={[styles.secondaryBtn, styles.disabledBtn]}>
         <Text style={styles.secondaryBtnText}>View Profile</Text>
       </Pressable>
     </View>
@@ -76,6 +71,9 @@ const styles = StyleSheet.create({
   secondaryBtnText: {
     color: "#111",
     fontWeight: "700",
+  },
+  disabledBtn: {
+    opacity: 0.6,
   },
 });
 
