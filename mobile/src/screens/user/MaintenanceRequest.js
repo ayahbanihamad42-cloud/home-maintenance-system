@@ -6,7 +6,8 @@ import {
   TouchableOpacity,
   ScrollView,
   SafeAreaView,
-  Linking,StyleSheet
+  Linking,
+  Platform,
 } from "react-native";
 import DateTimePicker from "@react-native-community/datetimepicker";
 import { useNavigation, useRoute } from "@react-navigation/native";
@@ -15,7 +16,6 @@ import * as Location from "expo-location";
 
 import Header from "../../components/Common/Header";
 import {
-  getTechnicians,
   getAvailability,
   getTechnicianProfile,
 } from "../../services/technicianService";
@@ -29,7 +29,6 @@ function MaintenanceRequest() {
   const initialTechnicianId = route.params?.technicianId;
 
   const [service, setService] = useState("");
-  const [technicians, setTechnicians] = useState([]);
   const [technicianId, setTechnicianId] = useState(initialTechnicianId || "");
   const [technicianName, setTechnicianName] = useState("");
   const [technicianPrice, setTechnicianPrice] = useState(0);
@@ -67,20 +66,12 @@ function MaintenanceRequest() {
 
   const openMap = async () => {
     const query = locationNote || "Jordan";
-    const url = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(query)}`;
+    const url = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(
+      query
+    )}`;
     await Linking.openURL(url);
   };
 
-  // Fetch technicians
-  useEffect(() => {
-    if (!service || initialTechnicianId) return;
-
-    getTechnicians(service)
-      .then((data) => setTechnicians(data || []))
-      .catch(() => setTechnicians([]));
-  }, [service]);
-
-  // Fetch technician profile
   useEffect(() => {
     if (!technicianId) return;
 
@@ -93,7 +84,6 @@ function MaintenanceRequest() {
       .catch(() => {});
   }, [technicianId]);
 
-  // Fetch availability
   useEffect(() => {
     if (!date || !technicianId) return;
 
@@ -102,7 +92,7 @@ function MaintenanceRequest() {
         setSlots(data || []);
         setTime("");
 
-        if (!data.length) {
+        if (!(data || []).length) {
           showMessage("warning", "Notice", "No availability for this date");
         }
       })
@@ -111,24 +101,37 @@ function MaintenanceRequest() {
       });
   }, [date, technicianId]);
 
-  // Get location
   useEffect(() => {
     (async () => {
-      const { status } = await Location.requestForegroundPermissionsAsync();
-      if (status !== "granted") {
-        setGeoError("Location permission denied");
-        return;
-      }
+      try {
+        const { status } = await Location.requestForegroundPermissionsAsync();
 
-      const loc = await Location.getCurrentPositionAsync({});
-      setGeoCoords({
-        lat: loc.coords.latitude,
-        lng: loc.coords.longitude,
-      });
+        if (status !== "granted") {
+          setGeoError("Location permission denied");
+          return;
+        }
+
+        const loc = await Location.getCurrentPositionAsync({});
+        setGeoCoords({
+          lat: loc.coords.latitude,
+          lng: loc.coords.longitude,
+        });
+      } catch (error) {
+        setGeoError("Failed to get current location");
+      }
     })();
   }, []);
 
-  // Submit
+  const handleDateChange = (event, selectedDate) => {
+    if (Platform.OS !== "ios") {
+      setShowDatePicker(false);
+    }
+
+    if (selectedDate) {
+      setDate(formatDate(selectedDate));
+    }
+  };
+
   const submit = async () => {
     if (!service || !technicianId || !date || !time || !description?.trim()) {
       showMessage("warning", "Notice", "Fill all required fields");
@@ -169,9 +172,7 @@ function MaintenanceRequest() {
       }
 
       const res = await createMaintenanceRequest(payload);
-
       navigation.navigate("Review", { requestId: res.id });
-
     } catch (e) {
       showMessage("error", "Notice", "Server error");
     }
@@ -185,12 +186,19 @@ function MaintenanceRequest() {
         <Text style={appStyles.title}>Maintenance Request</Text>
 
         {requestMessage && (
-          <View style={[appStyles.messageCard]}>
+          <View style={appStyles.messageCard}>
             <Text>{requestMessage.body}</Text>
           </View>
         )}
 
-        {/* DATE PICKER */}
+        {!!technicianName && (
+          <View style={appStyles.messageCard}>
+            <Text>Technician: {technicianName}</Text>
+            <Text>Service: {service}</Text>
+            <Text>Price per hour: {technicianPrice} JOD</Text>
+          </View>
+        )}
+
         <Text style={appStyles.label}>Date</Text>
         <TouchableOpacity
           style={appStyles.input}
@@ -203,15 +211,12 @@ function MaintenanceRequest() {
           <DateTimePicker
             value={date ? new Date(date) : new Date()}
             mode="date"
+            display="default"
             minimumDate={new Date()}
-            onChange={(e, selected) => {
-              setShowDatePicker(false);
-              if (selected) setDate(formatDate(selected));
-            }}
+            onChange={handleDateChange}
           />
         )}
 
-        {/* TIME */}
         <Text style={appStyles.label}>Time</Text>
         <Picker selectedValue={time} onValueChange={setTime}>
           <Picker.Item label="Select time" value="" />
@@ -220,7 +225,7 @@ function MaintenanceRequest() {
           ))}
         </Picker>
 
-        {/* DESCRIPTION */}
+        <Text style={appStyles.label}>Description</Text>
         <TextInput
           style={appStyles.input}
           placeholder="Describe the issue"
@@ -228,12 +233,44 @@ function MaintenanceRequest() {
           onChangeText={setDescription}
         />
 
-        {/* MAP */}
+        <Text style={appStyles.label}>Location Note</Text>
+        <TextInput
+          style={appStyles.input}
+          placeholder="Enter location details"
+          value={locationNote}
+          onChangeText={setLocationNote}
+        />
+
+        <Text style={appStyles.label}>Estimated Hours</Text>
+        <TextInput
+          style={appStyles.input}
+          placeholder="Enter estimated hours"
+          value={estimatedHours}
+          onChangeText={setEstimatedHours}
+          keyboardType="numeric"
+        />
+
+        <Text style={appStyles.label}>Payment Method</Text>
+        <Picker selectedValue={paymentMethod} onValueChange={setPaymentMethod}>
+          <Picker.Item label="Cash" value="cash" />
+          <Picker.Item label="Online" value="online" />
+        </Picker>
+
+        <View style={appStyles.messageCard}>
+          <Text>Total Price: {totalPrice} JOD</Text>
+          {geoCoords && (
+            <Text>
+              Current Location: {geoCoords.lat.toFixed(5)},{" "}
+              {geoCoords.lng.toFixed(5)}
+            </Text>
+          )}
+          {!!geoError && <Text>{geoError}</Text>}
+        </View>
+
         <TouchableOpacity style={appStyles.primaryBtn} onPress={openMap}>
           <Text style={appStyles.primaryBtnText}>Open Map</Text>
         </TouchableOpacity>
 
-        {/* SUBMIT */}
         <TouchableOpacity style={appStyles.primaryBtn} onPress={submit}>
           <Text style={appStyles.primaryBtnText}>Submit</Text>
         </TouchableOpacity>
