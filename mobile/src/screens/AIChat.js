@@ -11,7 +11,7 @@ import {
   KeyboardAvoidingView,
   Platform,
   ActivityIndicator,
-} from "react-native-safe-area-context";
+} from "react-native";
 import * as ImagePicker from "expo-image-picker";
 
 import { chatWithAI, generateAIImage } from "../services/aiService";
