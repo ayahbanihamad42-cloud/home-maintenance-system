@@ -8,7 +8,7 @@ import {
   TextInput,
   SafeAreaView,
   ActivityIndicator,
-} from "react-native-safe-area-context";
+} from "react-native";
 import { useNavigation, useRoute } from "@react-navigation/native";
 import { Picker } from "@react-native-picker/picker";
 
