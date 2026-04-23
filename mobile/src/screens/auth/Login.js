@@ -21,12 +21,12 @@ function Login() {
 
   const handleSubmit = async () => {
     try {
-      const user = await login({ email, password });
+      const response = await login({ email, password });
 
       setSuccessMessage("Login successful. Redirecting...");
 
       setTimeout(() => {
-        const role = String(user?.role || "").toLowerCase();
+        const role = String(response?.user?.role || "").toLowerCase();
 
         if (role === "admin") {
           navigation.replace("AdminDashboard");
