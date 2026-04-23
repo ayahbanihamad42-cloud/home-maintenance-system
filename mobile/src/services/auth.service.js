@@ -1,4 +1,3 @@
-mobile/src/services/auth.service.js
 
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import api from "./api";

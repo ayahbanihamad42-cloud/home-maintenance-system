@@ -1,8 +1,16 @@
 import React from "react";
-import { View, Text, Image, StyleSheet, TouchableOpacity, SafeAreaView, ScrollView } from "react-native";
+import {
+  SafeAreaView,
+  ScrollView,
+  Text,
+  TouchableOpacity,
+  View,
+  Image,
+  StyleSheet,
+} from "react-native-safe-area-context";
 import { useNavigation } from "@react-navigation/native";
 
-import welcomeimage from "../../images/home.png";
+import welcomeimage from "../../assets/home.png";
 
 function Welcome() {
   const navigation = useNavigation();
@@ -10,7 +18,6 @@ function Welcome() {
   return (
     <SafeAreaView style={styles.container}>
       <ScrollView contentContainerStyle={styles.scrollContent}>
-        
         <Text style={styles.welcomeTitle}>
           Welcome to Home Maintenance System
         </Text>
@@ -20,28 +27,27 @@ function Welcome() {
           Book reliable technicians, manage requests, and keep your home in great shape.
         </Text>
 
-        <Image 
-          source={welcomeimage} 
-          style={styles.welcomeImage} 
-          resizeMode="contain" 
+        <Image
+          source={welcomeimage}
+          style={styles.welcomeImage}
+          resizeMode="contain"
         />
 
         <View style={styles.welcomeButtons}>
-          <TouchableOpacity 
-            style={styles.primaryButton} 
+          <TouchableOpacity
+            style={styles.primaryButton}
             onPress={() => navigation.navigate("Register")}
           >
             <Text style={styles.buttonText}>Register</Text>
           </TouchableOpacity>
 
-          <TouchableOpacity 
-            style={styles.primaryButton} 
+          <TouchableOpacity
+            style={styles.primaryButton}
             onPress={() => navigation.navigate("Login")}
           >
             <Text style={styles.buttonText}>Login</Text>
           </TouchableOpacity>
         </View>
-
       </ScrollView>
     </SafeAreaView>
   );
@@ -50,7 +56,7 @@ function Welcome() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#fff",
+    backgroundColor: "#E8DCCF",
   },
   scrollContent: {
     alignItems: "center",
@@ -62,13 +68,13 @@ const styles = StyleSheet.create({
     fontSize: 24,
     fontWeight: "bold",
     textAlign: "center",
-    color: "#333",
+    color: "#111",
     marginBottom: 15,
   },
   welcomeSubtitle: {
     fontSize: 16,
     textAlign: "center",
-    color: "#666",
+    color: "#555",
     lineHeight: 22,
     marginBottom: 30,
   },
@@ -79,10 +85,9 @@ const styles = StyleSheet.create({
   },
   welcomeButtons: {
     width: "100%",
-    gap: 15, // ملاحظة: تعمل في الإصدارات الحديثة من RN، إذا لم تعمل استخدم marginBottom في الـ button
   },
   primaryButton: {
-    backgroundColor: "#007AFF",
+    backgroundColor: "#111",
     paddingVertical: 15,
     borderRadius: 10,
     alignItems: "center",
@@ -96,4 +101,3 @@ const styles = StyleSheet.create({
 });
 
 export default Welcome;
-

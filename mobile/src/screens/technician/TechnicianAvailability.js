@@ -1,28 +1,33 @@
 import { useEffect, useState } from "react";
-// React hooks
-
 import API from "../../services/api";
-// Axios API instance
-
-import Header from "../../components/common/Header";
-// Header component
-
+import Header from "../../components/Common/Header";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-
 import {
   View,
   Text,
   TextInput,
   TouchableOpacity,
-  StyleSheet,
-  ScrollView
-} from "react-native";
+  ScrollView,
+  SafeAreaView,
+} from "react-native-safe-area-context";
+import appStyles from "../../styles/mobileStyles";
 
-// Technician availability management component
 function TechnicianAvailability() {
-
-  // Get logged-in user from AsyncStorage
   const [user, setUser] = useState(null);
+  const [technicianId, setTechnicianId] = useState(null);
+  const [technicianStatus, setTechnicianStatus] = useState("loading");
+  const [message, setMessage] = useState(null);
+
+  const [form, setForm] = useState({
+    day: "",
+    start_time: "",
+    end_time: "",
+  });
+
+  const showMessage = (type, title, body) => {
+    setMessage({ type, title, body });
+    setTimeout(() => setMessage(null), 2800);
+  };
 
   useEffect(() => {
     const loadUser = async () => {
@@ -32,193 +37,107 @@ function TechnicianAvailability() {
     loadUser();
   }, []);
 
-  // Store technician ID
-  const [technicianId, setTechnicianId] = useState(null);
-
-  // Track technician profile status
-  const [technicianStatus, setTechnicianStatus] = useState("loading");
-
-  // Feedback message state
-  const [message, setMessage] = useState("");
-
-  // Availability form state
-  const [form, setForm] = useState({
-    day: "",
-    start_time: "",
-    end_time: ""
-  });
-
-  // Fetch technician profile using user ID
   useEffect(() => {
-
-    // Stop if user is not available
     if (!user?.id) return;
 
-    // Set loading state
     setTechnicianStatus("loading");
 
-    // Request technician data
     API.get(`/technicians/user/${user.id}`)
       .then((res) => {
-
-        // Save technician ID
         setTechnicianId(res.data.technicianId);
-
-        // Mark profile as ready
         setTechnicianStatus("ready");
-
-        // Clear messages
-        setMessage("");
+        setMessage(null);
       })
       .catch(() => {
-
-        // Handle missing technician profile
         setTechnicianId(null);
         setTechnicianStatus("error");
       });
-
   }, [user?.id]);
 
-  // Submit availability data
   const submit = async () => {
-
-    // Validate form inputs
     if (!form.day || !form.start_time || !form.end_time) {
-      setMessage("Please choose a date and time range.");
+      showMessage("warning", "Notice", "Please choose a date and time range.");
       return;
     }
 
-    // Handle missing technician profile
     if (!technicianId && technicianStatus === "error") {
-      setMessage("Technician profile not found. Please contact the admin.");
+      showMessage("error", "Notice", "Technician profile not found. Please contact the admin.");
+      return;
+    }
+
+    if (form.end_time <= form.start_time) {
+      showMessage("error", "Notice", "End time must be later than start time.");
       return;
     }
 
     try {
-      // Send availability data to backend
       await API.post("/technicians/availability", {
-
-        // Include technician ID if available
         ...(technicianId ? { technician_id: technicianId } : {}),
-
-        // Include availability form data
-        ...form
+        ...form,
       });
 
-      // Show success message
-      setMessage("Availability saved");
+      showMessage("success", "Saved Successfully", "Save success. Review email.");
 
+      setForm({
+        day: "",
+        start_time: "",
+        end_time: "",
+      });
     } catch (error) {
-
-      // Handle API error
-      setMessage(
-        error.response?.data?.message ||
-        "Failed to save availability."
+      showMessage(
+        "error",
+        "Notice",
+        error.response?.data?.message || "Failed to save availability."
       );
     }
   };
 
   return (
-    <>
-      {/* Page header */}
+    <SafeAreaView style={appStyles.screen}>
       <Header />
 
-      <ScrollView style={styles.container}>
+      <ScrollView style={appStyles.container} contentContainerStyle={appStyles.content}>
+        <Text style={appStyles.title}>Set Availability</Text>
 
-        {/* Page title */}
-        <Text style={styles.title}>Set Availability</Text>
-
-        <View style={styles.panel}>
-
-          {/* Date input */}
-          <View style={styles.inputGroup}>
-            <Text>Date</Text>
-            <TextInput
-              style={styles.input}
-              placeholder="YYYY-MM-DD"
-              onChangeText={text =>
-                setForm({ ...form, day: text })
-              }
-            />
+        {message ? (
+          <View style={[appStyles.messageCard, appStyles[`${message.type}Card`]]}>
+            <Text style={appStyles.messageTitle}>{message.title}</Text>
+            <Text style={appStyles.messageBody}>{message.body}</Text>
           </View>
+        ) : null}
 
-          {/* Start time input */}
-          <View style={styles.inputGroup}>
-            <Text>Start Time</Text>
-            <TextInput
-              style={styles.input}
-              placeholder="HH:MM"
-              onChangeText={text =>
-                setForm({ ...form, start_time: text })
-              }
-            />
-          </View>
+        <View style={appStyles.panel}>
+          <Text style={appStyles.label}>Date</Text>
+          <TextInput
+            style={appStyles.input}
+            placeholder="YYYY-MM-DD"
+            value={form.day}
+            onChangeText={(text) => setForm({ ...form, day: text })}
+          />
 
-          {/* End time input */}
-          <View style={styles.inputGroup}>
-            <Text>End Time</Text>
-            <TextInput
-              style={styles.input}
-              placeholder="HH:MM"
-              onChangeText={text =>
-                setForm({ ...form, end_time: text })
-              }
-            />
-          </View>
+          <Text style={appStyles.label}>Start Time</Text>
+          <TextInput
+            style={appStyles.input}
+            placeholder="HH:MM"
+            value={form.start_time}
+            onChangeText={(text) => setForm({ ...form, start_time: text })}
+          />
 
-          {/* Feedback message */}
-          {message ? (
-            <Text style={styles.message}>{message}</Text>
-          ) : null}
+          <Text style={appStyles.label}>End Time</Text>
+          <TextInput
+            style={appStyles.input}
+            placeholder="HH:MM"
+            value={form.end_time}
+            onChangeText={(text) => setForm({ ...form, end_time: text })}
+          />
 
-          {/* Submit button */}
-          <TouchableOpacity style={styles.button} onPress={submit}>
-            <Text style={styles.buttonText}>Save</Text>
+          <TouchableOpacity style={appStyles.primaryBtn} onPress={submit}>
+            <Text style={appStyles.primaryBtnText}>Save</Text>
           </TouchableOpacity>
-
         </View>
       </ScrollView>
-    </>
+    </SafeAreaView>
   );
 }
-
-// Styles
-const styles = StyleSheet.create({
-  container: {
-    padding: 15,
-  },
-  title: {
-    fontSize: 20,
-    fontWeight: "bold",
-    marginBottom: 10,
-  },
-  panel: {
-    backgroundColor: "#fff",
-    padding: 15,
-    borderRadius: 10,
-  },
-  inputGroup: {
-    marginBottom: 12,
-  },
-  input: {
-    borderWidth: 1,
-    borderColor: "#ccc",
-    padding: 10,
-    marginTop: 5,
-  },
-  message: {
-    marginBottom: 10,
-    color: "#333",
-  },
-  button: {
-    backgroundColor: "#007BFF",
-    padding: 12,
-    borderRadius: 5,
-  },
-  buttonText: {
-    color: "#fff",
-    textAlign: "center",
-  },
-});
 
 export default TechnicianAvailability;

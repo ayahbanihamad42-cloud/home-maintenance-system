@@ -1,4 +1,3 @@
-
 import api from "./api";
 
 export const createMaintenanceRequest = async (data) => {
@@ -20,4 +19,3 @@ export const updateRequestStatus = async (id, data) => {
   const res = await api.patch(`/maintenance/${id}/status`, data);
   return res.data;
 };
-

@@ -1,30 +1,19 @@
-// React hook for managing state
-import { useState } from "react";
-
-// Axios API instance
+import React, { useState } from "react";
 import API from "../../services/api";
 
-// React Native components
 import {
   View,
   Text,
   TextInput,
   TouchableOpacity,
-  StyleSheet
+  StyleSheet,
 } from "react-native";
 
-// Forgot password page component
 function ForgotPassword() {
-  // Email input state
   const [email, setEmail] = useState("");
-
-  // Message feedback state
   const [message, setMessage] = useState("");
-
-  // Loading state for submit action
   const [loading, setLoading] = useState(false);
 
-  // Handle submit action
   const submit = async () => {
     if (!email) {
       setMessage("Please enter your email.");
@@ -33,10 +22,7 @@ function ForgotPassword() {
 
     try {
       setLoading(true);
-
-      // Send forgot password request (email only)
       const res = await API.post("/auth/forgotPassword", { email });
-
       setMessage(res?.data?.message || "Reset link sent to your email.");
       setEmail("");
     } catch (error) {
@@ -49,29 +35,25 @@ function ForgotPassword() {
   return (
     <View style={styles.page}>
       <View style={styles.card}>
-        {/* Page title */}
         <Text style={styles.title}>Forgot Password</Text>
 
-        {/* Page description */}
         <Text style={styles.subtitle}>
           Enter your email to receive a password reset link.
         </Text>
 
-        {/* Email input */}
         <View style={styles.inputGroup}>
           <Text>Email</Text>
           <TextInput
             style={styles.input}
             placeholder="name@example.com"
             value={email}
-            onChangeText={(text) => setEmail(text)}
+            onChangeText={setEmail}
+            autoCapitalize="none"
           />
         </View>
 
-        {/* Feedback message */}
         {message ? <Text style={styles.message}>{message}</Text> : null}
 
-        {/* Submit button */}
         <TouchableOpacity
           style={[styles.button, loading && { opacity: 0.6 }]}
           onPress={submit}
@@ -91,16 +73,20 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: "center",
     padding: 20,
+    backgroundColor: "#E8DCCF",
   },
   card: {
-    backgroundColor: "#fff",
+    backgroundColor: "#FFF9F3",
     padding: 20,
-    borderRadius: 10,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: "#D8C8B8",
   },
   title: {
     fontSize: 20,
     fontWeight: "bold",
     marginBottom: 10,
+    color: "#111",
   },
   subtitle: {
     marginBottom: 15,
@@ -114,19 +100,22 @@ const styles = StyleSheet.create({
     borderColor: "#ccc",
     padding: 10,
     marginTop: 5,
+    borderRadius: 10,
+    backgroundColor: "#fff",
   },
   message: {
     marginBottom: 10,
     color: "#333",
   },
   button: {
-    backgroundColor: "#007BFF",
+    backgroundColor: "#111",
     padding: 12,
-    borderRadius: 5,
+    borderRadius: 10,
   },
   buttonText: {
     color: "#fff",
     textAlign: "center",
+    fontWeight: "700",
   },
 });
 

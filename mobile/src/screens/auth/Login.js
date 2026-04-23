@@ -1,14 +1,7 @@
 import React, { useState } from "react";
-// React and useState hook
-
 import { useNavigation } from "@react-navigation/native";
-// Navigation بدل react-router
-
-import { login } from "../../services/auth.service.jsx";
-// Login service function
-
-import welomeimage from "../../images/home.png";
-// Illustration image
+import { login } from "../../services/auth.service.js";
+import welomeimage from "../../assets/home.png";
 
 import {
   View,
@@ -20,46 +13,38 @@ import {
   Alert,
 } from "react-native";
 
-// Login page component
 function Login() {
-
-  // Email input state
   const [email, setEmail] = useState("");
-
-  // Password input state
   const [password, setPassword] = useState("");
-
-  // Success message state
   const [successMessage, setSuccessMessage] = useState("");
+  const navigation = useNavigation();
 
-  // Navigation hook
-  const navigate = useNavigation();
-
-  // Handle form submission
   const handleSubmit = async () => {
-
     try {
-      // Call login API
-      await login({ email, password });
+      const user = await login({ email, password });
 
-      // Show success message
       setSuccessMessage("Login successful. Redirecting...");
 
-      // Redirect user to home page after delay
       setTimeout(() => {
-        navigate.navigate("/home");
+        const role = String(user?.role || "").toLowerCase();
+
+        if (role === "admin") {
+          navigation.replace("AdminDashboard");
+          return;
+        }
+
+        if (role === "technician") {
+          navigation.replace("TechnicianDashboard");
+          return;
+        }
+
+        navigation.replace("Home");
       }, 900);
-
     } catch (err) {
-      // Get error message from response or fallback
       const msg =
-        err.response?.data?.message ||
-        "Login failed. Check your credentials.";
+        err.response?.data?.message || "Login failed. Check your credentials.";
 
-      // Log error for debugging
       console.error(msg);
-
-      // Show error alert
       Alert.alert("Error", msg);
     }
   };
@@ -67,93 +52,83 @@ function Login() {
   return (
     <View style={styles.page}>
       <View style={styles.card}>
-
-        {/* Page title */}
         <Text style={styles.title}>Welcome back</Text>
 
-        {/* Page subtitle */}
         <Text style={styles.subtitle}>
           Sign in to manage your maintenance requests.
         </Text>
 
-        {/* Success message */}
         {successMessage ? (
           <Text style={styles.success}>{successMessage}</Text>
         ) : null}
 
-        {/* Login form */}
-
-        {/* Email input */}
         <View style={styles.inputGroup}>
           <Text>Email</Text>
           <TextInput
             style={styles.input}
             value={email}
-            onChangeText={text => setEmail(text)}
+            onChangeText={setEmail}
             placeholder="name@example.com"
+            autoCapitalize="none"
           />
         </View>
 
-        {/* Password input */}
         <View style={styles.inputGroup}>
           <Text>Password</Text>
           <TextInput
             style={styles.input}
             value={password}
-            onChangeText={text => setPassword(text)}
+            onChangeText={setPassword}
             placeholder="Enter your password"
             secureTextEntry
           />
         </View>
 
-        {/* Submit button */}
         <TouchableOpacity style={styles.button} onPress={handleSubmit}>
           <Text style={styles.buttonText}>Login</Text>
         </TouchableOpacity>
 
-        {/* Illustration image */}
         <Image
           style={styles.image}
           source={welomeimage}
           resizeMode="contain"
         />
 
-        {/* Additional message */}
         <Text style={styles.message}>
           We’re ready to help you keep your home running smoothly.
         </Text>
 
-        {/* Register link */}
-        <TouchableOpacity onPress={() => navigate.navigate("/register")}>
+        <TouchableOpacity onPress={() => navigation.navigate("Register")}>
           <Text style={styles.link}>Don't have an account? Register</Text>
         </TouchableOpacity>
 
-        {/* Forgot password link */}
-        <TouchableOpacity onPress={() => navigate.navigate("/forgot-password")}>
+        <TouchableOpacity onPress={() => navigation.navigate("ForgotPassword")}>
           <Text style={styles.link}>Forgot password?</Text>
         </TouchableOpacity>
-
       </View>
     </View>
   );
 }
 
-// Styles
 const styles = StyleSheet.create({
   page: {
     flex: 1,
     justifyContent: "center",
     padding: 20,
+    backgroundColor: "#E8DCCF",
   },
   card: {
-    backgroundColor: "#fff",
+    backgroundColor: "#FFF9F3",
     padding: 20,
-    borderRadius: 10,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: "#D8C8B8",
   },
   title: {
     fontSize: 22,
     fontWeight: "bold",
     marginBottom: 10,
+    color: "#111",
   },
   subtitle: {
     color: "#666",
@@ -171,16 +146,19 @@ const styles = StyleSheet.create({
     borderColor: "#ccc",
     padding: 10,
     marginTop: 5,
+    borderRadius: 10,
+    backgroundColor: "#fff",
   },
   button: {
-    backgroundColor: "#007BFF",
+    backgroundColor: "#111",
     padding: 12,
-    borderRadius: 5,
+    borderRadius: 10,
     marginBottom: 15,
   },
   buttonText: {
     color: "#fff",
     textAlign: "center",
+    fontWeight: "700",
   },
   image: {
     width: "100%",
@@ -193,11 +171,10 @@ const styles = StyleSheet.create({
     color: "#555",
   },
   link: {
-    color: "blue",
+    color: "#2563eb",
     textAlign: "center",
     marginTop: 5,
   },
 });
 
-// Export component
 export default Login;

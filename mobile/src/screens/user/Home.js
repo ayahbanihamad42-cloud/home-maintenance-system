@@ -1,13 +1,13 @@
 import React from "react";
-import { View, Text, Image, StyleSheet, TouchableOpacity, SafeAreaView } from "react-native";
+import { View, Text, Image, StyleSheet, TouchableOpacity, SafeAreaView } from "react-native-safe-area-context";
 import { useNavigation } from "@react-navigation/native";
 
-import plumbingImg from "../../images/plumbing.png";
-import electricalImg from "../../images/electrical.png";
-import paintingImg from "../../images/Painting.png";
-import decorationImg from "../../images/Decoration.png";
+import plumbingImg from "../../assets/plumbing.png";
+import electricalImg from "../../assets/electrical.png";
+import paintingImg from "../../assets/Painting.png";
+import decorationImg from "../../assets/Decoration.png";
 
-import Header from "../../components/common/Header";
+import Header from "../../components/Common/Header";
 
 function Home() {
   const navigation = useNavigation();
@@ -16,7 +16,7 @@ function Home() {
     { name: "Plumbing", img: plumbingImg },
     { name: "Electrical", img: electricalImg },
     { name: "Painting", img: paintingImg },
-    { name: "Decoration", img: decorationImg }
+    { name: "Decoration", img: decorationImg },
   ];
 
   return (
@@ -28,10 +28,9 @@ function Home() {
       <View style={styles.servicesContainer}>
         {services.map((s, i) => (
           <View key={i} style={styles.serviceItem}>
-            
             <TouchableOpacity
               style={styles.serviceCircle}
-              onPress={() => navigation.navigate("ServiceDetails", { serviceName: s.name })}
+              onPress={() => navigation.navigate("Services", { service: s.name })}
             >
               <Image
                 source={s.img}
@@ -51,13 +50,14 @@ function Home() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#fff",
+    backgroundColor: "#E8DCCF",
   },
   homeTitle: {
     fontSize: 20,
     fontWeight: "bold",
     margin: 20,
     textAlign: "center",
+    color: "#111",
   },
   servicesContainer: {
     flexDirection: "row",
@@ -74,7 +74,7 @@ const styles = StyleSheet.create({
     width: 60,
     height: 60,
     borderRadius: 30,
-    backgroundColor: "#f0f0f0",
+    backgroundColor: "#FFF9F3",
     justifyContent: "center",
     alignItems: "center",
     marginBottom: 10,
@@ -82,6 +82,8 @@ const styles = StyleSheet.create({
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
+    borderWidth: 1,
+    borderColor: "#D8C8B8",
   },
   serviceName: {
     fontSize: 14,

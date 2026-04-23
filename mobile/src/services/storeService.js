@@ -1,4 +1,3 @@
-mobile/src/services/storeService.js
 
 import api from "./api";
 

@@ -1,10 +1,5 @@
-// React hook for managing state
 import { useState } from "react";
-
-// Navigation utilities
 import { useRoute, useNavigation } from "@react-navigation/native";
-
-// Axios API instance
 import API from "../../services/api";
 
 import {
@@ -12,31 +7,19 @@ import {
   Text,
   TextInput,
   TouchableOpacity,
-  StyleSheet
+  StyleSheet,
 } from "react-native";
 
-// Reset password page component
 function ResetPassword() {
-  // Get reset token from params
   const route = useRoute();
-  const { token } = route.params;
+  const navigation = useNavigation();
+  const { token } = route.params || {};
 
-  // Navigation hook
-  const navigate = useNavigation();
-
-  // Password input state
   const [password, setPassword] = useState("");
-
-  // Confirm password input state
   const [confirmPassword, setConfirmPassword] = useState("");
-
-  // Feedback message state
   const [message, setMessage] = useState("");
-
-  // Loading state
   const [loading, setLoading] = useState(false);
 
-  // Submit new password
   const submit = async () => {
     setMessage("");
 
@@ -58,13 +41,11 @@ function ResetPassword() {
     try {
       setLoading(true);
 
-      // Call backend reset endpoint
       const res = await API.post(`/auth/reset-password/${token}`, { password });
 
       setMessage(res?.data?.message || "Password updated successfully.");
 
-      // Redirect to login after short delay
-      setTimeout(() => navigate.navigate("/login"), 900);
+      setTimeout(() => navigation.replace("Login"), 900);
     } catch (error) {
       setMessage(error.response?.data?.message || "Failed to reset password.");
     } finally {
@@ -75,42 +56,36 @@ function ResetPassword() {
   return (
     <View style={styles.page}>
       <View style={styles.card}>
-        {/* Page title */}
         <Text style={styles.title}>Reset Password</Text>
 
-        {/* Page description */}
         <Text style={styles.subtitle}>
           Enter a new password for your account.
         </Text>
 
-        {/* New password input */}
         <View style={styles.inputGroup}>
           <Text>New Password</Text>
           <TextInput
             style={styles.input}
             placeholder="New password"
             value={password}
-            onChangeText={(text) => setPassword(text)}
+            onChangeText={setPassword}
             secureTextEntry
           />
         </View>
 
-        {/* Confirm password input */}
         <View style={styles.inputGroup}>
           <Text>Confirm Password</Text>
           <TextInput
             style={styles.input}
             placeholder="Confirm password"
             value={confirmPassword}
-            onChangeText={(text) => setConfirmPassword(text)}
+            onChangeText={setConfirmPassword}
             secureTextEntry
           />
         </View>
 
-        {/* Feedback message */}
         {message ? <Text style={styles.message}>{message}</Text> : null}
 
-        {/* Submit button */}
         <TouchableOpacity
           style={[styles.button, loading && { opacity: 0.6 }]}
           onPress={submit}
@@ -121,8 +96,7 @@ function ResetPassword() {
           </Text>
         </TouchableOpacity>
 
-        {/* Back to login */}
-        <TouchableOpacity onPress={() => navigate.navigate("/login")}>
+        <TouchableOpacity onPress={() => navigation.navigate("Login")}>
           <Text style={styles.link}>Back to Login</Text>
         </TouchableOpacity>
       </View>
@@ -130,22 +104,25 @@ function ResetPassword() {
   );
 }
 
-// Styles
 const styles = StyleSheet.create({
   page: {
     flex: 1,
     justifyContent: "center",
     padding: 20,
+    backgroundColor: "#E8DCCF",
   },
   card: {
-    backgroundColor: "#fff",
+    backgroundColor: "#FFF9F3",
     padding: 20,
-    borderRadius: 10,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: "#D8C8B8",
   },
   title: {
     fontSize: 20,
     fontWeight: "bold",
     marginBottom: 10,
+    color: "#111",
   },
   subtitle: {
     marginBottom: 15,
@@ -159,22 +136,25 @@ const styles = StyleSheet.create({
     borderColor: "#ccc",
     padding: 10,
     marginTop: 5,
+    borderRadius: 10,
+    backgroundColor: "#fff",
   },
   message: {
     marginBottom: 10,
     color: "#333",
   },
   button: {
-    backgroundColor: "#007BFF",
+    backgroundColor: "#111",
     padding: 12,
-    borderRadius: 5,
+    borderRadius: 10,
   },
   buttonText: {
     color: "#fff",
     textAlign: "center",
+    fontWeight: "700",
   },
   link: {
-    color: "blue",
+    color: "#2563eb",
     textAlign: "center",
     marginTop: 10,
   },

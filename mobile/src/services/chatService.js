@@ -1,5 +1,3 @@
-mobile/src/services/chatService.js
-
 import api from "./api";
 
 export const getChatMessages = async (userId) => {
@@ -12,3 +10,7 @@ export const sendChatMessage = async (data) => {
   return res.data;
 };
 
+export const getChatConversations = async () => {
+  const res = await api.get("/chat/conversations");
+  return res.data;
+};

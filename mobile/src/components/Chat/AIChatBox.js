@@ -1,8 +1,8 @@
 import React, { useState } from "react";
 import { View, TextInput, Pressable, Text } from "react-native";
+import appStyles from "../../styles/mobileStyles";
 
 function AIBox({ onAsk }) {
-
   const [text, setText] = useState("");
 
   const submit = () => {
@@ -12,27 +12,19 @@ function AIBox({ onAsk }) {
   };
 
   return (
-    <View style={{ padding: 10 }}>
-
+    <View style={{ padding: 12 }}>
       <TextInput
         value={text}
         onChangeText={setText}
         placeholder="Ask AI..."
+        placeholderTextColor="#777"
         multiline
-        style={{
-          borderWidth: 1,
-          padding: 10,
-          marginBottom: 10
-        }}
+        style={[appStyles.input, { minHeight: 100, textAlignVertical: "top" }]}
       />
 
-      <Pressable
-        onPress={submit}
-        style={{ backgroundColor: "#007bff", padding: 10 }}
-      >
-        <Text style={{ color: "#fff" }}>Ask</Text>
+      <Pressable onPress={submit} style={appStyles.primaryBtn}>
+        <Text style={appStyles.primaryBtnText}>Ask</Text>
       </Pressable>
-
     </View>
   );
 }

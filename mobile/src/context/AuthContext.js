@@ -5,10 +5,9 @@ import { logout as clearAuthStorage } from "../services/auth.service";
 export const AuthContext = createContext();
 
 export const AuthProvider = ({ children }) => {
-
   const [user, setUser] = useState(null);
 
-  // تحميل البيانات من AsyncStorage عند تشغيل التطبيق
+  // تحميل المستخدم عند فتح التطبيق
   useEffect(() => {
     const loadUser = async () => {
       const raw = await AsyncStorage.getItem("user");
@@ -28,11 +27,12 @@ export const AuthProvider = ({ children }) => {
       email: data.user.email,
       role: data.user.role,
       phone: data.user.phone || null,
-      city: data.user.city || null
+      city: data.user.city || null,
     };
 
     await AsyncStorage.setItem("token", data.token);
     await AsyncStorage.setItem("user", JSON.stringify(safeUser));
+
     setUser(safeUser);
   };
 

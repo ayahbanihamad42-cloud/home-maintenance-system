@@ -1,12 +1,12 @@
 import React, { useEffect, useState } from "react";
-import { View, Text, StyleSheet, FlatList, SafeAreaView } from "react-native";
+import { View, Text, StyleSheet, FlatList, SafeAreaView } from "react-native-safe-area-context";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
 import { getUserRequests } from "../../services/maintenanceService";
 import { getRatingByRequest } from "../../services/ratingService";
 
-import MaintenanceCard from "../../components/cards/MaintenanceCard";
-import Header from "../../components/common/Header";
+import MaintenanceCard from "../../components/Cards/MaintenanceCard";
+import Header from "../../components/Common/Header";
 
 function MaintenanceHistory() {
   const [requests, setRequests] = useState([]);
@@ -37,11 +37,11 @@ function MaintenanceHistory() {
         getRatingByRequest(request.id)
           .then((rating) => ({
             requestId: request.id,
-            rating
+            rating,
           }))
           .catch(() => ({
             requestId: request.id,
-            rating: null
+            rating: null,
           }))
       )
     ).then((results) => {
@@ -56,7 +56,7 @@ function MaintenanceHistory() {
   return (
     <SafeAreaView style={styles.container}>
       <Header />
-      
+
       <View style={styles.content}>
         <Text style={styles.title}>Request History</Text>
 
@@ -79,7 +79,7 @@ function MaintenanceHistory() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#fff",
+    backgroundColor: "#E8DCCF",
   },
   content: {
     flex: 1,
@@ -89,7 +89,7 @@ const styles = StyleSheet.create({
     fontSize: 22,
     fontWeight: "bold",
     marginVertical: 20,
-    color: "#333",
+    color: "#111",
   },
   listPadding: {
     paddingBottom: 20,

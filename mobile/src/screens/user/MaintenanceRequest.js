@@ -1,23 +1,27 @@
 import React, { useState, useEffect, useMemo } from "react";
-import { 
-  View, 
-  Text, 
-  StyleSheet, 
-  TextInput, 
-  TouchableOpacity, 
-  ScrollView, 
-  Alert,
-  SafeAreaView 
+import {
+  View,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  ScrollView,
+  SafeAreaView,
+  Linking,StyleSheet
 } from "react-native";
+import DateTimePicker from "@react-native-community/datetimepicker";
 import { useNavigation, useRoute } from "@react-navigation/native";
 import { Picker } from "@react-native-picker/picker";
-import * as Location from 'expo-location';
-import { WebView } from 'react-native-webview';
+import * as Location from "expo-location";
 
-import Header from "../../components/common/Header";
-import { getTechnicians, getAvailability } from "../../services/technicianService";
+import Header from "../../components/Common/Header";
+import {
+  getTechnicians,
+  getAvailability,
+  getTechnicianProfile,
+} from "../../services/technicianService";
 import { createMaintenanceRequest } from "../../services/maintenanceService";
-import API from "../../services/api";
+import { createMockPayment } from "../../services/paymentservice";
+import appStyles from "../../styles/mobileStyles";
 
 function MaintenanceRequest() {
   const route = useRoute();
@@ -28,169 +32,214 @@ function MaintenanceRequest() {
   const [technicians, setTechnicians] = useState([]);
   const [technicianId, setTechnicianId] = useState(initialTechnicianId || "");
   const [technicianName, setTechnicianName] = useState("");
+  const [technicianPrice, setTechnicianPrice] = useState(0);
+
   const [date, setDate] = useState("");
+  const [showDatePicker, setShowDatePicker] = useState(false);
+
   const [slots, setSlots] = useState([]);
   const [time, setTime] = useState("");
   const [description, setDescription] = useState("");
   const [locationNote, setLocationNote] = useState("");
 
+  const [estimatedHours, setEstimatedHours] = useState("1");
+  const [paymentMethod, setPaymentMethod] = useState("cash");
+
   const [geoCoords, setGeoCoords] = useState(null);
   const [geoError, setGeoError] = useState("");
+  const [requestMessage, setRequestMessage] = useState(null);
 
-  const mapQuery = useMemo(() => {
-    if (geoCoords) return `${geoCoords.lat},${geoCoords.lng}`;
-    return locationNote ? encodeURIComponent(locationNote) : "Riyadh";
-  }, [geoCoords, locationNote]);
+  const showMessage = (type, title, body) => {
+    setRequestMessage({ type, title, body });
+    setTimeout(() => setRequestMessage(null), 2800);
+  };
 
+  const formatDate = (d) => {
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, "0");
+    const day = String(d.getDate()).padStart(2, "0");
+    return `${y}-${m}-${day}`;
+  };
+
+  const totalPrice = useMemo(() => {
+    return Number(technicianPrice || 0) * Number(estimatedHours || 1);
+  }, [technicianPrice, estimatedHours]);
+
+  const openMap = async () => {
+    const query = locationNote || "Jordan";
+    const url = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(query)}`;
+    await Linking.openURL(url);
+  };
+
+  // Fetch technicians
   useEffect(() => {
-    if (!service) return;
-    getTechnicians(service).then((data) => setTechnicians(data || [])).catch(() => setTechnicians([]));
+    if (!service || initialTechnicianId) return;
+
+    getTechnicians(service)
+      .then((data) => setTechnicians(data || []))
+      .catch(() => setTechnicians([]));
   }, [service]);
 
+  // Fetch technician profile
   useEffect(() => {
-    if (!technicianId) {
-      setTechnicianName("");
-      return;
-    }
-    API.get(`/technicians/${technicianId}`)
+    if (!technicianId) return;
+
+    getTechnicianProfile(technicianId)
       .then((res) => {
-        setService(res.data?.service || "");
-        setTechnicianName(res.data?.name || "");
+        setService(res?.service || "");
+        setTechnicianName(res?.name || "");
+        setTechnicianPrice(Number(res?.price_per_hour || 0));
       })
-      .catch(() => setTechnicianName(""));
+      .catch(() => {});
   }, [technicianId]);
 
+  // Fetch availability
   useEffect(() => {
     if (!date || !technicianId) return;
+
     getAvailability(technicianId, date)
-      .then((data) => setSlots(data || []))
-      .catch(() => setSlots([]));
+      .then((data) => {
+        setSlots(data || []);
+        setTime("");
+
+        if (!data.length) {
+          showMessage("warning", "Notice", "No availability for this date");
+        }
+      })
+      .catch(() => {
+        showMessage("error", "Notice", "Failed to load availability");
+      });
   }, [date, technicianId]);
 
+  // Get location
   useEffect(() => {
     (async () => {
-      let { status } = await Location.requestForegroundPermissionsAsync();
-      if (status !== 'granted') {
-        setGeoError("Permission to access location was denied");
+      const { status } = await Location.requestForegroundPermissionsAsync();
+      if (status !== "granted") {
+        setGeoError("Location permission denied");
         return;
       }
-      let location = await Location.getCurrentPositionAsync({});
-      setGeoCoords({ lat: location.coords.latitude, lng: location.coords.longitude });
+
+      const loc = await Location.getCurrentPositionAsync({});
+      setGeoCoords({
+        lat: loc.coords.latitude,
+        lng: loc.coords.longitude,
+      });
     })();
   }, []);
 
+  // Submit
   const submit = async () => {
-    if (!service || !technicianId || !date || !time) {
-      Alert.alert("Error", "Please fill Service, Technician, Date, and Time.");
+    if (!service || !technicianId || !date || !time || !description?.trim()) {
+      showMessage("warning", "Notice", "Fill all required fields");
       return;
     }
 
-    try {
-      const response = await createMaintenanceRequest({
-        technician_id: technicianId,
-        description,
-        scheduled_date: date,
-        scheduled_time: time,
-        service,
-        location_note: locationNote,
-        city: ""
-      });
+    const payload = {
+      technician_id: technicianId,
+      description,
+      scheduled_date: date,
+      scheduled_time: time,
+      service,
+      location_note: locationNote,
+      estimated_hours: Number(estimatedHours),
+      payment_method: paymentMethod,
+    };
 
-      if (response?.id) {
-        navigation.navigate("Review", { id: response.id });
+    try {
+      if (paymentMethod === "online") {
+        const payment = await createMockPayment({
+          amount: totalPrice,
+          technicianId,
+          hoursRequested: Number(estimatedHours),
+        });
+
+        const res = await createMaintenanceRequest({
+          ...payload,
+          payment_transaction_id: payment.transactionId,
+        });
+
+        navigation.navigate("PaymentSuccess", {
+          requestId: res.id,
+          transactionId: payment.transactionId,
+          totalPrice,
+        });
+
         return;
       }
-      Alert.alert("Notice", "Request submitted, but no id returned.");
+
+      const res = await createMaintenanceRequest(payload);
+
+      navigation.navigate("Review", { requestId: res.id });
+
     } catch (e) {
-      Alert.alert("Error", "Failed to submit request.");
+      showMessage("error", "Notice", "Server error");
     }
   };
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={appStyles.screen}>
       <Header />
-      <ScrollView contentContainerStyle={styles.scrollContent}>
-        <Text style={styles.title}>Maintenance Request</Text>
 
-        {technicianId ? (
-          <View style={styles.inputGroup}>
-            <Text style={styles.label}>Service</Text>
-            <View style={styles.readonlyField}><Text>{service || "Loading..."}</Text></View>
-            <Text style={styles.label}>Technician</Text>
-            <View style={styles.readonlyField}><Text>{technicianName || "Loading..."}</Text></View>
+      <ScrollView contentContainerStyle={appStyles.content}>
+        <Text style={appStyles.title}>Maintenance Request</Text>
+
+        {requestMessage && (
+          <View style={[appStyles.messageCard]}>
+            <Text>{requestMessage.body}</Text>
           </View>
-        ) : (
-          <>
-            <Text style={styles.label}>Service Type</Text>
-            <View style={styles.pickerContainer}>
-              <Picker selectedValue={service} onValueChange={(val) => setService(val)}>
-                <Picker.Item label="Select service" value="" />
-                <Picker.Item label="Electrical" value="Electrical" />
-                <Picker.Item label="Plumbing" value="Plumbing" />
-              </Picker>
-            </View>
-
-            <Text style={styles.label}>Technician</Text>
-            <View style={styles.pickerContainer}>
-              <Picker selectedValue={technicianId} onValueChange={(val) => setTechnicianId(val)}>
-                <Picker.Item label="Select technician" value="" />
-                {technicians.map((tech) => (
-                  <Picker.Item key={tech.technicianId} label={`${tech.name} - ${tech.experience} yrs`} value={tech.technicianId} />
-                ))}
-              </Picker>
-            </View>
-          </>
         )}
 
-        <Text style={styles.label}>Date (YYYY-MM-DD)</Text>
-        <TextInput style={styles.input} value={date} onChangeText={setDate} placeholder="2023-10-25" />
+        {/* DATE PICKER */}
+        <Text style={appStyles.label}>Date</Text>
+        <TouchableOpacity
+          style={appStyles.input}
+          onPress={() => setShowDatePicker(true)}
+        >
+          <Text>{date || "Select date"}</Text>
+        </TouchableOpacity>
 
-        <Text style={styles.label}>Time Slot</Text>
-        <View style={styles.pickerContainer}>
-          <Picker selectedValue={time} onValueChange={(val) => setTime(val)}>
-            <option value="">Select time</option>
-            {slots.map((slot) => (
-              <Picker.Item key={slot.id} label={slot.start_time} value={slot.start_time} />
-            ))}
-          </Picker>
-        </View>
-
-        <Text style={styles.label}>Location Note</Text>
-        <TextInput style={styles.input} value={locationNote} onChangeText={setLocationNote} placeholder="Address details" />
-
-        <Text style={styles.label}>Description</Text>
-        <TextInput style={[styles.input, { height: 80 }]} multiline numberOfLines={3} value={description} onChangeText={setDescription} />
-
-        <Text style={styles.label}>Map Location</Text>
-        {geoError ? <Text style={styles.errorText}>{geoError}</Text> : null}
-        <View style={styles.mapContainer}>
-          <WebView 
-            source={{ uri: `https://maps.google.com/maps?q=${mapQuery}&z=14&output=embed` }} 
-            style={styles.map}
+        {showDatePicker && (
+          <DateTimePicker
+            value={date ? new Date(date) : new Date()}
+            mode="date"
+            minimumDate={new Date()}
+            onChange={(e, selected) => {
+              setShowDatePicker(false);
+              if (selected) setDate(formatDate(selected));
+            }}
           />
-        </View>
+        )}
 
-        <TouchableOpacity style={styles.button} onPress={submit}>
-          <Text style={styles.buttonText}>Submit</Text>
+        {/* TIME */}
+        <Text style={appStyles.label}>Time</Text>
+        <Picker selectedValue={time} onValueChange={setTime}>
+          <Picker.Item label="Select time" value="" />
+          {slots.map((s) => (
+            <Picker.Item key={s.id} label={s.start_time} value={s.start_time} />
+          ))}
+        </Picker>
+
+        {/* DESCRIPTION */}
+        <TextInput
+          style={appStyles.input}
+          placeholder="Describe the issue"
+          value={description}
+          onChangeText={setDescription}
+        />
+
+        {/* MAP */}
+        <TouchableOpacity style={appStyles.primaryBtn} onPress={openMap}>
+          <Text style={appStyles.primaryBtnText}>Open Map</Text>
+        </TouchableOpacity>
+
+        {/* SUBMIT */}
+        <TouchableOpacity style={appStyles.primaryBtn} onPress={submit}>
+          <Text style={appStyles.primaryBtnText}>Submit</Text>
         </TouchableOpacity>
       </ScrollView>
     </SafeAreaView>
   );
 }
-
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#fff" },
-  scrollContent: { padding: 20 },
-  title: { fontSize: 22, fontWeight: "bold", marginBottom: 20 },
-  label: { fontSize: 14, fontWeight: "600", marginBottom: 5, marginTop: 15 },
-  input: { borderWidth: 1, borderColor: "#ccc", borderRadius: 8, padding: 10, fontSize: 16 },
-  readonlyField: { backgroundColor: "#f0f0f0", padding: 12, borderRadius: 8 },
-  pickerContainer: { borderWidth: 1, borderColor: "#ccc", borderRadius: 8 },
-  mapContainer: { height: 200, marginTop: 10, borderRadius: 8, overflow: 'hidden' },
-  map: { flex: 1 },
-  button: { backgroundColor: "#007AFF", padding: 15, borderRadius: 8, marginTop: 30, alignItems: "center" },
-  buttonText: { color: "#fff", fontWeight: "bold", fontSize: 16 },
-  errorText: { color: "red", fontSize: 12 }
-});
 
 export default MaintenanceRequest;
