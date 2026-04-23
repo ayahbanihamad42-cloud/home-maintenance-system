@@ -7,7 +7,7 @@ import {
   View,
   Image,
   StyleSheet,
-} from "react-native-safe-area-context";
+} from "react-native";
 import { useNavigation } from "@react-navigation/native";
 
 import welcomeimage from "../../assets/home.png";
