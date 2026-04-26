@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useRef } from "react";
-import { chatWithAI, generateAIImage } from "../services/aiService";
+import { chatWithAI, generateAIImage } from "../services/aiService.jsx";
 import Header from "../components/common/Header";
 import "../index.css";
 import aiimage from "../images/aiassistant.png";
