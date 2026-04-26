@@ -9,7 +9,8 @@ export const getTechniciansByService = (req, res) => {
       t.id AS technicianId,
       u.name,
       t.service,
-      t.experience
+      t.experience,
+      t.price_per_hour
     FROM technicians t
     JOIN users u ON t.user_id = u.id
     WHERE LOWER(t.service) = LOWER(?)
@@ -53,7 +54,9 @@ export const createAvailability = (req, res) => {
   const { day, start_time, end_time } = req.body;
 
   if (req.user.role !== "technician" && req.user.role !== "admin") {
-    return res.status(403).json({ message: "Only technician/admin can manage availability" });
+    return res
+      .status(403)
+      .json({ message: "Only technician/admin can manage availability" });
   }
 
   db.query(
@@ -102,12 +105,22 @@ export const getTechnicianProfile = (req, res) => {
       u.city,
       t.service,
       t.experience,
+      t.price_per_hour,
       COALESCE(AVG(r.rating), 0) AS rating
     FROM technicians t
     JOIN users u ON t.user_id = u.id
     LEFT JOIN ratings r ON r.technician_id = t.id
     WHERE t.id = ?
-    GROUP BY t.id, t.user_id, u.name, u.email, u.phone, u.city, t.service, t.experience
+    GROUP BY 
+      t.id,
+      t.user_id,
+      u.name,
+      u.email,
+      u.phone,
+      u.city,
+      t.service,
+      t.experience,
+      t.price_per_hour
   `;
 
   db.query(q, [id], (err, rows) => {
@@ -134,7 +147,8 @@ export const getTechnicianByUserId = (req, res) => {
       t.user_id,
       u.name,
       t.service,
-      t.experience
+      t.experience,
+      t.price_per_hour
     FROM technicians t
     JOIN users u ON t.user_id = u.id
     WHERE t.user_id = ?
@@ -152,6 +166,40 @@ export const getTechnicianByUserId = (req, res) => {
 
     res.json(rows[0]);
   });
+};
+
+// Update technician price per hour
+export const updateTechnicianPrice = (req, res) => {
+  const { price_per_hour } = req.body;
+  const parsedPrice = Number(price_per_hour);
+
+  if (req.user.role !== "technician" && req.user.role !== "admin") {
+    return res.status(403).json({ message: "Not authorized" });
+  }
+
+  if (Number.isNaN(parsedPrice) || parsedPrice < 0) {
+    return res.status(400).json({ message: "Invalid price_per_hour" });
+  }
+
+  db.query(
+    "UPDATE technicians SET price_per_hour = ? WHERE user_id = ?",
+    [parsedPrice, req.user.id],
+    (err, result) => {
+      if (err) {
+        console.error("updateTechnicianPrice error:", err);
+        return res.status(500).json({ message: "Server error" });
+      }
+
+      if (!result.affectedRows) {
+        return res.status(404).json({ message: "Technician profile not found" });
+      }
+
+      res.json({
+        message: "Technician price updated",
+        price_per_hour: parsedPrice,
+      });
+    }
+  );
 };
 
 // Fetch maintenance requests for technician

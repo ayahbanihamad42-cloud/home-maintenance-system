@@ -10,6 +10,5 @@ router.get("/:id/availability", tech.getAvailability);
 router.post("/availability", auth, tech.createAvailability);
 router.get("/:id", tech.getTechnicianProfile);
 router.get("/:id/requests", auth, tech.getTechnicianRequests);
-
-
+router.put("/price", auth, tech.updateTechnicianPrice);
 export default router;

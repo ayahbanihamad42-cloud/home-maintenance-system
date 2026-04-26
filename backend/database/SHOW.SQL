@@ -1,0 +1,9 @@
+--ALTER TABLE home_maintenance_db.technicians
+--ADD COLUMN price_per_hour DECIMAL(10,2) DEFAULT 0.00;
+--ALTER TABLE home_maintenance_db.maintenance_requests
+--ADD COLUMN hours_requested INT DEFAULT 1,
+--ADD COLUMN price_per_hour DECIMAL(10,2) DEFAULT 0.00,
+--ADD COLUMN total_price DECIMAL(10,2) DEFAULT 0.00,
+--ADD COLUMN payment_method ENUM('cash', 'online') DEFAULT 'cash',
+--ADD COLUMN payment_status ENUM('unpaid', 'paid', 'failed') DEFAULT 'unpaid',
+--ADD COLUMN payment_transaction_id VARCHAR(255) NULL;

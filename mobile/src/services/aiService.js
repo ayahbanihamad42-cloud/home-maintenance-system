@@ -1,4 +1,3 @@
-mobile/src/services/aiService.js
 
 import api from "./api";
 

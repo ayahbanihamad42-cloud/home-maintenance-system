@@ -1,4 +1,3 @@
-mobile/src/services/ratingService.js
 
 import api from "./api";
 

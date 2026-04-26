@@ -1,162 +1,181 @@
-import React, { useEffect, useState } from "react";
-import { View, Text, Pressable, ScrollView } from "react-native";
+import React, { useEffect, useMemo, useState } from "react";
+import {
+  View,
+  Text,
+  TouchableOpacity,
+  Modal,
+  Pressable,
+} from "react-native";
+import { useNavigation, useRoute } from "@react-navigation/native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { getNotifications } from "../../services/notificationService.jsx";
+import appStyles from "../../styles/mobileStyles";
 
-function Header({ navigation }) {
+function normalizeRole(role) {
+  return role ? String(role).trim().toLowerCase() : "";
+}
 
+function Header() {
+  const navigation = useNavigation();
+  const route = useRoute();
+
+  const [menuVisible, setMenuVisible] = useState(false);
+  const [notificationsVisible, setNotificationsVisible] = useState(false);
   const [user, setUser] = useState(null);
-  const role = user?.role;
 
-  const [showNotifications, setShowNotifications] = useState(false);
-  const [notificationFeed, setNotificationFeed] = useState([]);
-  const [latestChatUserId, setLatestChatUserId] = useState(null);
+  const currentRoute = route?.name || "";
 
-  // 🔥 بدل localStorage
   useEffect(() => {
     const loadUser = async () => {
-      const data = await AsyncStorage.getItem("user");
-      setUser(data ? JSON.parse(data) : null);
+      try {
+        const raw = await AsyncStorage.getItem("user");
+        if (raw) {
+          setUser(JSON.parse(raw));
+        } else {
+          setUser(null);
+        }
+      } catch (error) {
+        console.error("Header user load error:", error);
+        setUser(null);
+      }
     };
+
     loadUser();
   }, []);
 
-  const handleLogout = async () => {
-    await AsyncStorage.clear();
-    navigation.navigate("Login");
-  };
+  const role = normalizeRole(user?.role);
 
-  useEffect(() => {
-    if (!user) return;
-
-    const req = getNotifications();
-
-    if (!req || typeof req.then !== "function") {
-      setNotificationFeed([]);
-      return;
+  const menuItems = useMemo(() => {
+    if (role === "admin") {
+      return [
+        { label: "Dashboard", screen: "AdminDashboard" },
+        { label: "AI Assistant", screen: "AIChat" },
+      ];
     }
 
-    req
-      .then((res) => {
-        const feed = res?.data || [];
-        setNotificationFeed(feed);
+    if (role === "technician") {
+      return [
+        { label: "Dashboard", screen: "TechnicianDashboard" },
+        { label: "Profile", screen: "Profile" },
+        { label: "Requests", screen: "TechnicianRequests" },
+        { label: "Availability", screen: "TechnicianAvailability" },
+        { label: "Chats", screen: "ChatList" },
+        { label: "AI Assistant", screen: "AIChat" },
+      ];
+    }
 
-        const latestMessage = feed.find(
-          (item) => item.type === "message" && item.chatUserId
-        );
-        setLatestChatUserId(latestMessage?.chatUserId || null);
-      })
-      .catch(() => setNotificationFeed([]));
-  }, [user]);
+    return [
+      { label: "Home", screen: "Home" },
+      { label: "Requests History", screen: "History" },
+      { label: "Profile", screen: "Profile" },
+      { label: "Chats", screen: "ChatList" },
+      { label: "AI Assistant", screen: "AIChat" },
+    ];
+  }, [role]);
+
+  const handleNavigate = (screen) => {
+    setMenuVisible(false);
+
+    if (screen && screen !== currentRoute) {
+      navigation.navigate(screen);
+    }
+  };
+
+  const handleLogout = async () => {
+    try {
+      await AsyncStorage.removeItem("token");
+      await AsyncStorage.removeItem("user");
+    } catch (error) {
+      console.error("Logout error:", error);
+    }
+
+    setMenuVisible(false);
+
+    navigation.reset({
+      index: 0,
+      routes: [{ name: "Welcome" }],
+    });
+  };
 
   return (
-    <View>
+    <>
+      <View style={appStyles.mobileHeader}>
+        <View style={appStyles.mobileHeaderLeft}>
+          <TouchableOpacity
+            style={appStyles.mobileHeaderIconBtn}
+            onPress={() => setMenuVisible(true)}
+          >
+            <Text style={appStyles.mobileHeaderIconText}>☰</Text>
+          </TouchableOpacity>
 
-      <Text>Maintenance System</Text>
+          <Text style={appStyles.mobileHeaderTitle}>Maintenance System</Text>
+        </View>
 
-      {user ? (
-        <>
-          <View>
+        <View style={appStyles.mobileHeaderRight}>
+          <TouchableOpacity
+            style={appStyles.mobileHeaderIconBtn}
+            onPress={() => setNotificationsVisible(true)}
+          >
+            <Text style={appStyles.mobileHeaderIconText}>🔔</Text>
+          </TouchableOpacity>
 
-            {role === "technician" ? (
-              <>
-                <Pressable onPress={() => navigation.navigate("TechnicianDashboard")}>
-                  <Text>Dashboard</Text>
-                </Pressable>
+          <TouchableOpacity
+            style={appStyles.mobileLogoutBtn}
+            onPress={handleLogout}
+          >
+            <Text style={appStyles.mobileLogoutBtnText}>Log Out</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
 
-                <Pressable onPress={() => navigation.navigate("TechnicianRequests")}>
-                  <Text>Requests</Text>
-                </Pressable>
+      <Modal
+        visible={menuVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setMenuVisible(false)}
+      >
+        <Pressable
+          style={appStyles.mobileMenuOverlay}
+          onPress={() => setMenuVisible(false)}
+        >
+          <Pressable
+            style={appStyles.mobileMenuSheet}
+            onPress={(e) => e.stopPropagation()}
+          >
+            <Text style={appStyles.mobileMenuTitle}>Menu</Text>
 
-                <Pressable onPress={() => navigation.navigate("Availability")}>
-                  <Text>Availability</Text>
-                </Pressable>
+            {menuItems.map((item) => (
+              <TouchableOpacity
+                key={item.screen}
+                style={appStyles.mobileMenuItem}
+                onPress={() => handleNavigate(item.screen)}
+              >
+                <Text style={appStyles.mobileMenuItemText}>{item.label}</Text>
+              </TouchableOpacity>
+            ))}
+          </Pressable>
+        </Pressable>
+      </Modal>
 
-                {latestChatUserId ? (
-                  <Pressable onPress={() => navigation.navigate("Chat", { id: latestChatUserId })}>
-                    <Text>Chat</Text>
-                  </Pressable>
-                ) : (
-                  <Pressable onPress={() => alert("No chats yet")}>
-                    <Text>Chat</Text>
-                  </Pressable>
-                )}
-              </>
-            ) : (
-              <>
-                <Pressable onPress={() => navigation.navigate("Home")}>
-                  <Text>Home</Text>
-                </Pressable>
-
-                <Pressable onPress={() => navigation.navigate("History")}>
-                  <Text>Requests History</Text>
-                </Pressable>
-
-                <Pressable onPress={() => navigation.navigate("Profile")}>
-                  <Text>Profile</Text>
-                </Pressable>
-
-                <Pressable onPress={() => navigation.navigate("AIChat")}>
-                  <Text>AI Assistant</Text>
-                </Pressable>
-              </>
-            )}
-
-          </View>
-
-          <View>
-
-            <Pressable onPress={() => setShowNotifications(prev => !prev)}>
-              <Text>🔔</Text>
-            </Pressable>
-
-            {showNotifications ? (
-              <View>
-
-                <Text>Notifications</Text>
-
-                {notificationFeed.length === 0 ? (
-                  <Text>No notifications yet.</Text>
-                ) : (
-                  <ScrollView>
-                    {notificationFeed.map((item) => (
-                      <Pressable
-                        key={item.id}
-                        onPress={() => {
-                          setShowNotifications(false);
-
-                          if (item.type === "message" && item.chatUserId) {
-                            navigation.navigate("Chat", { id: item.chatUserId });
-                          } else if (item.type === "request") {
-                            if (role === "technician") {
-                              navigation.navigate("TechnicianRequests");
-                            } else if (item.requestId) {
-                              navigation.navigate("Review", { id: item.requestId });
-                            }
-                          }
-                        }}
-                      >
-                        <Text>{item.title}</Text>
-                        <Text>{item.body}</Text>
-                      </Pressable>
-                    ))}
-                  </ScrollView>
-                )}
-
-              </View>
-            ) : null}
-
-            <Pressable onPress={handleLogout}>
-              <Text>Log Out</Text>
-            </Pressable>
-
-          </View>
-        </>
-      ) : (
-        <Text>Welcome to our Home Maintenance System</Text>
-      )}
-
-    </View>
+      <Modal
+        visible={notificationsVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setNotificationsVisible(false)}
+      >
+        <Pressable
+          style={appStyles.mobileMenuOverlay}
+          onPress={() => setNotificationsVisible(false)}
+        >
+          <Pressable
+            style={appStyles.mobileNotificationBox}
+            onPress={(e) => e.stopPropagation()}
+          >
+            <Text style={appStyles.messageTitle}>Notifications</Text>
+            <Text style={appStyles.messageBody}>No notifications yet.</Text>
+          </Pressable>
+        </Pressable>
+      </Modal>
+    </>
   );
 }
 

@@ -1,7 +1,6 @@
-import React, { useCallback, useEffect, useMemo, useState } from "react";
-import { getToken } from "../../services/auth.service.jsx";
-import Header from "../../components/common/Header";
-import axios from "axios";
+import React, { useCallback, useEffect, useState } from "react";
+import Header from "../../components/Common/Header";
+import API from "../../services/api";
 
 import {
   View,
@@ -15,7 +14,6 @@ import {
   ScrollView,
 } from "react-native";
 
-/* --- helper صغير لعرض سطرين معلومات داخل المودال --- */
 function InfoRow({ label, value }) {
   return (
     <View style={styles.infoRow}>
@@ -40,30 +38,19 @@ function AdminDashboard() {
     experience: "",
   });
 
-  const serviceOptions = ["Plumbing", "Electrical", "Painting", "Decoration"];
-
-  const API = useMemo(
-    () =>
-      axios.create({
-        baseURL: "http://localhost:5000/api",
-        headers: { Authorization: `Bearer ${getToken()}` },
-      }),
-    []
-  );
-
   const fetchData = useCallback(async () => {
     try {
       if (view === "users") {
         const res = await API.get("/admin/users");
-        setUsers(res.data);
+        setUsers(res.data || []);
       } else {
         const res = await API.get("/admin/technicians");
-        setTechnicians(res.data);
+        setTechnicians(res.data || []);
       }
     } catch (error) {
       Alert.alert("Error", error.response?.data?.message || error.message);
     }
-  }, [API, view]);
+  }, [view]);
 
   useEffect(() => {
     fetchData();
@@ -71,7 +58,7 @@ function AdminDashboard() {
 
   const handleDeleteUser = async (userId) => {
     Alert.alert("Confirm", "Are you sure you want to delete this user?", [
-      { text: "Cancel" },
+      { text: "Cancel", style: "cancel" },
       {
         text: "OK",
         onPress: async () => {
@@ -89,7 +76,7 @@ function AdminDashboard() {
 
   const handleDeleteTechnician = async (technicianId) => {
     Alert.alert("Confirm", "Are you sure you want to delete this technician?", [
-      { text: "Cancel" },
+      { text: "Cancel", style: "cancel" },
       {
         text: "OK",
         onPress: async () => {
@@ -103,6 +90,45 @@ function AdminDashboard() {
         },
       },
     ]);
+  };
+
+  const handleAdd = async () => {
+    try {
+      if (view === "users") {
+        await API.post("/admin/users", {
+          name: form.name,
+          email: form.email,
+          phone: form.phone,
+          city: form.city,
+          password: form.password,
+        });
+      } else {
+        await API.post("/admin/technicians", {
+          name: form.name,
+          email: form.email,
+          phone: form.phone,
+          city: form.city,
+          password: form.password,
+          service: form.service,
+          experience: form.experience,
+        });
+      }
+
+      setForm({
+        name: "",
+        email: "",
+        phone: "",
+        city: "",
+        password: "",
+        service: "",
+        experience: "",
+      });
+
+      fetchData();
+      Alert.alert("Success", `${view === "users" ? "User" : "Technician"} added successfully.`);
+    } catch (error) {
+      Alert.alert("Error", error.response?.data?.message || error.message);
+    }
   };
 
   return (
@@ -122,9 +148,9 @@ function AdminDashboard() {
           </TouchableOpacity>
         </View>
 
-        {/* USERS */}
         {view === "users" ? (
           <FlatList
+            scrollEnabled={false}
             data={users}
             keyExtractor={(item) => item.id.toString()}
             renderItem={({ item: u }) => (
@@ -134,9 +160,7 @@ function AdminDashboard() {
                 <Text>{u.phone}</Text>
                 <Text>{u.city}</Text>
 
-                <TouchableOpacity
-                  onPress={() => setSelectedProfile({ type: "user", data: u })}
-                >
+                <TouchableOpacity onPress={() => setSelectedProfile({ type: "user", data: u })}>
                   <Text style={styles.link}>View</Text>
                 </TouchableOpacity>
 
@@ -148,6 +172,7 @@ function AdminDashboard() {
           />
         ) : (
           <FlatList
+            scrollEnabled={false}
             data={technicians}
             keyExtractor={(item) => item.technicianId.toString()}
             renderItem={({ item: t }) => (
@@ -159,15 +184,11 @@ function AdminDashboard() {
                 <Text>{t.service}</Text>
                 <Text>{t.experience} yrs</Text>
 
-                <TouchableOpacity
-                  onPress={() => setSelectedProfile({ type: "technician", data: t })}
-                >
+                <TouchableOpacity onPress={() => setSelectedProfile({ type: "technician", data: t })}>
                   <Text style={styles.link}>View</Text>
                 </TouchableOpacity>
 
-                <TouchableOpacity
-                  onPress={() => handleDeleteTechnician(t.technicianId)}
-                >
+                <TouchableOpacity onPress={() => handleDeleteTechnician(t.technicianId)}>
                   <Text style={styles.link}>Delete</Text>
                 </TouchableOpacity>
               </View>
@@ -175,7 +196,6 @@ function AdminDashboard() {
           />
         )}
 
-        {/* FORM */}
         <View style={styles.form}>
           <Text style={styles.sectionTitle}>
             Add {view === "users" ? "User" : "Technician"}
@@ -235,53 +255,7 @@ function AdminDashboard() {
             </>
           ) : null}
 
-          <TouchableOpacity
-            style={styles.primaryBtn}
-            onPress={async () => {
-              try {
-                if (view === "users") {
-                  await API.post("/admin/users", {
-                    name: form.name,
-                    email: form.email,
-                    phone: form.phone,
-                    city: form.city,
-                    password: form.password,
-                  });
-                  setView("users");
-                  fetchData();
-                } else {
-                  await API.post("/admin/technicians", {
-                    name: form.name,
-                    email: form.email,
-                    phone: form.phone,
-                    city: form.city,
-                    password: form.password,
-                    service: form.service,
-                    experience: form.experience,
-                  });
-                  setView("technicians");
-                  fetchData();
-                }
-
-                setForm({
-                  name: "",
-                  email: "",
-                  phone: "",
-                  city: "",
-                  password: "",
-                  service: "",
-                  experience: "",
-                });
-
-                Alert.alert(
-                  "Success",
-                  `${view === "users" ? "User" : "Technician"} added successfully.`
-                );
-              } catch (error) {
-                Alert.alert("Error", error.response?.data?.message || error.message);
-              }
-            }}
-          >
+          <TouchableOpacity style={styles.primaryBtn} onPress={handleAdd}>
             <Text style={styles.btnText}>
               Add {view === "users" ? "User" : "Technician"}
             </Text>
@@ -289,16 +263,13 @@ function AdminDashboard() {
         </View>
       </ScrollView>
 
-      {/* MODAL */}
       <Modal visible={!!selectedProfile} transparent animationType="fade">
         <View style={styles.modalOverlay}>
           <View style={styles.modalBox}>
             {selectedProfile && (
               <>
                 <Text style={styles.modalTitle}>
-                  {selectedProfile.type === "user"
-                    ? "User Profile"
-                    : "Technician Profile"}
+                  {selectedProfile.type === "user" ? "User Profile" : "Technician Profile"}
                 </Text>
 
                 <InfoRow label="Email" value={selectedProfile.data.email} />
@@ -315,9 +286,7 @@ function AdminDashboard() {
                   </>
                 ) : null}
 
-                <TouchableOpacity
-                  onPress={() => setSelectedProfile(null)}
-                >
+                <TouchableOpacity onPress={() => setSelectedProfile(null)}>
                   <Text style={styles.link}>Close</Text>
                 </TouchableOpacity>
               </>
@@ -330,21 +299,40 @@ function AdminDashboard() {
 }
 
 const styles = StyleSheet.create({
-  container: { padding: 15 },
-  title: { fontSize: 20, fontWeight: "bold", marginBottom: 10 },
+  container: { padding: 15, backgroundColor: "#E8DCCF" },
+  title: { fontSize: 20, fontWeight: "bold", marginBottom: 10, color: "#111" },
   buttonRow: { flexDirection: "row", gap: 10, marginBottom: 15 },
-  primaryBtn: { backgroundColor: "#007BFF", padding: 10, borderRadius: 5 },
-  secondaryBtn: { backgroundColor: "#6c757d", padding: 10, borderRadius: 5 },
-  btnText: { color: "#fff", textAlign: "center" },
-  card: { padding: 10, backgroundColor: "#fff", marginBottom: 10 },
-  link: { color: "blue", marginTop: 5 },
+  primaryBtn: {
+    backgroundColor: "#111",
+    padding: 10,
+    borderRadius: 8,
+    marginBottom: 10,
+  },
+  secondaryBtn: {
+    backgroundColor: "#6c757d",
+    padding: 10,
+    borderRadius: 8,
+    marginBottom: 10,
+  },
+  btnText: { color: "#fff", textAlign: "center", fontWeight: "700" },
+  card: {
+    padding: 12,
+    backgroundColor: "#FFF9F3",
+    marginBottom: 10,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: "#D8C8B8",
+  },
+  link: { color: "#2563eb", marginTop: 8 },
   form: { marginTop: 20 },
-  sectionTitle: { fontWeight: "bold", marginBottom: 10 },
+  sectionTitle: { fontWeight: "bold", marginBottom: 10, color: "#111" },
   input: {
     borderWidth: 1,
     borderColor: "#ccc",
     marginBottom: 10,
-    padding: 8,
+    padding: 10,
+    borderRadius: 10,
+    backgroundColor: "#fff",
   },
   modalOverlay: {
     flex: 1,
@@ -355,10 +343,10 @@ const styles = StyleSheet.create({
   modalBox: {
     backgroundColor: "#fff",
     padding: 20,
-    borderRadius: 10,
-    width: "80%",
+    borderRadius: 12,
+    width: "85%",
   },
-  modalTitle: { fontWeight: "bold", marginBottom: 10 },
+  modalTitle: { fontWeight: "bold", marginBottom: 10, fontSize: 16 },
   infoRow: { flexDirection: "row", justifyContent: "space-between", marginBottom: 5 },
   infoLabel: { fontWeight: "bold" },
   infoValue: {},

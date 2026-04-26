@@ -20,8 +20,7 @@ function TechnicianDashboard() {
         {/* Page title */}
         <h2 className="section-title">Technician Dashboard</h2>
 
-        <div className="panel">
-
+        <div className="panel dashboard-panel">
           {/* Dashboard cards grid */}
           <div className="dashboard-grid">
 

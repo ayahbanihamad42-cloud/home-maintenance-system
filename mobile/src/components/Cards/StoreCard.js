@@ -1,32 +1,80 @@
 import React from "react";
-import { View, Text, Pressable } from "react-native";
+import { View, Text, Pressable, StyleSheet } from "react-native";
+import { useNavigation } from "@react-navigation/native";
 
-function StoreCard({ store, navigation }) {
+function StoreCard({ store }) {
+  const navigation = useNavigation();
+
+  if (!store) return null;
 
   return (
-    <View style={{ padding: 15, margin: 10, borderWidth: 1, borderRadius: 10 }}>
-
-      <Text style={{ fontSize: 18, fontWeight: "bold" }}>{store.name}</Text>
-      <Text>{store.service}</Text>
-      <Text>{store.city}</Text>
-      <Text>{store.address}</Text>
-
-      <Pressable
-        onPress={() => navigation.navigate("Request", { id: store.storeId })}
-        style={{ marginTop: 10, backgroundColor: "#007bff", padding: 10 }}
-      >
-        <Text style={{ color: "#fff" }}>Booking</Text>
-      </Pressable>
+    <View style={styles.card}>
+      <Text style={styles.name}>{store.name}</Text>
+      <Text style={styles.info}>{store.service}</Text>
+      <Text style={styles.info}>{store.city}</Text>
+      <Text style={styles.info}>{store.address}</Text>
 
       <Pressable
-        onPress={() => navigation.navigate("StoreProfile", { id: store.storeId })}
-        style={{ marginTop: 10, backgroundColor: "gray", padding: 10 }}
+        onPress={() =>
+          navigation.navigate("MaintenanceRequest", { storeId: store.storeId })
+        }
+        style={styles.primaryBtn}
       >
-        <Text style={{ color: "#fff" }}>View Profile</Text>
+        <Text style={styles.primaryBtnText}>Booking</Text>
       </Pressable>
 
+      <Pressable style={[styles.secondaryBtn, styles.disabledBtn]}>
+        <Text style={styles.secondaryBtnText}>View Profile</Text>
+      </Pressable>
     </View>
   );
 }
+
+const styles = StyleSheet.create({
+  card: {
+    padding: 15,
+    marginVertical: 8,
+    borderWidth: 1,
+    borderRadius: 16,
+    borderColor: "#D8C8B8",
+    backgroundColor: "#FFF9F3",
+  },
+  name: {
+    fontSize: 18,
+    fontWeight: "bold",
+    color: "#111",
+    marginBottom: 6,
+  },
+  info: {
+    fontSize: 14,
+    color: "#444",
+    marginBottom: 4,
+  },
+  primaryBtn: {
+    marginTop: 12,
+    backgroundColor: "#111",
+    padding: 12,
+    borderRadius: 12,
+    alignItems: "center",
+  },
+  primaryBtnText: {
+    color: "#fff",
+    fontWeight: "700",
+  },
+  secondaryBtn: {
+    marginTop: 10,
+    backgroundColor: "#ECE2D6",
+    padding: 12,
+    borderRadius: 12,
+    alignItems: "center",
+  },
+  secondaryBtnText: {
+    color: "#111",
+    fontWeight: "700",
+  },
+  disabledBtn: {
+    opacity: 0.6,
+  },
+});
 
 export default StoreCard;

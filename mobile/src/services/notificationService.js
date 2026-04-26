@@ -1,4 +1,3 @@
-mobile/src/services/notificationService.js
 
 import api from "./api";
 

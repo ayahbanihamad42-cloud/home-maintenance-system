@@ -1,41 +1,85 @@
 import React from "react";
-import { View, Text, Pressable } from "react-native";
+import { View, Text, Pressable, StyleSheet } from "react-native";
+import { useNavigation } from "@react-navigation/native";
 
-function MaintenanceCard({ request, rating, navigation }) {
+function TechnicianCard({ technician }) {
+  const navigation = useNavigation();
+
+  if (!technician) return null;
 
   return (
-    <View style={{ padding: 15, margin: 10, borderWidth: 1, borderRadius: 10 }}>
-      
-      {/* Service name */}
-      <Text style={{ color: '#007bff', fontSize: 18, fontWeight: "bold" }}>
-        {request.service}
-      </Text>
+    <View style={styles.card}>
+      <Text style={styles.name}>{technician.name}</Text>
+      <Text style={styles.info}>{technician.service}</Text>
+      <Text style={styles.info}>{technician.experience} years</Text>
 
-      {/* Request status */}
-      <Text style={{ marginVertical: 15, fontWeight: "bold" }}>
-        Status:{" "}
-        <Text style={{ color: request.status === 'completed' ? 'green' : 'orange' }}>
-          {request.status}
-        </Text>
-      </Text>
-
-      {/* Rating display */}
-      {rating ? (
-        <Text><Text style={{ fontWeight: "bold" }}>Rating:</Text> {rating.rating} ⭐</Text>
-      ) : (
-        <Text><Text style={{ fontWeight: "bold" }}>Rating:</Text> Not submitted</Text>
-      )}
-
-      {/* Navigate to review */}
       <Pressable
-        onPress={() => navigation.navigate("Review", { id: request.id })}
-        style={{ marginTop: 10, backgroundColor: "#007bff", padding: 10 }}
+        onPress={() =>
+          navigation.navigate("MaintenanceRequest", {
+            technicianId: technician.technicianId,
+          })
+        }
+        style={styles.primaryBtn}
       >
-        <Text style={{ color: "#fff" }}>View Details</Text>
+        <Text style={styles.primaryBtnText}>Booking</Text>
       </Pressable>
 
+      <Pressable
+        onPress={() =>
+          navigation.navigate("TechnicianProfile", {
+            technicianId: technician.technicianId,
+          })
+        }
+        style={styles.secondaryBtn}
+      >
+        <Text style={styles.secondaryBtnText}>View Profile</Text>
+      </Pressable>
     </View>
   );
 }
 
-export default MaintenanceCard;
+const styles = StyleSheet.create({
+  card: {
+    padding: 15,
+    marginVertical: 8,
+    borderWidth: 1,
+    borderRadius: 16,
+    borderColor: "#D8C8B8",
+    backgroundColor: "#FFF9F3",
+  },
+  name: {
+    fontSize: 18,
+    fontWeight: "bold",
+    color: "#111",
+    marginBottom: 6,
+  },
+  info: {
+    fontSize: 14,
+    color: "#444",
+    marginBottom: 4,
+  },
+  primaryBtn: {
+    marginTop: 12,
+    backgroundColor: "#111",
+    padding: 12,
+    borderRadius: 12,
+    alignItems: "center",
+  },
+  primaryBtnText: {
+    color: "#fff",
+    fontWeight: "700",
+  },
+  secondaryBtn: {
+    marginTop: 10,
+    backgroundColor: "#ECE2D6",
+    padding: 12,
+    borderRadius: 12,
+    alignItems: "center",
+  },
+  secondaryBtnText: {
+    color: "#111",
+    fontWeight: "700",
+  },
+});
+
+export default TechnicianCard;

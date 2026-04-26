@@ -1,46 +1,38 @@
 import React, { useEffect, useState } from "react";
 import { View, Text, Button, ScrollView, StyleSheet, ActivityIndicator } from "react-native";
 import { useRoute, useNavigation } from "@react-navigation/native";
-// Navigation hooks for RN
 
 import API from "../../services/api";
-// Axios API instance
-
-import Header from "../../components/common/Header";
-// Header component
+import Header from "../../components/Common/Header";
 
 function TechnicianProfile() {
   const route = useRoute();
   const navigation = useNavigation();
+  const { technicianId } = route.params || {};
 
-  // Get technicianId from route params
-  const { technicianId } = route.params;
-
-  // Technician data state
   const [tech, setTech] = useState(null);
 
-  // Fetch technician details
   useEffect(() => {
+    if (!technicianId) return;
+
     API.get(`/technicians/${technicianId}`)
-      .then(res => setTech(res.data))
-      .catch(err => console.error(err));
+      .then((res) => setTech(res.data))
+      .catch((err) => console.error(err));
   }, [technicianId]);
 
-  // Show loader while fetching data
-  if (!tech)
+  if (!tech) {
     return (
       <View style={styles.loaderContainer}>
         <ActivityIndicator size="large" color="#007BFF" />
       </View>
     );
+  }
 
   return (
     <>
-      {/* Page header */}
       <Header />
 
       <ScrollView contentContainerStyle={styles.container}>
-        {/* Technician profile card */}
         <View style={styles.card}>
           <Text style={styles.name}>{tech.name}</Text>
           <Text style={styles.specialty}>{tech.service} Specialist</Text>
@@ -52,7 +44,7 @@ function TechnicianProfile() {
             </Text>
             <Text style={styles.statItem}>
               <Text style={styles.bold}>Rating: </Text>
-              ⭐ {Number(tech.rating).toFixed(1)}
+              ⭐ {Number(tech.rating || 0).toFixed(1)}
             </Text>
           </View>
 
@@ -82,12 +74,16 @@ function TechnicianProfile() {
 const styles = StyleSheet.create({
   container: {
     padding: 15,
+    backgroundColor: "#E8DCCF",
+    flexGrow: 1,
   },
   card: {
-    backgroundColor: "#fff",
+    backgroundColor: "#FFF9F3",
     padding: 20,
-    borderRadius: 10,
+    borderRadius: 12,
     marginBottom: 20,
+    borderWidth: 1,
+    borderColor: "#D8C8B8",
   },
   name: {
     fontSize: 22,
@@ -100,18 +96,18 @@ const styles = StyleSheet.create({
     marginBottom: 15,
   },
   stats: {
-    flexDirection: "row",
-    justifyContent: "space-between",
     marginBottom: 15,
   },
   statItem: {
     fontSize: 14,
+    marginBottom: 5,
   },
   bold: {
     fontWeight: "bold",
   },
   contact: {
     marginBottom: 15,
+    gap: 6,
   },
   bio: {
     fontSize: 14,

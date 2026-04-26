@@ -104,7 +104,7 @@ function Login() {
         </form>
 
         {/* Illustration image */}
-        <img
+        <img width={250} height={200}
           className="auth-illustration"
           src={welomeimage}
           alt="Home maintenance"
