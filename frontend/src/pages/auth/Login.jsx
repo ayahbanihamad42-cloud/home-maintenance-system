@@ -132,4 +132,3 @@ function Login() {
 
 // Export component
 export default Login;
-
