@@ -1,8 +1,11 @@
-
 import api from "./api";
 
-export const chatWithAI = async (message) => {
-  const res = await api.post("/ai/chat", { message });
+export const chatWithAI = async (message, image = null) => {
+  const res = await api.post("/ai/chat", {
+    message,
+    image,
+  });
+
   return res.data;
 };
 

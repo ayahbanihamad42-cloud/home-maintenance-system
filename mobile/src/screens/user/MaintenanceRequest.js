@@ -6,10 +6,8 @@ import {
   TouchableOpacity,
   ScrollView,
   SafeAreaView,
-  Platform,
   Alert,
 } from "react-native";
-import DateTimePicker from "@react-native-community/datetimepicker";
 import MapView, { Marker } from "react-native-maps";
 import * as Location from "expo-location";
 import { Picker } from "@react-native-picker/picker";
@@ -33,9 +31,11 @@ function MaintenanceRequest() {
   const [service, setService] = useState("");
   const [pricePerHour, setPricePerHour] = useState(0);
 
-  const [date, setDate] = useState("");
-  const [showDatePicker, setShowDatePicker] = useState(false);
+  const [availableDates, setAvailableDates] = useState([]);
+  const [availabilityByDate, setAvailabilityByDate] = useState({});
+  const [loadingDates, setLoadingDates] = useState(false);
 
+  const [date, setDate] = useState("");
   const [slots, setSlots] = useState([]);
   const [time, setTime] = useState("");
 
@@ -71,6 +71,18 @@ function MaintenanceRequest() {
     return `${y}-${m}-${day}`;
   };
 
+  const getNextDays = (count = 14) => {
+    const days = [];
+
+    for (let i = 0; i < count; i++) {
+      const d = new Date();
+      d.setDate(d.getDate() + i);
+      days.push(formatDate(d));
+    }
+
+    return days;
+  };
+
   useEffect(() => {
     if (!technicianId) return;
 
@@ -86,32 +98,79 @@ function MaintenanceRequest() {
   }, [technicianId]);
 
   useEffect(() => {
-    if (!technicianId || !date) return;
+    if (!technicianId) return;
 
-    getAvailability(technicianId, date)
-      .then((data) => {
-        setSlots(data || []);
-        setTime("");
-      })
-      .catch((err) => {
-        console.error("Availability error:", err);
+    const loadAvailableDates = async () => {
+      try {
+        setLoadingDates(true);
+
+        const days = getNextDays(14);
+        const map = {};
+        const validDates = [];
+
+        for (const day of days) {
+          try {
+            const daySlots = await getAvailability(technicianId, day);
+
+            if (Array.isArray(daySlots) && daySlots.length > 0) {
+              map[day] = daySlots;
+              validDates.push(day);
+            }
+          } catch (err) {
+            console.error("Availability date error:", day, err);
+          }
+        }
+
+        setAvailabilityByDate(map);
+        setAvailableDates(validDates);
+
+        if (validDates.length > 0) {
+          setDate(validDates[0]);
+          setSlots(map[validDates[0]] || []);
+        } else {
+          setDate("");
+          setSlots([]);
+        }
+      } catch (err) {
+        console.error("Load available dates error:", err);
+        setAvailableDates([]);
+        setAvailabilityByDate({});
         setSlots([]);
-      });
-  }, [technicianId, date]);
+      } finally {
+        setLoadingDates(false);
+      }
+    };
+
+    loadAvailableDates();
+  }, [technicianId]);
 
   useEffect(() => {
-    (async () => {
+    if (!date) {
+      setSlots([]);
+      setTime("");
+      return;
+    }
+
+    setSlots(availabilityByDate[date] || []);
+    setTime("");
+  }, [date, availabilityByDate]);
+
+  useEffect(() => {
+    const loadLocation = async () => {
       try {
         setLoadingLocation(true);
 
         const { status } = await Location.requestForegroundPermissionsAsync();
 
         if (status !== "granted") {
-          setLoadingLocation(false);
+          setLocationReady(false);
           return;
         }
 
-        const current = await Location.getCurrentPositionAsync({});
+        const current = await Location.getCurrentPositionAsync({
+          accuracy: Location.Accuracy.Balanced,
+        });
+
         const newRegion = {
           latitude: current.coords.latitude,
           longitude: current.coords.longitude,
@@ -124,6 +183,7 @@ function MaintenanceRequest() {
           latitude: current.coords.latitude,
           longitude: current.coords.longitude,
         });
+
         setLocationReady(true);
 
         const reverse = await Location.reverseGeocodeAsync({
@@ -133,6 +193,7 @@ function MaintenanceRequest() {
 
         if (reverse?.length) {
           const place = reverse[0];
+
           setCity(place.city || place.subregion || place.region || "");
           setLocationNote(
             [
@@ -148,21 +209,14 @@ function MaintenanceRequest() {
         }
       } catch (err) {
         console.error("Location error:", err);
+        setLocationReady(false);
       } finally {
         setLoadingLocation(false);
       }
-    })();
+    };
+
+    loadLocation();
   }, []);
-
-  const handleDateChange = (event, selectedDate) => {
-    if (Platform.OS !== "ios") {
-      setShowDatePicker(false);
-    }
-
-    if (selectedDate) {
-      setDate(formatDate(selectedDate));
-    }
-  };
 
   const onMarkerDragEnd = async (e) => {
     const coords = e.nativeEvent.coordinate;
@@ -179,6 +233,7 @@ function MaintenanceRequest() {
 
       if (reverse?.length) {
         const place = reverse[0];
+
         setCity(place.city || place.subregion || place.region || "");
         setLocationNote(
           [
@@ -203,7 +258,12 @@ function MaintenanceRequest() {
       return;
     }
 
-    if (!date || !time || !description.trim()) {
+    if (!date) {
+      Alert.alert("Notice", "Technician is not available.");
+      return;
+    }
+
+    if (!time || !description.trim()) {
       Alert.alert("Notice", "Please fill all required fields.");
       return;
     }
@@ -233,6 +293,7 @@ function MaintenanceRequest() {
       });
     } catch (err) {
       console.error("Maintenance request error:", err?.response?.data || err);
+
       Alert.alert(
         "Server Error",
         err?.response?.data?.message ||
@@ -261,34 +322,47 @@ function MaintenanceRequest() {
         </View>
 
         <Text style={appStyles.label}>Date</Text>
-        <TouchableOpacity
-          style={appStyles.input}
-          onPress={() => setShowDatePicker(true)}
-        >
-          <Text>{date || "Select date"}</Text>
-        </TouchableOpacity>
 
-        {showDatePicker && (
-          <DateTimePicker
-            value={date ? new Date(date) : new Date()}
-            mode="date"
-            display="default"
-            minimumDate={new Date()}
-            onChange={handleDateChange}
-          />
+        {loadingDates ? (
+          <View style={appStyles.card}>
+            <Text style={appStyles.infoRow}>Loading available dates...</Text>
+          </View>
+        ) : availableDates.length === 0 ? (
+          <View style={appStyles.card}>
+            <Text style={appStyles.infoRow}>Technician is not available.</Text>
+          </View>
+        ) : (
+          <Picker selectedValue={date} onValueChange={setDate}>
+            {availableDates.map((availableDate) => (
+              <Picker.Item
+                key={availableDate}
+                label={availableDate}
+                value={availableDate}
+              />
+            ))}
+          </Picker>
         )}
 
         <Text style={appStyles.label}>Time</Text>
-        <Picker selectedValue={time} onValueChange={setTime}>
-          <Picker.Item label="Select time" value="" />
-          {slots.map((slot) => (
-            <Picker.Item
-              key={slot.id}
-              label={slot.start_time}
-              value={slot.start_time}
-            />
-          ))}
-        </Picker>
+
+        {date && slots.length === 0 ? (
+          <View style={appStyles.card}>
+            <Text style={appStyles.infoRow}>
+              No available times for selected date.
+            </Text>
+          </View>
+        ) : (
+          <Picker selectedValue={time} onValueChange={setTime}>
+            <Picker.Item label="Select time" value="" />
+            {slots.map((slot) => (
+              <Picker.Item
+                key={slot.id || slot.start_time}
+                label={slot.start_time}
+                value={slot.start_time}
+              />
+            ))}
+          </Picker>
+        )}
 
         <Text style={appStyles.label}>Description</Text>
         <TextInput
@@ -332,6 +406,7 @@ function MaintenanceRequest() {
         </Picker>
 
         <Text style={appStyles.label}>Location on Map</Text>
+
         <View
           style={{
             height: 260,
@@ -361,16 +436,19 @@ function MaintenanceRequest() {
           <Text style={appStyles.infoRow}>
             Latitude: {marker.latitude.toFixed(6)}
           </Text>
+
           <Text style={appStyles.infoRow}>
             Longitude: {marker.longitude.toFixed(6)}
           </Text>
+
           <Text style={appStyles.infoRow}>
             {loadingLocation
               ? "Getting current location..."
               : locationReady
               ? "Location loaded successfully"
-              : "Location permission not granted"}
+              : "Current location unavailable. You can drag the marker manually."}
           </Text>
+
           <Text style={appStyles.infoRow}>Total Price: {totalPrice} JOD</Text>
         </View>
 

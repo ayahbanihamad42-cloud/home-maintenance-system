@@ -14,7 +14,7 @@ import {
 } from "react-native";
 import * as ImagePicker from "expo-image-picker";
 
-import { chatWithAI, generateAIImage } from "../services/aiService";
+import { chatWithAI } from "../services/aiService";
 import Header from "../components/Common/Header";
 import aiimage from "../assets/aiassistant.png";
 
@@ -22,82 +22,119 @@ function AIChat() {
   const [messages, setMessages] = useState([
     {
       role: "ai",
-      text: "Hello! I'm your ServiceHub AI assistant. I can chat and generate images for you!",
+      text: "Hello! I'm your ServiceHub AI assistant. Send text or image.",
     },
   ]);
+
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
+  const [selectedImage, setSelectedImage] = useState(null);
+  const [lastImage, setLastImage] = useState(null);
+
   const scrollViewRef = useRef(null);
 
   const fallbackMessage =
     "حالياً ما قدرت أوصل للخدمة، جرّب ترجع لي بعد شوي.";
 
-  const handleSend = async (content = null, type = "text") => {
-    const messageValue = content || input;
-    if (!messageValue.trim()) return;
+  const handleSend = async () => {
+    const messageValue = input.trim();
+
+    if (!messageValue && !selectedImage) return;
+
+    const imageToSend = selectedImage || lastImage;
 
     setMessages((prev) => [
       ...prev,
       {
         role: "user",
-        text: type === "text" ? messageValue : "Sent an image",
-        image: type === "image" ? messageValue : null,
+        text: messageValue || "Sent an image",
+        image: selectedImage,
       },
     ]);
 
-    if (type === "text") setInput("");
+    if (selectedImage) {
+      setLastImage(selectedImage);
+    }
+
+    setInput("");
+    setSelectedImage(null);
     setLoading(true);
 
     try {
-      if (type === "text" && messageValue.toLowerCase().startsWith("/draw")) {
-        const prompt = messageValue.replace("/draw", "").trim();
-        const response = await generateAIImage(prompt);
-        setMessages((prev) => [
-          ...prev,
-          {
-            role: "ai",
-            text: `Here is your image for: ${prompt}`,
-            image: response.url,
-          },
-        ]);
-      } else {
-        const response = await chatWithAI(messageValue);
-        setMessages((prev) => [...prev, { role: "ai", text: response.reply }]);
-      }
+      const response = await chatWithAI(
+        messageValue || "Analyze this image.",
+        imageToSend
+      );
+
+      setMessages((prev) => [
+        ...prev,
+        {
+          role: "ai",
+          text: response.reply || fallbackMessage,
+          image: response.url || response.image || null,
+        },
+      ]);
     } catch (error) {
-      setMessages((prev) => [...prev, { role: "ai", text: fallbackMessage }]);
-    } finally {
-      setLoading(false);
-    }
+  console.log("AI MOBILE ERROR:", error.response?.data || error.message);
+
+  setMessages((prev) => [
+    ...prev,
+    {
+      role: "ai",
+      text: error.response?.data?.reply || fallbackMessage,
+    },
+  ]);
+} finally {
+  setLoading(false);
+}
   };
 
   const pickImage = async () => {
-    let result = await ImagePicker.launchImageLibraryAsync({
+    const permissionResult =
+      await ImagePicker.requestMediaLibraryPermissionsAsync();
+
+    if (!permissionResult.granted) {
+      setMessages((prev) => [
+        ...prev,
+        {
+          role: "ai",
+          text: "لازم تسمحي للتطبيق بالوصول للصور.",
+        },
+      ]);
+      return;
+    }
+
+    const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
       allowsEditing: true,
-      quality: 0.5,
+      quality: 0.25,
       base64: true,
     });
 
-    if (!result.canceled) {
-      handleSend(`data:image/jpeg;base64,${result.assets[0].base64}`, "image");
+    if (!result.canceled && result.assets?.[0]?.base64) {
+      const mimeType = result.assets[0].mimeType || "image/jpeg";
+      setSelectedImage(`data:${mimeType};base64,${result.assets[0].base64}`);
     }
+  };
+
+  const removeSelectedImage = () => {
+    setSelectedImage(null);
   };
 
   return (
     <SafeAreaView style={styles.container}>
       <Header />
+
       <KeyboardAvoidingView
         behavior={Platform.OS === "ios" ? "padding" : "height"}
-        style={{ flex: 1 }}
+        style={styles.keyboardArea}
       >
         <View style={styles.chatHeaderBar}>
           <Image source={aiimage} style={styles.avatarImg} />
+
           <View style={styles.chatTitleBlock}>
             <Text style={styles.chatTitle}>AI Assistant</Text>
-            <Text style={styles.chatSubtitle}>
-              Use /draw [prompt] to create images
-            </Text>
+            <Text style={styles.chatSubtitle}>Send text or image</Text>
           </View>
         </View>
 
@@ -119,6 +156,7 @@ function AIChat() {
               {m.image ? (
                 <Image source={{ uri: m.image }} style={styles.sentImage} />
               ) : null}
+
               <Text
                 style={[
                   styles.messageText,
@@ -129,6 +167,7 @@ function AIChat() {
               </Text>
             </View>
           ))}
+
           {loading ? (
             <View style={[styles.messageBubble, styles.otherMessage]}>
               <ActivityIndicator size="small" color="#000" />
@@ -136,17 +175,32 @@ function AIChat() {
           ) : null}
         </ScrollView>
 
+        {selectedImage ? (
+          <View style={styles.previewBox}>
+            <Image source={{ uri: selectedImage }} style={styles.previewImage} />
+
+            <TouchableOpacity
+              style={styles.removeBtn}
+              onPress={removeSelectedImage}
+            >
+              <Text style={styles.removeBtnText}>Remove</Text>
+            </TouchableOpacity>
+          </View>
+        ) : null}
+
         <View style={styles.chatInputArea}>
           <TouchableOpacity onPress={pickImage} style={styles.iconBtn}>
-            <Text style={{ fontSize: 20 }}>📷</Text>
+            <Text style={styles.iconText}>📷</Text>
           </TouchableOpacity>
+
           <TextInput
             style={styles.chatInput}
-            placeholder="Ask or use /draw..."
+            placeholder="Ask anything..."
             value={input}
             onChangeText={setInput}
           />
-          <TouchableOpacity style={styles.sendBtn} onPress={() => handleSend()}>
+
+          <TouchableOpacity style={styles.sendBtn} onPress={handleSend}>
             <Text style={styles.sendBtnText}>Send</Text>
           </TouchableOpacity>
         </View>
@@ -156,54 +210,135 @@ function AIChat() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#E8DCCF" },
+  container: {
+    flex: 1,
+    backgroundColor: "#E8DCCF",
+  },
+  keyboardArea: {
+    flex: 1,
+  },
   chatHeaderBar: {
     flexDirection: "row",
     padding: 15,
     borderBottomWidth: 1,
     borderBottomColor: "#eee",
     alignItems: "center",
+    backgroundColor: "#111",
   },
-  avatarImg: { width: 40, height: 40, borderRadius: 20, marginRight: 10 },
-  chatTitleBlock: { flex: 1 },
-  chatTitle: { fontSize: 16, fontWeight: "bold" },
-  chatSubtitle: { fontSize: 12, color: "#888" },
-  messagesContainer: { flex: 1, padding: 15 },
+  avatarImg: {
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    marginRight: 10,
+  },
+  chatTitleBlock: {
+    flex: 1,
+  },
+  chatTitle: {
+    fontSize: 16,
+    fontWeight: "bold",
+    color: "#fff",
+  },
+  chatSubtitle: {
+    fontSize: 12,
+    color: "#ddd",
+  },
+  messagesContainer: {
+    flex: 1,
+    padding: 15,
+  },
   messageBubble: {
-    maxWidth: "80%",
+    maxWidth: "82%",
     padding: 12,
     borderRadius: 15,
     marginBottom: 10,
   },
-  myMessage: { alignSelf: "flex-end", backgroundColor: "#111" },
-  otherMessage: { alignSelf: "flex-start", backgroundColor: "#E5E5EA" },
-  messageText: { fontSize: 15 },
-  myText: { color: "#fff" },
-  otherText: { color: "#000" },
-  sentImage: { width: 220, height: 180, borderRadius: 10, marginBottom: 5 },
+  myMessage: {
+    alignSelf: "flex-end",
+    backgroundColor: "#111",
+  },
+  otherMessage: {
+    alignSelf: "flex-start",
+    backgroundColor: "#F8F1EA",
+    borderWidth: 1,
+    borderColor: "#D8C7B5",
+  },
+  messageText: {
+    fontSize: 15,
+    lineHeight: 22,
+  },
+  myText: {
+    color: "#fff",
+  },
+  otherText: {
+    color: "#000",
+  },
+  sentImage: {
+    width: 220,
+    height: 180,
+    borderRadius: 10,
+    marginBottom: 7,
+  },
+  previewBox: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderTopWidth: 1,
+    borderTopColor: "#ddd",
+    backgroundColor: "#F8F1EA",
+  },
+  previewImage: {
+    width: 75,
+    height: 60,
+    borderRadius: 8,
+    marginRight: 10,
+  },
+  removeBtn: {
+    backgroundColor: "#111",
+    paddingVertical: 7,
+    paddingHorizontal: 12,
+    borderRadius: 8,
+  },
+  removeBtnText: {
+    color: "#fff",
+    fontWeight: "bold",
+  },
   chatInputArea: {
     flexDirection: "row",
     padding: 10,
     borderTopWidth: 1,
-    borderTopColor: "#eee",
+    borderTopColor: "#ddd",
     alignItems: "center",
+    backgroundColor: "#E8DCCF",
   },
   chatInput: {
     flex: 1,
-    backgroundColor: "#F2F2F7",
+    backgroundColor: "#F8F1EA",
     borderRadius: 20,
     paddingHorizontal: 15,
     paddingVertical: 8,
     marginRight: 10,
+    borderWidth: 1,
+    borderColor: "#D8C7B5",
   },
-  iconBtn: { padding: 5, marginRight: 5 },
+  iconBtn: {
+    padding: 7,
+    marginRight: 5,
+  },
+  iconText: {
+    fontSize: 20,
+  },
   sendBtn: {
     backgroundColor: "#111",
-    paddingVertical: 8,
-    paddingHorizontal: 15,
+    paddingVertical: 9,
+    paddingHorizontal: 16,
     borderRadius: 20,
   },
-  sendBtnText: { color: "#fff", fontWeight: "bold" },
+  sendBtnText: {
+    color: "#fff",
+    fontWeight: "bold",
+  },
 });
 
 export default AIChat;

@@ -3,10 +3,9 @@ import { View, Text, Image, StyleSheet, TouchableOpacity, SafeAreaView } from "r
 import { useNavigation } from "@react-navigation/native";
 
 import plumbingImg from "../../assets/plumbing.png";
-import electricalImg from "../../assets/electrical.png";
+import electricalImg from "../../assets/Electrical.png";
 import paintingImg from "../../assets/Painting.png";
 import decorationImg from "../../assets/Decoration.png";
-
 import Header from "../../components/Common/Header";
 
 function Home() {
