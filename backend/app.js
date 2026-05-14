@@ -18,8 +18,8 @@ import paymentRoutes from "./routes/paymentRoutes.js";
 const app = express();
 
 app.use(helmet({ crossOriginResourcePolicy: false }));
-app.use(express.json());
-
+app.use(express.json({ limit: "20mb" }));
+app.use(express.urlencoded({ limit: "20mb", extended: true }));
 app.use(
   cors({
     origin: function (origin, callback) {
