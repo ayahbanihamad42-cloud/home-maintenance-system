@@ -1,92 +1,157 @@
-import React from "react";
-import { View, Text, Image, StyleSheet, TouchableOpacity, SafeAreaView } from "react-native";
+import React, { useEffect, useState } from "react";
+import {
+  View,
+  Text,
+  Image,
+  ScrollView,
+  TouchableOpacity,
+  StyleSheet,
+  ActivityIndicator,
+} from "react-native";
 import { useNavigation } from "@react-navigation/native";
 
-import plumbingImg from "../../assets/plumbing.png";
-import electricalImg from "../../assets/Electrical.png";
-import paintingImg from "../../assets/Painting.png";
-import decorationImg from "../../assets/Decoration.png";
 import Header from "../../components/Common/Header";
+import { getServices, getImageUrl } from "../../services/services";
 
 function Home() {
   const navigation = useNavigation();
 
-  const services = [
-    { name: "Plumbing", img: plumbingImg },
-    { name: "Electrical", img: electricalImg },
-    { name: "Painting", img: paintingImg },
-    { name: "Decoration", img: decorationImg },
-  ];
+  const [services, setServices] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    getServices()
+      .then((data) => setServices(data || []))
+      .catch((err) => {
+        console.error("get services error:", err);
+        setServices([]);
+      })
+      .finally(() => setLoading(false));
+  }, []);
+
+  const openService = (service) => {
+    navigation.navigate("Services", {
+      service: service.name,
+    });
+  };
 
   return (
-    <SafeAreaView style={styles.container}>
+    <>
       <Header />
 
-      <Text style={styles.homeTitle}>Welcome to our services:</Text>
+      <ScrollView contentContainerStyle={styles.container}>
+        <Text style={styles.title}>Home Maintenance Services</Text>
+        <Text style={styles.subtitle}>Choose the service you need</Text>
 
-      <View style={styles.servicesContainer}>
-        {services.map((s, i) => (
-          <View key={i} style={styles.serviceItem}>
-            <TouchableOpacity
-              style={styles.serviceCircle}
-              onPress={() => navigation.navigate("Services", { service: s.name })}
-            >
-              <Image
-                source={s.img}
-                style={{ width: 24, height: 24 }}
-                resizeMode="contain"
-              />
-            </TouchableOpacity>
+        {loading ? (
+          <ActivityIndicator size="large" color="#111" />
+        ) : services.length === 0 ? (
+          <Text style={styles.emptyText}>No services available.</Text>
+        ) : (
+          <View style={styles.grid}>
+            {services.map((service) => (
+              <TouchableOpacity
+                key={service.id || service.name}
+                style={styles.serviceItem}
+                onPress={() => openService(service)}
+                activeOpacity={0.85}
+              >
+                <View style={styles.serviceCircle}>
+                  {service.image_url ? (
+                    <Image
+                      source={{ uri: getImageUrl(service.image_url) }}
+                      style={styles.serviceImage}
+                    />
+                  ) : (
+                    <Text style={styles.placeholderText}>
+                      {String(service.name || "?").charAt(0)}
+                    </Text>
+                  )}
+                </View>
 
-            <Text style={styles.serviceName}>{s.name}</Text>
+                <Text style={styles.serviceName}>{service.name}</Text>
+              </TouchableOpacity>
+            ))}
           </View>
-        ))}
-      </View>
-    </SafeAreaView>
+        )}
+      </ScrollView>
+    </>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
-    flex: 1,
+    padding: 18,
     backgroundColor: "#E8DCCF",
+    flexGrow: 1,
+    alignItems: "center",
   },
-  homeTitle: {
-    fontSize: 20,
-    fontWeight: "bold",
-    margin: 20,
-    textAlign: "center",
+  title: {
+    fontSize: 28,
+    fontWeight: "800",
     color: "#111",
+    textAlign: "center",
+    marginTop: 16,
+    marginBottom: 8,
   },
-  servicesContainer: {
+  subtitle: {
+    fontSize: 16,
+    color: "#6B5E52",
+    textAlign: "center",
+    marginBottom: 26,
+  },
+  grid: {
+    width: "100%",
     flexDirection: "row",
     flexWrap: "wrap",
-    justifyContent: "space-around",
-    padding: 10,
+    justifyContent: "center",
+    gap: 24,
+    paddingBottom: 30,
   },
   serviceItem: {
+    width: "42%",
     alignItems: "center",
-    marginBottom: 20,
-    width: "45%",
+    marginBottom: 8,
   },
   serviceCircle: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
+    width: 145,
+    height: 145,
+    borderRadius: 72.5,
     backgroundColor: "#FFF9F3",
-    justifyContent: "center",
-    alignItems: "center",
-    marginBottom: 10,
-    elevation: 3,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
     borderWidth: 1,
     borderColor: "#D8C8B8",
+    alignItems: "center",
+    justifyContent: "center",
+    overflow: "hidden",
+    shadowColor: "#000",
+    shadowOpacity: 0.1,
+    shadowRadius: 12,
+    shadowOffset: { width: 0, height: 8 },
+    elevation: 4,
+  },
+  serviceImage: {
+    width: "82%",
+    height: "82%",
+    resizeMode: "contain",
+    borderRadius: 70,
   },
   serviceName: {
-    fontSize: 14,
-    color: "#333",
+    marginTop: 12,
+    fontSize: 16,
+    fontWeight: "800",
+    color: "#2F241C",
+    textAlign: "center",
+  },
+  placeholderText: {
+    fontSize: 42,
+    fontWeight: "800",
+    color: "#111",
+  },
+  emptyText: {
+    marginTop: 20,
+    color: "#3A3028",
+    fontSize: 16,
+    textAlign: "center",
   },
 });
 

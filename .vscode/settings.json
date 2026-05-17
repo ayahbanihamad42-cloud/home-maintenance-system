@@ -3,17 +3,20 @@
         {
             "mysqlOptions": {
                 "authProtocol": "default",
-                "enableSsl": "Disabled"
+                "enableSsl": "Enabled",
+                "ssl": {
+                    "ca": "D:\\gp1ayah\\certs\\tidb-ca.pem"
+                }
             },
             "ssh": "Disabled",
             "previewLimit": 50,
-            "server": "localhost",
-            "port": 3306,
-            "driver": "MySQL",
-            "name": "ayah",
-            "database": "home_maintenance",
-            "username": "root",
-            "password": "12345678"
+            "server": "gateway01.eu-central-1.prod.aws.tidbcloud.com",
+            "port": 4000,
+            "driver": "TiDB",
+            "database": "home_maintenance_db",
+            "name": "TiDB home maintenance",
+            "username": "2X3jdWgnoCTihMS.root",
+            "password": "PXtHHbUcF5lbFhXl"
         }
     ]
 }

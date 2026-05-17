@@ -38,19 +38,9 @@ export const removeUser = async () => {
   await AsyncStorage.removeItem("user");
 };
 
-export const login = async (credentials) => {
-  if (!credentials?.email || !credentials?.password) {
-    throw new Error("Missing email or password");
-  }
 
-  const res = await api.post("/auth/login", {
-    email: credentials.email,
-    password: credentials.password
-  });
-
-  await setToken(res.data.token);
-  await setUser(res.data.user);
-
+export const login = async (data) => {
+  const res = await api.post("/auth/login", data);
   return res.data;
 };
 

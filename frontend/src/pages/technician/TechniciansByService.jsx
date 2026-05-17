@@ -1,120 +1,172 @@
-// Import React and required hooks
-import React, { useEffect, useState } from "react";
-
-// Import hook to read URL parameters
-import { useParams } from "react-router-dom";
-
-// Import technician and store card components
-import TechnicianCard from "../../components/cards/TechnicianCard";
-import StoreCard from "../../components/cards/StoreCard";
-
-// Import API services
-import { getTechnicians } from "../../services/technicianService";
-import { getStoresByService } from "../../services/storeService";
-
-// Import common header
+import React, { useEffect, useMemo, useState } from "react";
+import { useNavigate, useParams } from "react-router-dom";
 import Header from "../../components/common/Header";
+import { getTechnicians } from "../../services/technicianService";
 
-// Component to display technicians and stores by service
 function TechniciansByService() {
-
-  // Get service name from URL
   const { service } = useParams();
+  const navigate = useNavigate();
 
-  // State to store technicians list
   const [technicians, setTechnicians] = useState([]);
-
-  // State to store stores list
-  const [stores, setStores] = useState([]);
-
-  // State to control filter type (all, technician, store)
-  const [filter, setFilter] = useState("all");
-
-  // State to control loading indicator
   const [loading, setLoading] = useState(true);
 
-  // Fetch technicians and stores when service changes
-  useEffect(() => {
+  const [resultType, setResultType] = useState("technicians");
+  const [priceFilter, setPriceFilter] = useState("all");
+  const [locationFilter, setLocationFilter] = useState("all");
+  const [ratingFilter, setRatingFilter] = useState("all");
 
-    // Enable loading state
+  useEffect(() => {
     setLoading(true);
 
-    // Fetch technicians and stores in parallel
-    Promise.all([
-      getTechnicians(service),
-      getStoresByService(service)
-    ])
-      .then(([techs, storeList]) => {
-
-        // Log fetched data for debugging
-        console.log("Technicians:", techs);
-        console.log("Stores:", storeList);
-
-        // Update state with fetched data
-        setTechnicians(techs);
-        setStores(storeList);
-      })
+    getTechnicians(service)
+      .then((data) => setTechnicians(data || []))
       .catch((err) => {
-
-        // Handle API errors
-        console.error("Error fetching data:", err);
+        console.error("getTechnicians error:", err);
         setTechnicians([]);
-        setStores([]);
       })
-      .finally(() => setLoading(false)); // Stop loading
-
+      .finally(() => setLoading(false));
   }, [service]);
 
-  // Build list based on selected filter
-  const list =
-    filter === "store"
-      ? stores
-      : filter === "technician"
-      ? technicians
-      : [...technicians, ...stores];
+  const cities = useMemo(() => {
+    const result = [];
+
+    technicians.forEach((tech) => {
+      if (tech.city && !result.includes(tech.city)) {
+        result.push(tech.city);
+      }
+    });
+
+    return result;
+  }, [technicians]);
+
+  const filteredTechnicians = useMemo(() => {
+    if (resultType === "stores") return [];
+
+    let result = [...technicians];
+
+    if (priceFilter === "low") {
+      result = result.filter((t) => Number(t.price_per_hour || 0) <= 10);
+    }
+
+    if (priceFilter === "mid") {
+      result = result.filter(
+        (t) =>
+          Number(t.price_per_hour || 0) > 10 &&
+          Number(t.price_per_hour || 0) <= 25
+      );
+    }
+
+    if (priceFilter === "high") {
+      result = result.filter((t) => Number(t.price_per_hour || 0) > 25);
+    }
+
+    if (locationFilter !== "all") {
+      result = result.filter((t) => t.city === locationFilter);
+    }
+
+    if (ratingFilter !== "all") {
+      result = result.filter(
+        (t) => Number(t.rating || 0) >= Number(ratingFilter)
+      );
+    }
+
+    return result;
+  }, [technicians, resultType, priceFilter, locationFilter, ratingFilter]);
 
   return (
     <>
-      {/* Page header */}
       <Header />
 
-      <div className="container">
+      <div className="container technicians-service-page">
+        <h2>{service} Technicians</h2>
 
-        {/* Page title */}
-        <h2>{service} Options</h2>
+        <div className="tiny-filter-box">
+          <select
+            value={resultType}
+            onChange={(e) => setResultType(e.target.value)}
+          >
+            <option value="technicians">Technicians</option>
+            <option value="stores">Stores</option>
+          </select>
 
-        {/* Filter dropdown */}
-        <select
-          value={filter}
-          onChange={(e) => setFilter(e.target.value)}
-        >
-          <option value="all">All</option>
-          <option value="technician">Technicians</option>
-          <option value="store">Stores</option>
-        </select>
+          <select
+            value={priceFilter}
+            onChange={(e) => setPriceFilter(e.target.value)}
+          >
+            <option value="all">All prices</option>
+            <option value="low">Low</option>
+            <option value="mid">Medium</option>
+            <option value="high">High</option>
+          </select>
 
-        {/* Conditional rendering based on loading and results */}
+          <select
+            value={locationFilter}
+            onChange={(e) => setLocationFilter(e.target.value)}
+          >
+            <option value="all">All locations</option>
+
+            {cities.map((city) => (
+              <option key={city} value={city}>
+                {city}
+              </option>
+            ))}
+          </select>
+
+          <select
+            value={ratingFilter}
+            onChange={(e) => setRatingFilter(e.target.value)}
+          >
+            <option value="all">All ratings</option>
+            <option value="5">5+</option>
+            <option value="4">4+</option>
+            <option value="3">3+</option>
+          </select>
+        </div>
+
         {loading ? (
-          <p>Loading {service} options...</p>
-        ) : list.length === 0 ? (
-          <p>No {service} options found.</p>
+          <p>Loading...</p>
+        ) : resultType === "stores" ? (
+          <p className="history-empty">Store results will be connected later.</p>
+        ) : filteredTechnicians.length === 0 ? (
+          <p className="history-empty">No technicians found.</p>
         ) : (
           <div className="cards-grid">
+            {filteredTechnicians.map((tech) => (
+              <div
+                className="card technician-service-card"
+                key={tech.technicianId}
+              >
+                <h3>{tech.name}</h3>
 
-            {/* Render technician or store cards */}
-            {list.map((item) =>
-              "technicianId" in item ? (
-                <TechnicianCard
-                  key={item.technicianId}
-                  technician={item}
-                />
-              ) : (
-                <StoreCard
-                  key={item.storeId}
-                  store={item}
-                />
-              )
-            )}
+                <p>{tech.service}</p>
+
+                <p>
+                  Experience: {tech.experience} years
+                  <br />
+                  Location: {tech.city || "Not provided"}
+                  <br />
+                  Price: {Number(tech.price_per_hour || 0).toFixed(2)} JOD/hr
+                  <br />
+                  Rating: ⭐ {Number(tech.rating || 0).toFixed(1)}
+                </p>
+
+                <div className="technician-card-actions">
+                  <button
+                    className="primary"
+                    onClick={() => navigate(`/technician/${tech.technicianId}`)}
+                  >
+                    View Profile
+                  </button>
+
+                  <button
+                    className="primary"
+                    onClick={() => navigate(`/request/${tech.technicianId}`)}
+                  >
+                    Book Now
+                  </button>
+                </div>
+              </div>
+            ))}
           </div>
         )}
       </div>
@@ -122,6 +174,4 @@ function TechniciansByService() {
   );
 }
 
-// Export component
 export default TechniciansByService;
-

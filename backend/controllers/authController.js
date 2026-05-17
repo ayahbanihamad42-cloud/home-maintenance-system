@@ -128,54 +128,69 @@ export const forgotPassword = (req, res) => {
     return res.status(400).json({ message: "Email is required" });
   }
 
-  db.query("SELECT id, name, email FROM users WHERE email = ?", [email], async (err, rows) => {
-    if (err) {
-      console.error("forgotPassword query error:", err);
-      return res.status(500).json({ message: "Server error" });
-    }
-
-    if (!rows.length) {
-      return res.json({ message: "If the email exists, a reset link has been sent." });
-    }
-
-    const user = rows[0];
-
-    const rawToken = crypto.randomBytes(32).toString("hex");
-    const hashedToken = crypto.createHash("sha256").update(rawToken).digest("hex");
-    const expiry = new Date(Date.now() + 1000 * 60 * 30);
-
-    db.query(
-      "UPDATE users SET reset_token = ?, reset_token_expiry = ? WHERE id = ?",
-      [hashedToken, expiry, user.id],
-      async (updateErr) => {
-        if (updateErr) {
-          console.error("forgotPassword update error:", updateErr);
-          return res.status(500).json({ message: "Server error" });
-        }
-
-        const resetUrl = `${process.env.FRONTEND_URL}/reset-password/${rawToken}`;
-
-        try {
-          await transporter.sendMail({
-            from: process.env.EMAIL_USER,
-            to: user.email,
-            subject: "Password Reset Request",
-            html: `
-              <p>Hello ${user.name || ""},</p>
-              <p>Click the link below to reset your password:</p>
-              <a href="${resetUrl}">${resetUrl}</a>
-              <p>This link will expire in 30 minutes.</p>
-            `,
-          });
-
-          return res.json({ message: "If the email exists, a reset link has been sent." });
-        } catch (mailErr) {
-          console.error("forgotPassword email error:", mailErr);
-          return res.status(500).json({ message: "Server error" });
-        }
+  db.query(
+    "SELECT id, name, email FROM users WHERE email = ?",
+    [email],
+    async (err, rows) => {
+      if (err) {
+        console.error("forgotPassword query error:", err);
+        return res.status(500).json({ message: "Server error" });
       }
-    );
-  });
+
+      if (!rows.length) {
+        return res.json({
+          message: "If the email exists, a reset link has been sent.",
+        });
+      }
+
+      const user = rows[0];
+
+      const rawToken = crypto.randomBytes(32).toString("hex");
+      const hashedToken = crypto
+        .createHash("sha256")
+        .update(rawToken)
+        .digest("hex");
+
+      const expiry = new Date(Date.now() + 1000 * 60 * 30);
+
+      db.query(
+        "UPDATE users SET reset_token = ?, reset_token_expiry = ? WHERE id = ?",
+        [hashedToken, expiry, user.id],
+        async (updateErr) => {
+          if (updateErr) {
+            console.error("forgotPassword update error:", updateErr);
+            return res.status(500).json({ message: "Server error" });
+          }
+
+          const frontendUrl =
+            process.env.FRONTEND_URL || "http://localhost:3000";
+
+          const resetUrl = `${frontendUrl}/reset-password/${rawToken}`;
+
+          try {
+            await transporter.sendMail({
+              from: process.env.EMAIL_USER,
+              to: user.email,
+              subject: "Password Reset Request",
+              html: `
+                <p>Hello ${user.name || ""},</p>
+                <p>Click the link below to reset your password:</p>
+                <a href="${resetUrl}">${resetUrl}</a>
+                <p>This link will expire in 30 minutes.</p>
+              `,
+            });
+
+            return res.json({
+              message: "If the email exists, a reset link has been sent.",
+            });
+          } catch (mailErr) {
+            console.error("forgotPassword email error:", mailErr);
+            return res.status(500).json({ message: "Server error" });
+          }
+        }
+      );
+    }
+  );
 };
 
 export const resetPassword = async (req, res) => {
@@ -187,7 +202,9 @@ export const resetPassword = async (req, res) => {
   }
 
   if (!password || password.length < 6) {
-    return res.status(400).json({ message: "Password must be at least 6 characters" });
+    return res
+      .status(400)
+      .json({ message: "Password must be at least 6 characters" });
   }
 
   const hashedToken = crypto.createHash("sha256").update(token).digest("hex");
@@ -207,7 +224,10 @@ export const resetPassword = async (req, res) => {
 
       const user = rows[0];
 
-      if (!user.reset_token_expiry || new Date(user.reset_token_expiry).getTime() < Date.now()) {
+      if (
+        !user.reset_token_expiry ||
+        new Date(user.reset_token_expiry).getTime() < Date.now()
+      ) {
         return res.status(400).json({ message: "Invalid or expired token" });
       }
 

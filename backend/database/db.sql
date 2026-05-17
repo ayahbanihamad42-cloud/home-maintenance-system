@@ -86,3 +86,11 @@ CREATE TABLE ratings (
     FOREIGN KEY (technician_id) REFERENCES technicians(id),
     FOREIGN KEY (request_id) REFERENCES maintenance_requests(id)
 );
+CREATE TABLE IF NOT EXISTS technician_work_posts (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  technician_id INT NOT NULL,
+  description TEXT NOT NULL,
+  images LONGTEXT NOT NULL,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (technician_id) REFERENCES technicians(id) ON DELETE CASCADE
+);

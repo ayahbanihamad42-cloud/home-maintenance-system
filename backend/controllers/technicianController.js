@@ -1,5 +1,35 @@
 import { db } from "../database/connection.js";
 
+const parseGalleryImages = (value) => {
+  if (!value) return [];
+
+  if (Array.isArray(value)) return value;
+
+  try {
+    const parsed = JSON.parse(value);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+};
+
+const normalizeGalleryPost = (post) => ({
+  ...post,
+  images: parseGalleryImages(post.images),
+});
+
+const findMyTechnicianId = (userId, callback) => {
+  db.query(
+    "SELECT id FROM technicians WHERE user_id = ?",
+    [userId],
+    (err, rows) => {
+      if (err) return callback(err);
+      if (!rows.length) return callback(null, null);
+      callback(null, rows[0].id);
+    }
+  );
+};
+
 // Fetch technicians by service
 export const getTechniciansByService = (req, res) => {
   const { service } = req.params;
@@ -7,13 +37,28 @@ export const getTechniciansByService = (req, res) => {
   const q = `
     SELECT 
       t.id AS technicianId,
+      t.user_id,
       u.name,
+      u.city,
+      u.phone,
+      t.service,
+      t.experience,
+      t.price_per_hour,
+      COALESCE(AVG(r.rating), 0) AS rating
+    FROM technicians t
+    JOIN users u ON t.user_id = u.id
+    LEFT JOIN ratings r ON r.technician_id = t.id
+    WHERE LOWER(t.service) = LOWER(?)
+    GROUP BY 
+      t.id,
+      t.user_id,
+      u.name,
+      u.city,
+      u.phone,
       t.service,
       t.experience,
       t.price_per_hour
-    FROM technicians t
-    JOIN users u ON t.user_id = u.id
-    WHERE LOWER(t.service) = LOWER(?)
+    ORDER BY rating DESC
   `;
 
   db.query(q, [service], (err, rows) => {
@@ -25,7 +70,6 @@ export const getTechniciansByService = (req, res) => {
     res.json(rows || []);
   });
 };
-
 // Fetch technician availability
 export const getAvailability = (req, res) => {
   const { id } = req.params;
@@ -37,6 +81,7 @@ export const getAvailability = (req, res) => {
     WHERE technician_id = ?
       AND available_date = ?
       AND is_booked = FALSE
+    ORDER BY start_time ASC
   `;
 
   db.query(q, [id, date], (err, result) => {
@@ -252,4 +297,159 @@ export const getTechnicianRequests = (req, res) => {
       );
     }
   );
+};
+
+// Public: fetch gallery posts for technician profile
+export const getTechnicianGallery = (req, res) => {
+  const { id } = req.params;
+
+  db.query(
+    `SELECT id, technician_id, description, images, created_at
+     FROM technician_work_posts
+     WHERE technician_id = ?
+     ORDER BY created_at DESC`,
+    [id],
+    (err, rows) => {
+      if (err) {
+        console.error("getTechnicianGallery error:", err);
+        return res.status(500).json({ message: "Server error" });
+      }
+
+      res.json((rows || []).map(normalizeGalleryPost));
+    }
+  );
+};
+
+// Technician: fetch own gallery posts
+export const getMyGallery = (req, res) => {
+  if (req.user.role !== "technician" && req.user.role !== "admin") {
+    return res.status(403).json({ message: "Not authorized" });
+  }
+
+  findMyTechnicianId(req.user.id, (lookupErr, technicianId) => {
+    if (lookupErr) {
+      console.error("getMyGallery lookup error:", lookupErr);
+      return res.status(500).json({ message: "Server error" });
+    }
+
+    if (!technicianId) {
+      return res.status(404).json({ message: "Technician profile not found" });
+    }
+
+    db.query(
+      `SELECT id, technician_id, description, images, created_at
+       FROM technician_work_posts
+       WHERE technician_id = ?
+       ORDER BY created_at DESC`,
+      [technicianId],
+      (err, rows) => {
+        if (err) {
+          console.error("getMyGallery error:", err);
+          return res.status(500).json({ message: "Server error" });
+        }
+
+        res.json((rows || []).map(normalizeGalleryPost));
+      }
+    );
+  });
+};
+
+// Technician: create gallery post with multiple images
+export const createGalleryPost = (req, res) => {
+  const { description, images } = req.body;
+
+  if (req.user.role !== "technician" && req.user.role !== "admin") {
+    return res.status(403).json({ message: "Only technicians can create posts" });
+  }
+
+  if (!description || !description.trim()) {
+    return res.status(400).json({ message: "Description is required" });
+  }
+
+  if (!Array.isArray(images) || images.length === 0) {
+    return res.status(400).json({ message: "At least one image is required" });
+  }
+
+  if (images.length > 6) {
+    return res.status(400).json({ message: "Maximum 6 images per post" });
+  }
+
+  const safeImages = images.filter(
+    (img) => typeof img === "string" && img.startsWith("data:image/")
+  );
+
+  if (!safeImages.length) {
+    return res.status(400).json({ message: "Invalid image format" });
+  }
+
+  findMyTechnicianId(req.user.id, (lookupErr, technicianId) => {
+    if (lookupErr) {
+      console.error("createGalleryPost lookup error:", lookupErr);
+      return res.status(500).json({ message: "Server error" });
+    }
+
+    if (!technicianId) {
+      return res.status(404).json({ message: "Technician profile not found" });
+    }
+
+    db.query(
+      `INSERT INTO technician_work_posts (technician_id, description, images)
+       VALUES (?, ?, ?)`,
+      [technicianId, description.trim(), JSON.stringify(safeImages)],
+      (err, result) => {
+        if (err) {
+          console.error("createGalleryPost insert error:", err);
+          return res.status(500).json({ message: "Server error" });
+        }
+
+        res.status(201).json({
+          message: "Post created",
+          id: result.insertId,
+          technician_id: technicianId,
+          description: description.trim(),
+          images: safeImages,
+        });
+      }
+    );
+  });
+};
+
+// Technician: delete own gallery post
+export const deleteGalleryPost = (req, res) => {
+  const { postId } = req.params;
+
+  if (req.user.role !== "technician" && req.user.role !== "admin") {
+    return res.status(403).json({ message: "Not authorized" });
+  }
+
+  findMyTechnicianId(req.user.id, (lookupErr, technicianId) => {
+    if (lookupErr) {
+      console.error("deleteGalleryPost lookup error:", lookupErr);
+      return res.status(500).json({ message: "Server error" });
+    }
+
+    if (!technicianId) {
+      return res.status(404).json({ message: "Technician profile not found" });
+    }
+
+    const q =
+      req.user.role === "admin"
+        ? "DELETE FROM technician_work_posts WHERE id = ?"
+        : "DELETE FROM technician_work_posts WHERE id = ? AND technician_id = ?";
+
+    const params = req.user.role === "admin" ? [postId] : [postId, technicianId];
+
+    db.query(q, params, (err, result) => {
+      if (err) {
+        console.error("deleteGalleryPost error:", err);
+        return res.status(500).json({ message: "Server error" });
+      }
+
+      if (!result.affectedRows) {
+        return res.status(404).json({ message: "Post not found" });
+      }
+
+      res.json({ message: "Post deleted" });
+    });
+  });
 };

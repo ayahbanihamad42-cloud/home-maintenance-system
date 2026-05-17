@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from "react";
 import API from "../../services/api";
 import Header from "../../components/common/Header";
+import TechnicianProfileGallery from "../../pages/technician/TechnicianGalleryManager.jsx";
 
 function UserProfile() {
   const [profile, setProfile] = useState(null);
@@ -193,6 +194,9 @@ function UserProfile() {
             <p><b>City:</b> {profile.city}</p>
             <p><b>Birth Date:</b> {new Date(profile.dob).toLocaleDateString()}</p>
           </div>
+          {JSON.parse(localStorage.getItem("user") || "{}")?.role === "technician" ? (
+  <TechnicianProfileGallery />
+) : null}
         </div>
       </div>
 

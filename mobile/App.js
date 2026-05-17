@@ -3,14 +3,12 @@ import { NavigationContainer } from "@react-navigation/native";
 import { createStackNavigator } from "@react-navigation/stack";
 import { AuthProvider } from "./src/context/AuthContext";
 
-// Auth screens
 import Welcome from "./src/screens/user/Welcome";
 import Login from "./src/screens/auth/Login";
 import Register from "./src/screens/auth/Register";
 import ForgotPassword from "./src/screens/auth/ForgotPassword";
 import ResetPassword from "./src/screens/auth/ResetPassword";
 
-// User screens
 import Home from "./src/screens/user/Home";
 import Profile from "./src/screens/user/UserProfile";
 import MaintenanceHistory from "./src/screens/user/MaintenanceHistory";
@@ -18,24 +16,19 @@ import MaintenanceRequest from "./src/screens/user/MaintenanceRequest";
 import Review from "./src/screens/user/Review";
 import PaymentSuccess from "./src/screens/user/PaymentSuccess";
 
-// Technician Discovery
 import TechniciansByService from "./src/screens/technician/TechniciansByService";
 import TechnicianProfile from "./src/screens/technician/TechnicianProfile";
-
-// Technician-only screens
 import TechnicianAvailability from "./src/screens/technician/TechnicianAvailability";
 import TechnicianRequests from "./src/screens/technician/TechnicianRequests";
 import TechnicianDashboard from "./src/screens/technician/TechnicianDashboard";
+import GalleryPostDetails from "./src/screens/technician/GalleryPostDetails";
 
-// Admin screen
 import AdminDashboard from "./src/screens/Admin/AdminDashboard";
 
-// Chat & AI
 import AIChat from "./src/screens/AIChat";
 import Chat from "./src/screens/Chat";
 import ChatList from "./src/screens/ChatList";
 
-// Route guards
 import ProtectedRoute from "./src/components/Common/ProtectedRoute";
 import AdminRedirect from "./src/components/Common/AdminRedirect";
 
@@ -51,14 +44,12 @@ function App() {
             headerShown: false,
           }}
         >
-          {/* Public Screens */}
           <Stack.Screen name="Welcome" component={Welcome} />
           <Stack.Screen name="Login" component={Login} />
           <Stack.Screen name="Register" component={Register} />
           <Stack.Screen name="ForgotPassword" component={ForgotPassword} />
           <Stack.Screen name="ResetPassword" component={ResetPassword} />
 
-          {/* Home with admin redirect */}
           <Stack.Screen name="Home">
             {() => (
               <ProtectedRoute allowedRoles={["user", "technician", "admin"]}>
@@ -69,7 +60,6 @@ function App() {
             )}
           </Stack.Screen>
 
-          {/* User + Technician shared */}
           <Stack.Screen name="Profile">
             {() => (
               <ProtectedRoute allowedRoles={["user", "technician"]}>
@@ -78,31 +68,6 @@ function App() {
             )}
           </Stack.Screen>
 
-          <Stack.Screen name="AIChat">
-            {() => (
-              <ProtectedRoute allowedRoles={["user", "technician"]}>
-                <AIChat />
-              </ProtectedRoute>
-            )}
-          </Stack.Screen>
-
-          <Stack.Screen name="ChatList">
-            {() => (
-              <ProtectedRoute allowedRoles={["user", "technician"]}>
-                <ChatList />
-              </ProtectedRoute>
-            )}
-          </Stack.Screen>
-
-          <Stack.Screen name="Chat">
-            {() => (
-              <ProtectedRoute allowedRoles={["user", "technician"]}>
-                <Chat />
-              </ProtectedRoute>
-            )}
-          </Stack.Screen>
-
-          {/* User-only screens */}
           <Stack.Screen name="History">
             {() => (
               <ProtectedRoute allowedRoles={["user"]}>
@@ -151,7 +116,22 @@ function App() {
             )}
           </Stack.Screen>
 
-          {/* Technician-only screens */}
+          <Stack.Screen name="GalleryPostDetails">
+            {() => (
+              <ProtectedRoute allowedRoles={["user", "technician"]}>
+                <GalleryPostDetails />
+              </ProtectedRoute>
+            )}
+          </Stack.Screen>
+
+          <Stack.Screen name="TechnicianDashboard">
+            {() => (
+              <ProtectedRoute allowedRoles={["technician"]}>
+                <TechnicianDashboard />
+              </ProtectedRoute>
+            )}
+          </Stack.Screen>
+
           <Stack.Screen name="TechnicianAvailability">
             {() => (
               <ProtectedRoute allowedRoles={["technician"]}>
@@ -168,19 +148,34 @@ function App() {
             )}
           </Stack.Screen>
 
-          <Stack.Screen name="TechnicianDashboard">
-            {() => (
-              <ProtectedRoute allowedRoles={["technician"]}>
-                <TechnicianDashboard />
-              </ProtectedRoute>
-            )}
-          </Stack.Screen>
-
-          {/* Admin-only */}
           <Stack.Screen name="AdminDashboard">
             {() => (
               <ProtectedRoute allowedRoles={["admin"]}>
                 <AdminDashboard />
+              </ProtectedRoute>
+            )}
+          </Stack.Screen>
+
+          <Stack.Screen name="AIChat">
+            {() => (
+              <ProtectedRoute allowedRoles={["user", "technician"]}>
+                <AIChat />
+              </ProtectedRoute>
+            )}
+          </Stack.Screen>
+
+          <Stack.Screen name="ChatList">
+            {() => (
+              <ProtectedRoute allowedRoles={["user", "technician"]}>
+                <ChatList />
+              </ProtectedRoute>
+            )}
+          </Stack.Screen>
+
+          <Stack.Screen name="Chat">
+            {() => (
+              <ProtectedRoute allowedRoles={["user", "technician"]}>
+                <Chat />
               </ProtectedRoute>
             )}
           </Stack.Screen>

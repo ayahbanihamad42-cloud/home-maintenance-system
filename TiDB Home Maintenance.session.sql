@@ -1,2 +1,1 @@
-USE home_maintenance_db;
-SELECT * FROM users;
+select * from home_maintenance_db.users;

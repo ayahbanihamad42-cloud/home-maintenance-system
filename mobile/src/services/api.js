@@ -1,11 +1,11 @@
 import axios from "axios";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
-const api = axios.create({
-  baseURL: "http://192.168.1.27:5000/api",
+const API = axios.create({
+  baseURL: "http://10.95.32.9:5000/api",
 });
 
-api.interceptors.request.use(async (config) => {
+API.interceptors.request.use(async (config) => {
   const token = await AsyncStorage.getItem("token");
 
   if (token) {
@@ -15,4 +15,4 @@ api.interceptors.request.use(async (config) => {
   return config;
 });
 
-export default api;
+export default API;

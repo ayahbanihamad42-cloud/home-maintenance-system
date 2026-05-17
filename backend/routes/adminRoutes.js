@@ -1,25 +1,40 @@
 import express from "express";
-import auth from "../utils/authMiddleware.js";
-import requireRole from "../utils/requireRole.js";
+
 import {
-  createTechnician,
+  getAllUsers,
   createUser,
-  deleteTechnician,
   deleteUser,
   getAllTechnicians,
-  getAllUsers
+  createTechnician,
+  deleteTechnician,
+  getAllStores,
+  createStore,
+  deleteStore,
+  getAllServices,
+  createService,
+  deleteService,
 } from "../controllers/adminController.js";
 
 const router = express.Router();
-// All routes in this router require authentication and admin role
-router.use(auth, requireRole("admin"));
-//fetch all technicians and users
-router.get("/technicians", getAllTechnicians);
+
+/* Users */
 router.get("/users", getAllUsers);
-//create technician and user accaounts and delete them
 router.post("/users", createUser);
-router.post("/technicians", createTechnician);
 router.delete("/users/:id", deleteUser);
+
+/* Technicians */
+router.get("/technicians", getAllTechnicians);
+router.post("/technicians", createTechnician);
 router.delete("/technicians/:id", deleteTechnician);
+
+/* Stores */
+router.get("/stores", getAllStores);
+router.post("/stores", createStore);
+router.delete("/stores/:id", deleteStore);
+
+/* Services */
+router.get("/services", getAllServices);
+router.post("/services", createService);
+router.delete("/services/:id", deleteService);
 
 export default router;

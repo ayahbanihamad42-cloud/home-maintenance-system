@@ -1,98 +1,129 @@
-import React, { useEffect, useState } from "react";
-import { View, Text, StyleSheet, FlatList, SafeAreaView } from "react-native";
-import AsyncStorage from "@react-native-async-storage/async-storage";
+import React, { useEffect, useMemo, useState } from "react";
+import { View, Text, ScrollView, StyleSheet } from "react-native";
+import { Picker } from "@react-native-picker/picker";
 
-import { getUserRequests } from "../../services/maintenanceService";
-import { getRatingByRequest } from "../../services/ratingService";
-
-import MaintenanceCard from "../../components/Cards/MaintenanceCard";
 import Header from "../../components/Common/Header";
+import { getUserRequests } from "../../services/maintenanceService";
 
 function MaintenanceHistory() {
   const [requests, setRequests] = useState([]);
-  const [ratingsByRequest, setRatingsByRequest] = useState({});
-  const [user, setUser] = useState(null);
+  const [statusFilter, setStatusFilter] = useState("all");
 
   useEffect(() => {
-    const loadUser = async () => {
-      const userData = await AsyncStorage.getItem("user");
-      if (userData) setUser(JSON.parse(userData));
-    };
-    loadUser();
-  }, []);
-
-  useEffect(() => {
-    if (!user) return;
-
     getUserRequests()
       .then((data) => setRequests(data || []))
-      .catch(() => setRequests([]));
-  }, [user]);
-
-  useEffect(() => {
-    if (!requests.length) return;
-
-    Promise.all(
-      requests.map((request) =>
-        getRatingByRequest(request.id)
-          .then((rating) => ({
-            requestId: request.id,
-            rating,
-          }))
-          .catch(() => ({
-            requestId: request.id,
-            rating: null,
-          }))
-      )
-    ).then((results) => {
-      const nextRatings = {};
-      results.forEach(({ requestId, rating }) => {
-        nextRatings[requestId] = rating;
+      .catch((err) => {
+        console.error("history error:", err);
+        setRequests([]);
       });
-      setRatingsByRequest(nextRatings);
-    });
-  }, [requests]);
+  }, []);
+
+  const filteredRequests = useMemo(() => {
+    if (statusFilter === "all") return requests;
+
+    return requests.filter(
+      (req) =>
+        String(req.status || "").toLowerCase() ===
+        String(statusFilter).toLowerCase()
+    );
+  }, [requests, statusFilter]);
 
   return (
-    <SafeAreaView style={styles.container}>
+    <>
       <Header />
 
-      <View style={styles.content}>
-        <Text style={styles.title}>Request History</Text>
+      <ScrollView contentContainerStyle={styles.container}>
+        <Text style={styles.title}>Maintenance History</Text>
 
-        <FlatList
-          data={requests}
-          keyExtractor={(item) => item.id.toString()}
-          renderItem={({ item }) => (
-            <MaintenanceCard
-              request={item}
-              rating={ratingsByRequest[item.id]}
-            />
-          )}
-          contentContainerStyle={styles.listPadding}
-        />
-      </View>
-    </SafeAreaView>
+        <View style={styles.filterBox}>
+          <Picker selectedValue={statusFilter} onValueChange={setStatusFilter}>
+            <Picker.Item label="All requests" value="all" />
+            <Picker.Item label="Pending" value="pending" />
+            <Picker.Item label="Accepted" value="accepted" />
+            <Picker.Item label="In Progress" value="in_progress" />
+            <Picker.Item label="Completed" value="completed" />
+            <Picker.Item label="Rejected" value="rejected" />
+            <Picker.Item label="Cancelled" value="cancelled" />
+          </Picker>
+        </View>
+
+        {filteredRequests.length === 0 ? (
+          <View style={styles.emptyCard}>
+            <Text style={styles.emptyText}>No requests found.</Text>
+          </View>
+        ) : (
+          filteredRequests.map((req) => (
+            <View style={styles.card} key={req.id}>
+              <Text style={styles.cardTitle}>{req.service}</Text>
+
+              <Text style={styles.description}>{req.description}</Text>
+
+              <Text style={styles.info}>Status: {req.status}</Text>
+              <Text style={styles.info}>Date: {req.scheduled_date}</Text>
+              <Text style={styles.info}>Time: {req.scheduled_time}</Text>
+              <Text style={styles.info}>Technician ID: {req.technician_id}</Text>
+            </View>
+          ))
+        )}
+      </ScrollView>
+    </>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
-    flex: 1,
+    padding: 15,
     backgroundColor: "#E8DCCF",
-  },
-  content: {
-    flex: 1,
-    paddingHorizontal: 15,
+    flexGrow: 1,
   },
   title: {
-    fontSize: 22,
-    fontWeight: "bold",
-    marginVertical: 20,
+    fontSize: 24,
+    fontWeight: "800",
+    color: "#111",
+    marginBottom: 12,
+  },
+  filterBox: {
+    height: 44,
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: "#D8C8B8",
+    backgroundColor: "#F6EDE2",
+    overflow: "hidden",
+    justifyContent: "center",
+    marginBottom: 16,
+  },
+  card: {
+    backgroundColor: "#FFF9F3",
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: "#D8C8B8",
+    padding: 16,
+    marginBottom: 14,
+  },
+  cardTitle: {
+    fontSize: 20,
+    fontWeight: "800",
     color: "#111",
   },
-  listPadding: {
-    paddingBottom: 20,
+  description: {
+    color: "#3A3028",
+    marginVertical: 8,
+    lineHeight: 20,
+  },
+  info: {
+    color: "#3A3028",
+    marginBottom: 4,
+  },
+  emptyCard: {
+    backgroundColor: "#FFF9F3",
+    padding: 18,
+    borderRadius: 16,
+    alignItems: "center",
+    borderWidth: 1,
+    borderColor: "#D8C8B8",
+  },
+  emptyText: {
+    color: "#3A3028",
   },
 });
 

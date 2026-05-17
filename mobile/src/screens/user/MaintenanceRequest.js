@@ -1,463 +1,190 @@
 import React, { useEffect, useMemo, useState } from "react";
-import {
-  View,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  ScrollView,
-  SafeAreaView,
-  Alert,
-} from "react-native";
-import MapView, { Marker } from "react-native-maps";
-import * as Location from "expo-location";
+import { View, Text, ScrollView, StyleSheet, TouchableOpacity } from "react-native";
 import { Picker } from "@react-native-picker/picker";
-import { useNavigation, useRoute } from "@react-navigation/native";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 
 import Header from "../../components/Common/Header";
-import {
-  getAvailability,
-  getTechnicianProfile,
-} from "../../services/technicianService";
-import { createMaintenanceRequest } from "../../services/maintenanceService";
-import appStyles from "../../styles/mobileStyles";
+import API from "../../services/api";
+import { getTechnicianByUserId } from "../../services/technicianService";
 
-function MaintenanceRequest() {
-  const navigation = useNavigation();
-  const route = useRoute();
+function TechnicianRequests() {
+  const [requests, setRequests] = useState([]);
+  const [statusFilter, setStatusFilter] = useState("all");
 
-  const technicianId = route.params?.technicianId || "";
+  const loadRequests = async () => {
+    try {
+      const userText = await AsyncStorage.getItem("user");
+      const user = userText ? JSON.parse(userText) : {};
 
-  const [technicianName, setTechnicianName] = useState("");
-  const [service, setService] = useState("");
-  const [pricePerHour, setPricePerHour] = useState(0);
+      const tech = await getTechnicianByUserId(user.id);
+      const res = await API.get(`/technicians/${tech.technicianId}/requests`);
 
-  const [availableDates, setAvailableDates] = useState([]);
-  const [availabilityByDate, setAvailabilityByDate] = useState({});
-  const [loadingDates, setLoadingDates] = useState(false);
-
-  const [date, setDate] = useState("");
-  const [slots, setSlots] = useState([]);
-  const [time, setTime] = useState("");
-
-  const [description, setDescription] = useState("");
-  const [city, setCity] = useState("");
-  const [locationNote, setLocationNote] = useState("");
-  const [estimatedHours, setEstimatedHours] = useState("1");
-  const [paymentMethod, setPaymentMethod] = useState("cash");
-
-  const [region, setRegion] = useState({
-    latitude: 31.9539,
-    longitude: 35.9106,
-    latitudeDelta: 0.01,
-    longitudeDelta: 0.01,
-  });
-
-  const [marker, setMarker] = useState({
-    latitude: 31.9539,
-    longitude: 35.9106,
-  });
-
-  const [locationReady, setLocationReady] = useState(false);
-  const [loadingLocation, setLoadingLocation] = useState(true);
-
-  const totalPrice = useMemo(() => {
-    return Number(pricePerHour || 0) * Number(estimatedHours || 1);
-  }, [pricePerHour, estimatedHours]);
-
-  const formatDate = (d) => {
-    const y = d.getFullYear();
-    const m = String(d.getMonth() + 1).padStart(2, "0");
-    const day = String(d.getDate()).padStart(2, "0");
-    return `${y}-${m}-${day}`;
-  };
-
-  const getNextDays = (count = 14) => {
-    const days = [];
-
-    for (let i = 0; i < count; i++) {
-      const d = new Date();
-      d.setDate(d.getDate() + i);
-      days.push(formatDate(d));
+      setRequests(res.data || []);
+    } catch (err) {
+      console.error("technician requests error:", err);
+      setRequests([]);
     }
-
-    return days;
   };
 
   useEffect(() => {
-    if (!technicianId) return;
-
-    getTechnicianProfile(technicianId)
-      .then((res) => {
-        setTechnicianName(res?.name || "");
-        setService(res?.service || "");
-        setPricePerHour(Number(res?.price_per_hour || 0));
-      })
-      .catch((err) => {
-        console.error("Technician profile error:", err);
-      });
-  }, [technicianId]);
-
-  useEffect(() => {
-    if (!technicianId) return;
-
-    const loadAvailableDates = async () => {
-      try {
-        setLoadingDates(true);
-
-        const days = getNextDays(14);
-        const map = {};
-        const validDates = [];
-
-        for (const day of days) {
-          try {
-            const daySlots = await getAvailability(technicianId, day);
-
-            if (Array.isArray(daySlots) && daySlots.length > 0) {
-              map[day] = daySlots;
-              validDates.push(day);
-            }
-          } catch (err) {
-            console.error("Availability date error:", day, err);
-          }
-        }
-
-        setAvailabilityByDate(map);
-        setAvailableDates(validDates);
-
-        if (validDates.length > 0) {
-          setDate(validDates[0]);
-          setSlots(map[validDates[0]] || []);
-        } else {
-          setDate("");
-          setSlots([]);
-        }
-      } catch (err) {
-        console.error("Load available dates error:", err);
-        setAvailableDates([]);
-        setAvailabilityByDate({});
-        setSlots([]);
-      } finally {
-        setLoadingDates(false);
-      }
-    };
-
-    loadAvailableDates();
-  }, [technicianId]);
-
-  useEffect(() => {
-    if (!date) {
-      setSlots([]);
-      setTime("");
-      return;
-    }
-
-    setSlots(availabilityByDate[date] || []);
-    setTime("");
-  }, [date, availabilityByDate]);
-
-  useEffect(() => {
-    const loadLocation = async () => {
-      try {
-        setLoadingLocation(true);
-
-        const { status } = await Location.requestForegroundPermissionsAsync();
-
-        if (status !== "granted") {
-          setLocationReady(false);
-          return;
-        }
-
-        const current = await Location.getCurrentPositionAsync({
-          accuracy: Location.Accuracy.Balanced,
-        });
-
-        const newRegion = {
-          latitude: current.coords.latitude,
-          longitude: current.coords.longitude,
-          latitudeDelta: 0.01,
-          longitudeDelta: 0.01,
-        };
-
-        setRegion(newRegion);
-        setMarker({
-          latitude: current.coords.latitude,
-          longitude: current.coords.longitude,
-        });
-
-        setLocationReady(true);
-
-        const reverse = await Location.reverseGeocodeAsync({
-          latitude: current.coords.latitude,
-          longitude: current.coords.longitude,
-        });
-
-        if (reverse?.length) {
-          const place = reverse[0];
-
-          setCity(place.city || place.subregion || place.region || "");
-          setLocationNote(
-            [
-              place.name,
-              place.street,
-              place.district,
-              place.city,
-              place.region,
-            ]
-              .filter(Boolean)
-              .join(", ")
-          );
-        }
-      } catch (err) {
-        console.error("Location error:", err);
-        setLocationReady(false);
-      } finally {
-        setLoadingLocation(false);
-      }
-    };
-
-    loadLocation();
+    loadRequests();
   }, []);
 
-  const onMarkerDragEnd = async (e) => {
-    const coords = e.nativeEvent.coordinate;
+  const filteredRequests = useMemo(() => {
+    if (statusFilter === "all") return requests;
 
-    setMarker(coords);
-    setRegion((prev) => ({
-      ...prev,
-      latitude: coords.latitude,
-      longitude: coords.longitude,
-    }));
+    return requests.filter(
+      (req) =>
+        String(req.status || "").toLowerCase() ===
+        String(statusFilter).toLowerCase()
+    );
+  }, [requests, statusFilter]);
 
+  const updateStatus = async (requestId, status) => {
     try {
-      const reverse = await Location.reverseGeocodeAsync(coords);
-
-      if (reverse?.length) {
-        const place = reverse[0];
-
-        setCity(place.city || place.subregion || place.region || "");
-        setLocationNote(
-          [
-            place.name,
-            place.street,
-            place.district,
-            place.city,
-            place.region,
-          ]
-            .filter(Boolean)
-            .join(", ")
-        );
-      }
+      await API.patch(`/maintenance/${requestId}/status`, { status });
+      loadRequests();
     } catch (err) {
-      console.error("Reverse geocode error:", err);
-    }
-  };
-
-  const submit = async () => {
-    if (!technicianId) {
-      Alert.alert("Error", "Technician not found.");
-      return;
-    }
-
-    if (!date) {
-      Alert.alert("Notice", "Technician is not available.");
-      return;
-    }
-
-    if (!time || !description.trim()) {
-      Alert.alert("Notice", "Please fill all required fields.");
-      return;
-    }
-
-    const payload = {
-      technician_id: technicianId,
-      description: description.trim(),
-      scheduled_date: date,
-      scheduled_time: time,
-      service,
-      city,
-      location_note: locationNote,
-      estimated_hours: Number(estimatedHours || 1),
-      payment_method: paymentMethod,
-      latitude: marker.latitude,
-      longitude: marker.longitude,
-      total_price: totalPrice,
-    };
-
-    try {
-      console.log("Maintenance request payload:", payload);
-
-      const res = await createMaintenanceRequest(payload);
-
-      navigation.navigate("Review", {
-        requestId: res?.id,
-      });
-    } catch (err) {
-      console.error("Maintenance request error:", err?.response?.data || err);
-
-      Alert.alert(
-        "Server Error",
-        err?.response?.data?.message ||
-          err?.message ||
-          "Something went wrong while creating the request."
-      );
+      console.error("update request status error:", err);
     }
   };
 
   return (
-    <SafeAreaView style={appStyles.screen}>
+    <>
       <Header />
 
-      <ScrollView contentContainerStyle={appStyles.content}>
-        <Text style={appStyles.title}>Maintenance Request</Text>
+      <ScrollView contentContainerStyle={styles.container}>
+        <Text style={styles.title}>Technician Requests</Text>
 
-        <View style={appStyles.card}>
-          <Text style={appStyles.label}>Technician</Text>
-          <Text style={appStyles.infoRow}>{technicianName || "Loading..."}</Text>
-
-          <Text style={appStyles.label}>Service</Text>
-          <Text style={appStyles.infoRow}>{service || "-"}</Text>
-
-          <Text style={appStyles.label}>Price / Hour</Text>
-          <Text style={appStyles.infoRow}>{pricePerHour} JOD</Text>
+        <View style={styles.filterBox}>
+          <Picker selectedValue={statusFilter} onValueChange={setStatusFilter}>
+            <Picker.Item label="All requests" value="all" />
+            <Picker.Item label="Pending" value="pending" />
+            <Picker.Item label="Accepted" value="accepted" />
+            <Picker.Item label="In Progress" value="in_progress" />
+            <Picker.Item label="Completed" value="completed" />
+            <Picker.Item label="Rejected" value="rejected" />
+            <Picker.Item label="Cancelled" value="cancelled" />
+          </Picker>
         </View>
 
-        <Text style={appStyles.label}>Date</Text>
-
-        {loadingDates ? (
-          <View style={appStyles.card}>
-            <Text style={appStyles.infoRow}>Loading available dates...</Text>
-          </View>
-        ) : availableDates.length === 0 ? (
-          <View style={appStyles.card}>
-            <Text style={appStyles.infoRow}>Technician is not available.</Text>
+        {filteredRequests.length === 0 ? (
+          <View style={styles.emptyCard}>
+            <Text style={styles.emptyText}>No requests found.</Text>
           </View>
         ) : (
-          <Picker selectedValue={date} onValueChange={setDate}>
-            {availableDates.map((availableDate) => (
-              <Picker.Item
-                key={availableDate}
-                label={availableDate}
-                value={availableDate}
-              />
-            ))}
-          </Picker>
+          filteredRequests.map((req) => (
+            <View style={styles.card} key={req.id}>
+              <Text style={styles.cardTitle}>{req.service}</Text>
+
+              <Text style={styles.description}>{req.description}</Text>
+
+              <Text style={styles.info}>Status: {req.status}</Text>
+              <Text style={styles.info}>Date: {req.scheduled_date}</Text>
+              <Text style={styles.info}>Time: {req.scheduled_time}</Text>
+              <Text style={styles.info}>User ID: {req.user_id}</Text>
+
+              <View style={styles.actions}>
+                <TouchableOpacity
+                  style={styles.button}
+                  onPress={() => updateStatus(req.id, "accepted")}
+                >
+                  <Text style={styles.buttonText}>Accept</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={styles.button}
+                  onPress={() => updateStatus(req.id, "in_progress")}
+                >
+                  <Text style={styles.buttonText}>Start</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={styles.button}
+                  onPress={() => updateStatus(req.id, "completed")}
+                >
+                  <Text style={styles.buttonText}>Complete</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          ))
         )}
-
-        <Text style={appStyles.label}>Time</Text>
-
-        {date && slots.length === 0 ? (
-          <View style={appStyles.card}>
-            <Text style={appStyles.infoRow}>
-              No available times for selected date.
-            </Text>
-          </View>
-        ) : (
-          <Picker selectedValue={time} onValueChange={setTime}>
-            <Picker.Item label="Select time" value="" />
-            {slots.map((slot) => (
-              <Picker.Item
-                key={slot.id || slot.start_time}
-                label={slot.start_time}
-                value={slot.start_time}
-              />
-            ))}
-          </Picker>
-        )}
-
-        <Text style={appStyles.label}>Description</Text>
-        <TextInput
-          style={[appStyles.input, { minHeight: 100, textAlignVertical: "top" }]}
-          placeholder="Describe the issue"
-          value={description}
-          onChangeText={setDescription}
-          multiline
-        />
-
-        <Text style={appStyles.label}>City</Text>
-        <TextInput
-          style={appStyles.input}
-          placeholder="City"
-          value={city}
-          onChangeText={setCity}
-        />
-
-        <Text style={appStyles.label}>Location Note</Text>
-        <TextInput
-          style={[appStyles.input, { minHeight: 80, textAlignVertical: "top" }]}
-          placeholder="Building, street, apartment..."
-          value={locationNote}
-          onChangeText={setLocationNote}
-          multiline
-        />
-
-        <Text style={appStyles.label}>Estimated Hours</Text>
-        <TextInput
-          style={appStyles.input}
-          placeholder="Estimated hours"
-          value={estimatedHours}
-          onChangeText={setEstimatedHours}
-          keyboardType="numeric"
-        />
-
-        <Text style={appStyles.label}>Payment Method</Text>
-        <Picker selectedValue={paymentMethod} onValueChange={setPaymentMethod}>
-          <Picker.Item label="Cash" value="cash" />
-          <Picker.Item label="Online" value="online" />
-        </Picker>
-
-        <Text style={appStyles.label}>Location on Map</Text>
-
-        <View
-          style={{
-            height: 260,
-            borderRadius: 16,
-            overflow: "hidden",
-            marginBottom: 16,
-            borderWidth: 1,
-            borderColor: "#d6c7b8",
-          }}
-        >
-          <MapView
-            style={{ flex: 1 }}
-            region={region}
-            onRegionChangeComplete={setRegion}
-          >
-            <Marker
-              coordinate={marker}
-              draggable
-              onDragEnd={onMarkerDragEnd}
-              title="Your location"
-              description="Drag to adjust"
-            />
-          </MapView>
-        </View>
-
-        <View style={appStyles.card}>
-          <Text style={appStyles.infoRow}>
-            Latitude: {marker.latitude.toFixed(6)}
-          </Text>
-
-          <Text style={appStyles.infoRow}>
-            Longitude: {marker.longitude.toFixed(6)}
-          </Text>
-
-          <Text style={appStyles.infoRow}>
-            {loadingLocation
-              ? "Getting current location..."
-              : locationReady
-              ? "Location loaded successfully"
-              : "Current location unavailable. You can drag the marker manually."}
-          </Text>
-
-          <Text style={appStyles.infoRow}>Total Price: {totalPrice} JOD</Text>
-        </View>
-
-        <TouchableOpacity style={appStyles.primaryBtn} onPress={submit}>
-          <Text style={appStyles.primaryBtnText}>Submit Request</Text>
-        </TouchableOpacity>
       </ScrollView>
-    </SafeAreaView>
+    </>
   );
 }
 
-export default MaintenanceRequest;
+const styles = StyleSheet.create({
+  container: {
+    padding: 15,
+    backgroundColor: "#E8DCCF",
+    flexGrow: 1,
+  },
+  title: {
+    fontSize: 24,
+    fontWeight: "800",
+    color: "#111",
+    marginBottom: 12,
+  },
+  filterBox: {
+    height: 44,
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: "#D8C8B8",
+    backgroundColor: "#F6EDE2",
+    overflow: "hidden",
+    justifyContent: "center",
+    marginBottom: 16,
+  },
+  card: {
+    backgroundColor: "#FFF9F3",
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: "#D8C8B8",
+    padding: 16,
+    marginBottom: 14,
+  },
+  cardTitle: {
+    fontSize: 20,
+    fontWeight: "800",
+    color: "#111",
+  },
+  description: {
+    color: "#3A3028",
+    marginVertical: 8,
+    lineHeight: 20,
+  },
+  info: {
+    color: "#3A3028",
+    marginBottom: 4,
+  },
+  actions: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+    marginTop: 12,
+  },
+  button: {
+    backgroundColor: "#111",
+    borderRadius: 999,
+    paddingVertical: 9,
+    paddingHorizontal: 14,
+  },
+  buttonText: {
+    color: "#FFF",
+    fontWeight: "700",
+  },
+  emptyCard: {
+    backgroundColor: "#FFF9F3",
+    padding: 18,
+    borderRadius: 16,
+    alignItems: "center",
+    borderWidth: 1,
+    borderColor: "#D8C8B8",
+  },
+  emptyText: {
+    color: "#3A3028",
+  },
+});
+
+export default TechnicianRequests;

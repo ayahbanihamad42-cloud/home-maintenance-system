@@ -16,7 +16,7 @@ import PaymentSuccess from "./pages/user/PaymentSuccess.jsx";
 
 import TechniciansByService from "./pages/technician/TechniciansByService.jsx";
 import TechnicianProfile from "./pages/technician/TechnicianProfile.jsx";
-
+import GalleryPostDetails from "./pages/technician/GalleryPostDetails.jsx";
 import TechnicianAvailability from "./pages/technician/TechnicianAvailability.jsx";
 import TechnicianRequests from "./pages/technician/TechnicianRequests.jsx";
 import TechnicianDashboard from "./pages/technician/TechnicianDashboard.jsx";
@@ -35,6 +35,7 @@ function App() {
     <Router>
       <Routes>
         <Route path="/" element={<Welcome />} />
+
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
         <Route path="/forgot-password" element={<ForgotPassword />} />
@@ -124,6 +125,15 @@ function App() {
         />
 
         <Route
+          path="/technician/gallery/post/:postId"
+          element={
+            <ProtectedRoute allowedRoles={["user", "technician"]}>
+              <GalleryPostDetails />
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
           path="/technician/availability"
           element={
             <ProtectedRoute allowedRoles={["technician"]}>
@@ -167,14 +177,16 @@ function App() {
             </ProtectedRoute>
           }
         />
-         <Route
+
+        <Route
           path="/chat"
           element={
             <ProtectedRoute allowedRoles={["user", "technician"]}>
-             <ChatList />
+              <ChatList />
             </ProtectedRoute>
           }
-/>
+        />
+
         <Route
           path="/chat/:userId"
           element={

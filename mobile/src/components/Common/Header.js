@@ -1,12 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react";
-import {
-  View,
-  Text,
-  TouchableOpacity,
-  Modal,
-  Pressable,
-} from "react-native";
+import { View, Text, TouchableOpacity, Modal, Pressable } from "react-native";
 import { useNavigation, useRoute } from "@react-navigation/native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import appStyles from "../../styles/mobileStyles";
 
@@ -17,6 +12,7 @@ function normalizeRole(role) {
 function Header() {
   const navigation = useNavigation();
   const route = useRoute();
+  const insets = useSafeAreaInsets();
 
   const [menuVisible, setMenuVisible] = useState(false);
   const [notificationsVisible, setNotificationsVisible] = useState(false);
@@ -28,13 +24,8 @@ function Header() {
     const loadUser = async () => {
       try {
         const raw = await AsyncStorage.getItem("user");
-        if (raw) {
-          setUser(JSON.parse(raw));
-        } else {
-          setUser(null);
-        }
+        setUser(raw ? JSON.parse(raw) : null);
       } catch (error) {
-        console.error("Header user load error:", error);
         setUser(null);
       }
     };
@@ -74,19 +65,12 @@ function Header() {
 
   const handleNavigate = (screen) => {
     setMenuVisible(false);
-
-    if (screen && screen !== currentRoute) {
-      navigation.navigate(screen);
-    }
+    if (screen && screen !== currentRoute) navigation.navigate(screen);
   };
 
   const handleLogout = async () => {
-    try {
-      await AsyncStorage.removeItem("token");
-      await AsyncStorage.removeItem("user");
-    } catch (error) {
-      console.error("Logout error:", error);
-    }
+    await AsyncStorage.removeItem("token");
+    await AsyncStorage.removeItem("user");
 
     setMenuVisible(false);
 
@@ -98,7 +82,7 @@ function Header() {
 
   return (
     <>
-      <View style={appStyles.mobileHeader}>
+      <View style={[appStyles.mobileHeader, { paddingTop: insets.top + 8 }]}>
         <View style={appStyles.mobileHeaderLeft}>
           <TouchableOpacity
             style={appStyles.mobileHeaderIconBtn}
@@ -107,7 +91,9 @@ function Header() {
             <Text style={appStyles.mobileHeaderIconText}>☰</Text>
           </TouchableOpacity>
 
-          <Text style={appStyles.mobileHeaderTitle}>Maintenance System</Text>
+          <Text numberOfLines={1} style={appStyles.mobileHeaderTitle}>
+            Maintenance System
+          </Text>
         </View>
 
         <View style={appStyles.mobileHeaderRight}>
@@ -118,27 +104,19 @@ function Header() {
             <Text style={appStyles.mobileHeaderIconText}>🔔</Text>
           </TouchableOpacity>
 
-          <TouchableOpacity
-            style={appStyles.mobileLogoutBtn}
-            onPress={handleLogout}
-          >
+          <TouchableOpacity style={appStyles.mobileLogoutBtn} onPress={handleLogout}>
             <Text style={appStyles.mobileLogoutBtnText}>Log Out</Text>
           </TouchableOpacity>
         </View>
       </View>
 
-      <Modal
-        visible={menuVisible}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setMenuVisible(false)}
-      >
+      <Modal visible={menuVisible} transparent animationType="fade">
         <Pressable
           style={appStyles.mobileMenuOverlay}
           onPress={() => setMenuVisible(false)}
         >
           <Pressable
-            style={appStyles.mobileMenuSheet}
+            style={[appStyles.mobileMenuSheet, { marginTop: insets.top + 78 }]}
             onPress={(e) => e.stopPropagation()}
           >
             <Text style={appStyles.mobileMenuTitle}>Menu</Text>
@@ -156,18 +134,16 @@ function Header() {
         </Pressable>
       </Modal>
 
-      <Modal
-        visible={notificationsVisible}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setNotificationsVisible(false)}
-      >
+      <Modal visible={notificationsVisible} transparent animationType="fade">
         <Pressable
           style={appStyles.mobileMenuOverlay}
           onPress={() => setNotificationsVisible(false)}
         >
           <Pressable
-            style={appStyles.mobileNotificationBox}
+            style={[
+              appStyles.mobileNotificationBox,
+              { marginTop: insets.top + 78 },
+            ]}
             onPress={(e) => e.stopPropagation()}
           >
             <Text style={appStyles.messageTitle}>Notifications</Text>

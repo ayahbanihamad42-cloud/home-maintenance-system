@@ -18,7 +18,9 @@ function TechnicianDashboard() {
           <View style={styles.dashboardGrid}>
             <View style={styles.dashboardCard}>
               <Text style={styles.cardTitle}>Assigned Requests</Text>
-              <Text style={styles.cardText}>Track and manage current requests.</Text>
+              <Text style={styles.cardText}>
+                Track and manage current requests.
+              </Text>
 
               <View style={styles.cardActions}>
                 <TouchableOpacity
@@ -32,7 +34,9 @@ function TechnicianDashboard() {
 
             <View style={styles.dashboardCard}>
               <Text style={styles.cardTitle}>Availability</Text>
-              <Text style={styles.cardText}>Set your working hours for new bookings.</Text>
+              <Text style={styles.cardText}>
+                Set your working hours for new bookings.
+              </Text>
 
               <View style={styles.cardActions}>
                 <TouchableOpacity
@@ -40,6 +44,22 @@ function TechnicianDashboard() {
                   onPress={() => navigation.navigate("TechnicianAvailability")}
                 >
                   <Text style={styles.buttonText}>Set Availability</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+
+            <View style={styles.dashboardCard}>
+              <Text style={styles.cardTitle}>Work Gallery</Text>
+              <Text style={styles.cardText}>
+                Add posts with multiple images and details about completed work.
+              </Text>
+
+              <View style={styles.cardActions}>
+                <TouchableOpacity
+                  style={styles.button}
+                  onPress={() => navigation.navigate("TechnicianGallery")}
+                >
+                  <Text style={styles.buttonText}>Manage Gallery</Text>
                 </TouchableOpacity>
               </View>
             </View>

@@ -1,148 +1,143 @@
-import React, { useEffect, useState } from "react";
-import { View, Text, Button, FlatList, StyleSheet, ActivityIndicator } from "react-native";
-import { WebView } from "react-native-webview";
-import AsyncStorage from "@react-native-async-storage/async-storage";
+import React, { useEffect, useMemo, useState } from "react";
+import { View, Text, ScrollView, StyleSheet } from "react-native";
+import { Picker } from "@react-native-picker/picker";
 
 import Header from "../../components/Common/Header";
 import API from "../../services/api";
+import { getTechnicianByUserId } from "../../services/technicianService";
 
 function TechnicianRequests() {
   const [requests, setRequests] = useState([]);
-  const [technicianId, setTechnicianId] = useState(null);
-  const [loading, setLoading] = useState(true);
+  const [statusFilter, setStatusFilter] = useState("all");
 
   useEffect(() => {
-    const loadTechnician = async () => {
+    const loadRequests = async () => {
       try {
-        const rawUser = await AsyncStorage.getItem("user");
-        const user = rawUser ? JSON.parse(rawUser) : null;
+        const userText = await global.localStorage?.getItem?.("user");
+        const user = userText ? JSON.parse(userText) : {};
 
-        if (!user?.id) {
-          setLoading(false);
-          return;
-        }
+        const tech = await getTechnicianByUserId(user.id);
+        const res = await API.get(`/technicians/${tech.technicianId}/requests`);
 
-        const res = await API.get(`/technicians/user/${user.id}`);
-        setTechnicianId(res.data.technicianId);
-      } catch (error) {
-        console.error(error);
-        setTechnicianId(null);
-        setLoading(false);
+        setRequests(res.data || []);
+      } catch (err) {
+        console.error("technician requests error:", err);
+        setRequests([]);
       }
     };
 
-    loadTechnician();
+    loadRequests();
   }, []);
 
-  useEffect(() => {
-    if (!technicianId) {
-      setLoading(false);
-      return;
-    }
+  const filteredRequests = useMemo(() => {
+    if (statusFilter === "all") return requests;
 
-    API.get(`/technicians/${technicianId}/requests`)
-      .then((res) => setRequests(res.data || []))
-      .catch((err) => console.error(err))
-      .finally(() => setLoading(false));
-  }, [technicianId]);
-
-  const updateStatus = (id, status) => {
-    API.patch(`/maintenance/${id}/status`, { status })
-      .then(() =>
-        setRequests((prev) =>
-          prev.map((item) => (item.id === id ? { ...item, status } : item))
-        )
-      )
-      .catch((err) => console.error(err));
-  };
-
-  if (loading) {
-    return (
-      <View style={styles.loaderContainer}>
-        <ActivityIndicator size="large" color="#007BFF" />
-      </View>
+    return requests.filter(
+      (req) =>
+        String(req.status || "").toLowerCase() ===
+        String(statusFilter).toLowerCase()
     );
-  }
-
-  if (!requests.length) {
-    return (
-      <View style={styles.loaderContainer}>
-        <Text>No requests yet.</Text>
-      </View>
-    );
-  }
+  }, [requests, statusFilter]);
 
   return (
-    <View style={{ flex: 1, backgroundColor: "#E8DCCF" }}>
+    <>
       <Header />
-      <FlatList
-        data={requests}
-        keyExtractor={(item) => item.id.toString()}
-        contentContainerStyle={styles.container}
-        renderItem={({ item }) => {
-          const mapQuery = item.location_note
-            ? encodeURIComponent(item.location_note)
-            : "Irbid";
 
-          return (
-            <View style={styles.card}>
-              <Text><Text style={styles.bold}>Service:</Text> {item.service}</Text>
-              <Text><Text style={styles.bold}>Status:</Text> {item.status}</Text>
-              <Text><Text style={styles.bold}>Date:</Text> {item.scheduled_date}</Text>
-              <Text><Text style={styles.bold}>Time:</Text> {item.scheduled_time}</Text>
-              <Text><Text style={styles.bold}>Location:</Text> {item.location_note || "Not provided"}</Text>
-              <Text><Text style={styles.bold}>Issue:</Text> {item.description || "Not provided"}</Text>
+      <ScrollView contentContainerStyle={styles.container}>
+        <Text style={styles.title}>Technician Requests</Text>
 
-              <View style={{ height: 200, marginVertical: 10, overflow: "hidden", borderRadius: 12 }}>
-                <WebView
-                  source={{ uri: `https://maps.google.com/maps?q=${mapQuery}&z=14&output=embed` }}
-                />
-              </View>
+        <View style={styles.filterPanel}>
+          <Text style={styles.label}>Filter by request status</Text>
 
-              <View style={styles.actions}>
-                <Button
-                  title="Confirm"
-                  onPress={() => updateStatus(item.id, "confirmed")}
-                  color="#007BFF"
-                />
-                <View style={{ height: 10 }} />
-                <Button
-                  title="Mark Completed"
-                  onPress={() => updateStatus(item.id, "completed")}
-                  color="#28A745"
-                />
-              </View>
+          <View style={styles.pickerBox}>
+            <Picker selectedValue={statusFilter} onValueChange={setStatusFilter}>
+              <Picker.Item label="All requests" value="all" />
+              <Picker.Item label="Pending" value="pending" />
+              <Picker.Item label="Accepted" value="accepted" />
+              <Picker.Item label="In Progress" value="in_progress" />
+              <Picker.Item label="Completed" value="completed" />
+              <Picker.Item label="Rejected" value="rejected" />
+              <Picker.Item label="Cancelled" value="cancelled" />
+            </Picker>
+          </View>
+        </View>
+
+        {filteredRequests.length === 0 ? (
+          <View style={styles.emptyCard}>
+            <Text style={styles.emptyText}>No requests found.</Text>
+          </View>
+        ) : (
+          filteredRequests.map((req) => (
+            <View style={styles.card} key={req.id}>
+              <Text style={styles.cardTitle}>{req.service}</Text>
+              <Text style={styles.description}>{req.description}</Text>
+
+              <Text>Status: {req.status}</Text>
+              <Text>Date: {req.scheduled_date}</Text>
+              <Text>Time: {req.scheduled_time}</Text>
+              <Text>User ID: {req.user_id}</Text>
             </View>
-          );
-        }}
-      />
-    </View>
+          ))
+        )}
+      </ScrollView>
+    </>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     padding: 15,
+    backgroundColor: "#E8DCCF",
+    flexGrow: 1,
+  },
+  title: {
+    fontSize: 22,
+    fontWeight: "bold",
+    marginBottom: 12,
+  },
+  filterPanel: {
+    backgroundColor: "#FFF9F3",
+    borderRadius: 16,
+    padding: 14,
+    borderWidth: 1,
+    borderColor: "#D8C8B8",
+    marginBottom: 16,
+  },
+  label: {
+    fontWeight: "bold",
+    marginBottom: 6,
+  },
+  pickerBox: {
+    backgroundColor: "#FFF",
+    borderWidth: 1,
+    borderColor: "#D8C8B8",
+    borderRadius: 12,
+    overflow: "hidden",
   },
   card: {
     backgroundColor: "#FFF9F3",
-    padding: 15,
-    marginBottom: 20,
-    borderRadius: 12,
+    borderRadius: 16,
     borderWidth: 1,
     borderColor: "#D8C8B8",
+    padding: 16,
+    marginBottom: 12,
   },
-  bold: {
+  cardTitle: {
+    fontSize: 18,
     fontWeight: "bold",
   },
-  actions: {
-    marginTop: 10,
+  description: {
+    marginVertical: 8,
+    color: "#3C332B",
   },
-  loaderContainer: {
-    flex: 1,
-    justifyContent: "center",
+  emptyCard: {
+    backgroundColor: "#FFF9F3",
+    padding: 18,
+    borderRadius: 16,
     alignItems: "center",
-    backgroundColor: "#E8DCCF",
+  },
+  emptyText: {
+    color: "#5D5147",
   },
 });
 

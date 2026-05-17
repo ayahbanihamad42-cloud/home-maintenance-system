@@ -1,144 +1,88 @@
-/**
- * TechnicianRequests Page
- * Displays assigned maintenance requests
- */
-
-import { useEffect, useState } from "react";
-// React hooks
-
-import API from "../../services/api";
-// Axios API instance
-
+import React, { useEffect, useMemo, useState } from "react";
 import Header from "../../components/common/Header";
-// Header component
+import { getTechnicianByUserId } from "../../services/technicianService";
+import API from "../../services/api";
 
-// Technician assigned requests page
 function TechnicianRequests() {
+  const user = JSON.parse(localStorage.getItem("user") || "{}");
 
-  // Store assigned maintenance requests
   const [requests, setRequests] = useState([]);
+  const [statusFilter, setStatusFilter] = useState("all");
 
-  // Get logged-in user ID from localStorage
-  const userId = JSON.parse(localStorage.getItem("user")).id;
-
-  // Store technician ID
-  const [technicianId, setTechnicianId] = useState(null);
-
-  // Fetch technician ID using user ID
   useEffect(() => {
+    const loadRequests = async () => {
+      try {
+        const tech = await getTechnicianByUserId(user.id);
+        const res = await API.get(`/technicians/${tech.technicianId}/requests`);
+        setRequests(res.data || []);
+      } catch (err) {
+        console.error("technician requests error:", err);
+        setRequests([]);
+      }
+    };
 
-    // Request technician profile
-    API.get(`/technicians/user/${userId}`)
-      .then((res) => setTechnicianId(res.data.technicianId))
-      .catch(() => setTechnicianId(null));
+    loadRequests();
+  }, [user.id]);
 
-  }, [userId]);
+  const filteredRequests = useMemo(() => {
+    if (statusFilter === "all") return requests;
 
-  // Fetch assigned requests using technician ID
-  useEffect(() => {
-
-    // Stop if technician ID is not available
-    if (!technicianId) return;
-
-    // Request technician maintenance requests
-    API.get(`/technicians/${technicianId}/requests`)
-      .then(res => setRequests(res.data));
-
-  }, [technicianId]);
+    return requests.filter(
+      (req) =>
+        String(req.status || "").toLowerCase() ===
+        String(statusFilter).toLowerCase()
+    );
+  }, [requests, statusFilter]);
 
   return (
     <>
-      {/* Page header */}
       <Header />
 
       <div className="container">
+        <h2 className="section-title">Technician Requests</h2>
 
-        {/* Page title */}
-        <h2 className="section-title">Assigned Requests</h2>
+        <div className="filter-panel">
+          <div className="input-group">
+            <label>Filter by request status</label>
 
-        <div className="panel">
+            <select
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value)}
+            >
+              <option value="all">All requests</option>
+              <option value="pending">Pending</option>
+              <option value="accepted">Accepted</option>
+              <option value="in_progress">In Progress</option>
+              <option value="completed">Completed</option>
+              <option value="rejected">Rejected</option>
+              <option value="cancelled">Cancelled</option>
+            </select>
+          </div>
+        </div>
 
-          {/* Render each request card */}
-          {requests.map(r => {
+        {filteredRequests.length === 0 ? (
+          <div className="empty-gallery-card">No requests found.</div>
+        ) : (
+          <div className="history-list">
+            {filteredRequests.map((req) => (
+              <div className="history-card" key={req.id}>
+                <h3>{req.service}</h3>
 
-            // Prepare Google Maps query
-            const mapQuery = r.location_note
-              ? encodeURIComponent(r.location_note)
-              : "Riyadh";
+                <p>{req.description}</p>
 
-            return (
-              <div key={r.id} className="card">
-
-                {/* Request details */}
-                <p><b>Service:</b> {r.service}</p>
-                <p><b>Status:</b> {r.status}</p>
-                <p><b>Date:</b> {r.scheduled_date}</p>
-                <p><b>Time:</b> {r.scheduled_time}</p>
-                <p><b>Location:</b> {r.location_note || "Not provided"}</p>
-                <p><b>Issue:</b> {r.description || "Not provided"}</p>
-
-                {/* Embedded Google Map */}
-                <div className="map-embed">
-                  <iframe
-                    title={`request-${r.id}-map`}
-                    src={`https://maps.google.com/maps?q=${mapQuery}&z=14&output=embed`}
-                    loading="lazy"
-                    referrerPolicy="no-referrer-when-downgrade"
-                  />
-                </div>
-
-                {/* Request action buttons */}
-                <div className="request-actions">
-
-                  {/* Confirm request */}
-                  <button
-                    className="primary"
-                    type="button"
-                    onClick={() =>
-                      API.patch(`/maintenance/${r.id}/status`, { status: "confirmed" })
-                        .then(() =>
-                          setRequests((prev) =>
-                            prev.map((item) =>
-                              item.id === r.id
-                                ? { ...item, status: "confirmed" }
-                                : item
-                            )
-                          )
-                        )
-                    }
-                  >
-                    Confirm
-                  </button>
-
-                  {/* Mark request as completed */}
-                  <button
-                    className="secondary"
-                    type="button"
-                    onClick={() =>
-                      API.patch(`/maintenance/${r.id}/status`, { status: "completed" })
-                        .then(() =>
-                          setRequests((prev) =>
-                            prev.map((item) =>
-                              item.id === r.id
-                                ? { ...item, status: "completed" }
-                                : item
-                            )
-                          )
-                        )
-                    }
-                  >
-                    Mark Completed
-                  </button>
-
+                <div className="tech-info-list">
+                  <span>Status: {req.status}</span>
+                  <span>Date: {req.scheduled_date}</span>
+                  <span>Time: {req.scheduled_time}</span>
+                  <span>User ID: {req.user_id}</span>
                 </div>
               </div>
-            );
-          })}
-        </div>
+            ))}
+          </div>
+        )}
       </div>
     </>
   );
 }
 
-// Export component
 export default TechnicianRequests;
