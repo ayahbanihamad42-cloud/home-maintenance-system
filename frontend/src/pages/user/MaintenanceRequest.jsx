@@ -1,308 +1,256 @@
-import { useState, useEffect, useMemo } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import React, { useEffect, useMemo, useState } from "react";
+import { useNavigate, useParams, useLocation } from "react-router-dom";
 import Header from "../../components/common/Header";
-import {
-  getTechnicians,
-  getAvailability,
-  getTechnicianProfile,
-} from "../../services/technicianService";
-import { createMaintenanceRequest } from "../../services/maintenanceService";
-import { createMockPayment } from "../../services/paymentService";
+import API from "../../services/api";
 
 function MaintenanceRequest() {
-  const { technicianId: initialTechnicianId } = useParams();
+  const { technicianId } = useParams();
+  const location = useLocation();
   const navigate = useNavigate();
 
-  const [service, setService] = useState("");
-  const [technicians, setTechnicians] = useState([]);
-  const [technicianId, setTechnicianId] = useState(initialTechnicianId || "");
-  const [technicianName, setTechnicianName] = useState("");
-  const [technicianPrice, setTechnicianPrice] = useState(0);
+  const user = JSON.parse(localStorage.getItem("user") || "{}");
 
-  const [availableDates, setAvailableDates] = useState([]);
-  const [availabilityByDate, setAvailabilityByDate] = useState({});
-  const [loadingDates, setLoadingDates] = useState(false);
+  const passedTech = location.state?.technician || null;
 
-  const [date, setDate] = useState("");
-  const [slots, setSlots] = useState([]);
-  const [time, setTime] = useState("");
-  const [description, setDescription] = useState("");
-  const [locationNote, setLocationNote] = useState("");
+  const [tech, setTech] = useState(passedTech);
+  const [availableSlots, setAvailableSlots] = useState([]);
+  const [message, setMessage] = useState(null);
+  const [submitting, setSubmitting] = useState(false);
 
-  const [estimatedHours, setEstimatedHours] = useState(1);
-  const [paymentMethod, setPaymentMethod] = useState("cash");
+  const [form, setForm] = useState({
+    service: passedTech?.service || "",
+    technician_name: passedTech?.name || "",
+    scheduled_date: "",
+    scheduled_time: "",
+    estimated_hours: "1",
+    payment_method: "cash",
+    location_note: "",
+    description: "",
+  });
 
-  const [geoCoords, setGeoCoords] = useState(null);
-  const [geoError, setGeoError] = useState("");
+  const toSqlDate = (value) => {
+    if (!value) return "";
 
-  const [requestMessage, setRequestMessage] = useState(null);
+    if (/^\d{4}-\d{2}-\d{2}$/.test(value)) return value;
 
-  const totalPrice = useMemo(() => {
-    return Number(technicianPrice || 0) * Number(estimatedHours || 1);
-  }, [technicianPrice, estimatedHours]);
+    const d = new Date(value);
+    if (Number.isNaN(d.getTime())) return value;
 
-  const mapQuery = useMemo(() => {
-    if (geoCoords) return `${geoCoords.lat},${geoCoords.lng}`;
-    return encodeURIComponent(locationNote || "Amman");
-  }, [geoCoords, locationNote]);
+    const yyyy = d.getFullYear();
+    const mm = String(d.getMonth() + 1).padStart(2, "0");
+    const dd = String(d.getDate()).padStart(2, "0");
 
-  const formatDate = (d) => {
-    const y = d.getFullYear();
-    const m = String(d.getMonth() + 1).padStart(2, "0");
-    const day = String(d.getDate()).padStart(2, "0");
-    return `${y}-${m}-${day}`;
+    return `${yyyy}-${mm}-${dd}`;
   };
 
-  const getNextDays = (count = 14) => {
-    const days = [];
-
-    for (let i = 0; i < count; i++) {
-      const d = new Date();
-      d.setDate(d.getDate() + i);
-      days.push(formatDate(d));
-    }
-
-    return days;
+  const normalizeTime = (value) => {
+    if (!value) return "";
+    return String(value).split(".")[0];
   };
 
-  useEffect(() => {
-    if (!service || initialTechnicianId) return;
+  const slotStartTime = (slot) => {
+    if (!slot) return "";
+    return normalizeTime(String(slot).split(" - ")[0]);
+  };
 
-    getTechnicians(service)
-      .then((data) => setTechnicians(data || []))
-      .catch(() => setTechnicians([]));
-  }, [service, initialTechnicianId]);
-
-  useEffect(() => {
-    if (!technicianId) {
-      setTechnicianName("");
-      setTechnicianPrice(0);
-      setAvailableDates([]);
-      setAvailabilityByDate({});
-      setDate("");
-      setSlots([]);
-      setTime("");
-      return;
-    }
-
-    getTechnicianProfile(technicianId)
-      .then((res) => {
-        setService(res?.service || "");
-        setTechnicianName(res?.name || "");
-        setTechnicianPrice(Number(res?.price_per_hour || 0));
-      })
-      .catch(() => {
-        setTechnicianName("");
-        setTechnicianPrice(0);
-      });
-  }, [technicianId]);
-
-  useEffect(() => {
-    if (!technicianId) return;
-
-    const loadAvailableDates = async () => {
-      try {
-        setLoadingDates(true);
-        setDate("");
-        setSlots([]);
-        setTime("");
-        setRequestMessage(null);
-
-        const days = getNextDays(14);
-        const map = {};
-        const validDates = [];
-
-        for (const day of days) {
-          try {
-            const daySlots = await getAvailability(technicianId, day);
-
-            if (Array.isArray(daySlots) && daySlots.length > 0) {
-              map[day] = daySlots;
-              validDates.push(day);
-            }
-          } catch (err) {
-            console.error("Availability date error:", day, err);
-          }
-        }
-
-        setAvailabilityByDate(map);
-        setAvailableDates(validDates);
-
-        if (validDates.length > 0) {
-          setDate(validDates[0]);
-          setSlots(map[validDates[0]] || []);
-        } else {
-          setDate("");
-          setSlots([]);
-
-          setRequestMessage({
-            type: "warning",
-            title: "Notice",
-            body: "Technician is not available.",
-          });
-        }
-      } catch (err) {
-        console.error("Load available dates error:", err);
-
-        setAvailableDates([]);
-        setAvailabilityByDate({});
-        setSlots([]);
-
-        setRequestMessage({
-          type: "error",
-          title: "Notice",
-          body: "Failed to load technician availability.",
-        });
-      } finally {
-        setLoadingDates(false);
-      }
-    };
-
-    loadAvailableDates();
-  }, [technicianId]);
-
-  useEffect(() => {
-    if (!date) {
-      setSlots([]);
-      setTime("");
-      return;
-    }
-
-    setSlots(availabilityByDate[date] || []);
-    setTime("");
-  }, [date, availabilityByDate]);
-
-  useEffect(() => {
-    if (!navigator.geolocation) {
-      setGeoError("Geolocation is not supported by this browser.");
-      return;
-    }
-
-    navigator.geolocation.getCurrentPosition(
-      (pos) => {
-        setGeoCoords({
-          lat: pos.coords.latitude,
-          lng: pos.coords.longitude,
-        });
-      },
-      () => {
-        setGeoError("Unable to access your location.");
-      }
+  const selectedSlotObj = useMemo(() => {
+    return availableSlots.find(
+      (slot) =>
+        toSqlDate(slot.date) === toSqlDate(form.scheduled_date) &&
+        slot.label === form.scheduled_time
     );
-  }, []);
+  }, [availableSlots, form.scheduled_date, form.scheduled_time]);
 
-  const submit = async () => {
-    if (!service || !technicianId) {
-      setRequestMessage({
-        type: "warning",
-        title: "Notice",
-        body: "Please select Service and Technician.",
-      });
-      return;
-    }
+  const dates = useMemo(() => {
+    const unique = new Set();
 
-    if (!date) {
-      setRequestMessage({
-        type: "warning",
-        title: "Notice",
-        body: "Technician is not available.",
-      });
-      return;
-    }
+    availableSlots.forEach((slot) => {
+      if (slot?.date) unique.add(toSqlDate(slot.date));
+    });
 
-    if (!time) {
-      setRequestMessage({
-        type: "warning",
-        title: "Notice",
-        body: "Please select an available time.",
-      });
-      return;
-    }
+    return Array.from(unique).sort();
+  }, [availableSlots]);
 
-    if (!description.trim()) {
-      setRequestMessage({
-        type: "warning",
-        title: "Notice",
-        body: "Please describe the issue.",
-      });
-      return;
-    }
+  const timesForSelectedDate = useMemo(() => {
+    return availableSlots.filter(
+      (slot) => toSqlDate(slot.date) === toSqlDate(form.scheduled_date)
+    );
+  }, [availableSlots, form.scheduled_date]);
 
-    if (!estimatedHours || Number(estimatedHours) < 1) {
-      setRequestMessage({
-        type: "warning",
-        title: "Notice",
-        body: "Estimated hours must be at least 1.",
-      });
-      return;
-    }
+  const pricePerHour = Number(tech?.price_per_hour || 0);
+  const estimatedHours = Number(form.estimated_hours || 1);
+  const totalPrice = pricePerHour * estimatedHours;
 
-    const payload = {
-      technician_id: technicianId,
-      description: description.trim(),
-      scheduled_date: date,
-      scheduled_time: time,
-      service,
-      location_note: locationNote,
-      city: "",
-      estimated_hours: Number(estimatedHours),
-      payment_method: paymentMethod,
-    };
-
-    try {
-      if (paymentMethod === "online") {
-        const paymentResponse = await createMockPayment({
-          amount: totalPrice,
-          technicianId: technicianId,
-          estimated_hours: Number(estimatedHours),
-        });
-
-        const requestResponse = await createMaintenanceRequest({
-          ...payload,
-          payment_transaction_id: paymentResponse.transactionId,
-        });
-
-        if (requestResponse?.id) {
-          navigate(`/payment-success/${requestResponse.id}`, {
-            state: {
-              requestId: requestResponse.id,
-              transactionId: paymentResponse.transactionId,
-              totalPrice,
-            },
-          });
-
+  useEffect(() => {
+    const loadTechnician = async () => {
+      try {
+        if (passedTech) {
+          setTech(passedTech);
           return;
         }
 
-        setRequestMessage({
-          type: "warning",
-          title: "Notice",
-          body: "Payment completed, but request id was not returned.",
+        const res = await API.get(`/technicians/${technicianId}`);
+        setTech(res.data);
+      } catch (err) {
+        console.error("load technician error:", err);
+        setMessage({
+          type: "error",
+          title: "Error",
+          body: "Failed to load technician details.",
         });
-
-        return;
       }
+    };
 
-      const response = await createMaintenanceRequest(payload);
+    if (technicianId) loadTechnician();
+  }, [technicianId, passedTech]);
 
-      if (response?.id) {
-        navigate(`/review/${response.id}`);
-        return;
+  useEffect(() => {
+    if (!tech) return;
+
+    setForm((prev) => ({
+      ...prev,
+      service: tech.service || prev.service || "",
+      technician_name: tech.name || prev.technician_name || "",
+    }));
+  }, [tech]);
+
+  useEffect(() => {
+    const loadSlots = async () => {
+      try {
+        const res = await API.get(`/technicians/${technicianId}/available-slots`);
+
+        const slots = Array.isArray(res.data) ? res.data : [];
+
+        const cleanSlots = slots
+          .map((slot) => ({
+            ...slot,
+            date: toSqlDate(slot.date || slot.scheduled_date),
+            label:
+              slot.label ||
+              `${normalizeTime(slot.start_time)} - ${normalizeTime(slot.end_time)}`,
+            start_time: normalizeTime(slot.start_time),
+            end_time: normalizeTime(slot.end_time),
+          }))
+          .filter((slot) => slot.date && slot.label);
+
+        setAvailableSlots(cleanSlots);
+
+        if (cleanSlots.length > 0) {
+          setForm((prev) => ({
+            ...prev,
+            scheduled_date: prev.scheduled_date || cleanSlots[0].date,
+            scheduled_time: prev.scheduled_time || cleanSlots[0].label,
+          }));
+        }
+      } catch (err) {
+        console.error("load slots error:", err);
+        setAvailableSlots([]);
+        setMessage({
+          type: "error",
+          title: "Error",
+          body: "Failed to load available dates and times.",
+        });
       }
+    };
 
-      setRequestMessage({
-        type: "warning",
-        title: "Notice",
-        body: "Request submitted, but no id returned.",
-      });
-    } catch (e) {
-      console.error("submit request error:", e);
+    if (technicianId) loadSlots();
+  }, [technicianId]);
 
-      setRequestMessage({
+  const handleDateChange = (value) => {
+    const date = toSqlDate(value);
+    const firstSlot = availableSlots.find((slot) => toSqlDate(slot.date) === date);
+
+    setForm((prev) => ({
+      ...prev,
+      scheduled_date: date,
+      scheduled_time: firstSlot?.label || "",
+    }));
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+
+    if (!form.scheduled_date || !form.scheduled_time) {
+      setMessage({
         type: "error",
-        title: "Notice",
-        body: e?.response?.data?.message || "Failed to submit request.",
+        title: "Missing Date Or Time",
+        body: "Please choose an available date and time.",
       });
+      return;
+    }
+
+    if (!selectedSlotObj) {
+      setMessage({
+        type: "error",
+        title: "Unavailable Time",
+        body: "This date and time are not available. Please choose another slot.",
+      });
+      return;
+    }
+
+    try {
+      setSubmitting(true);
+      setMessage(null);
+
+      const payload = {
+        technician_id: Number(technicianId),
+        service: form.service,
+        description: form.description,
+        scheduled_date: toSqlDate(form.scheduled_date),
+        scheduled_time: slotStartTime(form.scheduled_time),
+        estimated_hours: estimatedHours,
+        payment_method: form.payment_method,
+        location_note: form.location_note,
+        total_price: totalPrice,
+      };
+
+      const res = await API.post("/maintenance", payload);
+
+      const newRequestId = res.data?.id || res.data?.request_id;
+
+      if (!newRequestId) {
+        setMessage({
+          type: "success",
+          title: "Request Created",
+          body: "Request created successfully.",
+        });
+        return;
+      }
+
+      navigate(`/review/${newRequestId}`, {
+        state: {
+          createdRequest: {
+            ...payload,
+            id: newRequestId,
+            service: form.service,
+            technician_name: form.technician_name,
+            created_at: new Date().toISOString(),
+          },
+        },
+      });
+    } catch (err) {
+      console.error("create request error:", err);
+
+      const backendMessage =
+        err.response?.data?.message ||
+        err.response?.data?.error ||
+        "Failed to create request.";
+
+      setMessage({
+        type: "error",
+        title:
+          backendMessage.toLowerCase().includes("duplicate") ||
+          backendMessage.toLowerCase().includes("available") ||
+          backendMessage.toLowerCase().includes("booked")
+            ? "Unavailable Time"
+            : "Error",
+        body:
+          backendMessage.toLowerCase().includes("duplicate")
+            ? "This date and time are already booked. Please choose another slot."
+            : backendMessage,
+      });
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -313,145 +261,90 @@ function MaintenanceRequest() {
       <div className="container request-container">
         <h2>Maintenance Request</h2>
 
-        {requestMessage ? (
-          <div className={`message-box-card request-message-box ${requestMessage.type}`}>
-            <div className="message-box-title">{requestMessage.title}</div>
-            <div className="message-box-body">{requestMessage.body}</div>
+        {message && (
+          <div className={`message-box-card ${message.type} request-message-card`}>
+            <div className="message-box-title">{message.title}</div>
+            <div className="message-box-body">{message.body}</div>
           </div>
-        ) : null}
+        )}
 
-        <div className="request-grid">
-          {technicianId ? (
-            <>
-              <div className="input-group">
-                <label>Service</label>
-                <div className="readonly-field">{service || "Loading..."}</div>
-              </div>
+        <form onSubmit={handleSubmit} className="request-grid">
+          <div className="input-group">
+            <label>Service</label>
+            <input value={form.service} readOnly />
+          </div>
 
-              <div className="input-group">
-                <label>Technician</label>
-                <div className="readonly-field">
-                  {technicianName || "Loading..."}
-                </div>
-              </div>
-            </>
-          ) : (
-            <>
-              <div className="input-group">
-                <label>Service Type</label>
-
-                <select
-                  value={service}
-                  onChange={(e) => {
-                    setService(e.target.value);
-                    setTechnicianId("");
-                    setTechnicianName("");
-                    setTechnicianPrice(0);
-                    setAvailableDates([]);
-                    setAvailabilityByDate({});
-                    setDate("");
-                    setTime("");
-                    setSlots([]);
-                    setRequestMessage(null);
-                  }}
-                >
-                  <option value="">Select service</option>
-                  <option value="Electrical">Electrical</option>
-                  <option value="Plumbing">Plumbing</option>
-                  <option value="Painting">Painting</option>
-                  <option value="Decoration">Decoration</option>
-                </select>
-              </div>
-
-              <div className="input-group">
-                <label>Technician</label>
-
-                <select
-                  value={technicianId}
-                  onChange={(e) => {
-                    setTechnicianId(e.target.value);
-                    setDate("");
-                    setTime("");
-                    setSlots([]);
-                    setAvailableDates([]);
-                    setAvailabilityByDate({});
-                    setRequestMessage(null);
-                  }}
-                >
-                  <option value="">Select technician</option>
-
-                  {technicians.map((tech) => (
-                    <option key={tech.technicianId} value={tech.technicianId}>
-                      {tech.name} - {tech.experience} yrs -{" "}
-                      {Number(tech.price_per_hour || 0).toFixed(2)} JOD/hr
-                    </option>
-                  ))}
-                </select>
-              </div>
-            </>
-          )}
+          <div className="input-group">
+            <label>Technician</label>
+            <input value={form.technician_name} readOnly />
+          </div>
 
           <div className="input-group">
             <label>Date</label>
-
-            {loadingDates ? (
-              <div className="readonly-field">Loading available dates...</div>
-            ) : availableDates.length === 0 ? (
-              <div className="readonly-field not-available-field">
-                Technician is not available.
-              </div>
-            ) : (
-              <select value={date} onChange={(e) => setDate(e.target.value)}>
-                {availableDates.map((availableDate) => (
-                  <option key={availableDate} value={availableDate}>
-                    {availableDate}
+            <select
+              value={form.scheduled_date}
+              onChange={(e) => handleDateChange(e.target.value)}
+            >
+              {dates.length === 0 ? (
+                <option value="">No available dates</option>
+              ) : (
+                dates.map((date) => (
+                  <option key={date} value={date}>
+                    {date}
                   </option>
-                ))}
-              </select>
-            )}
+                ))
+              )}
+            </select>
           </div>
 
           <div className="input-group">
             <label>Time Slot</label>
-
-            {date && slots.length === 0 ? (
-              <div className="readonly-field not-available-field">
-                No available times for selected date.
-              </div>
-            ) : (
-              <select
-                value={time}
-                onChange={(e) => setTime(e.target.value)}
-                disabled={!date}
-              >
-                <option value="">Select time</option>
-
-                {slots.map((slot) => (
-                  <option key={slot.id || slot.start_time} value={slot.start_time}>
-                    {slot.start_time}
+            <select
+              value={form.scheduled_time}
+              onChange={(e) =>
+                setForm((prev) => ({
+                  ...prev,
+                  scheduled_time: e.target.value,
+                }))
+              }
+            >
+              {timesForSelectedDate.length === 0 ? (
+                <option value="">No available times</option>
+              ) : (
+                timesForSelectedDate.map((slot) => (
+                  <option key={`${slot.date}-${slot.label}`} value={slot.label}>
+                    {slot.label}
                   </option>
-                ))}
-              </select>
-            )}
+                ))
+              )}
+            </select>
           </div>
 
           <div className="input-group">
             <label>Estimated Hours</label>
-
             <input
               type="number"
               min="1"
-              value={estimatedHours}
-              onChange={(e) => setEstimatedHours(e.target.value)}
+              value={form.estimated_hours}
+              onChange={(e) =>
+                setForm((prev) => ({
+                  ...prev,
+                  estimated_hours: e.target.value,
+                }))
+              }
             />
           </div>
 
           <div className="input-group">
             <label>Payment Method</label>
-
             <select
-              value={paymentMethod}
-              onChange={(e) => setPaymentMethod(e.target.value)}
+              value={form.payment_method}
+              onChange={(e) =>
+                setForm((prev) => ({
+                  ...prev,
+                  payment_method: e.target.value,
+                }))
+              }
             >
               <option value="cash">Cash</option>
               <option value="online">Online</option>
@@ -460,63 +353,44 @@ function MaintenanceRequest() {
 
           <div className="input-group full-width">
             <label>Price Summary</label>
-
             <div className="readonly-field">
-              Price / hour: {Number(technicianPrice || 0).toFixed(2)} JOD |
-              Estimated Hours: {estimatedHours} | Total:{" "}
-              {Number(totalPrice).toFixed(2)} JOD
+              Price / hour: {pricePerHour.toFixed(2)} JOD | Estimated Hours:{" "}
+              {estimatedHours || 1} | Total: {totalPrice.toFixed(2)} JOD
             </div>
           </div>
 
           <div className="input-group full-width">
             <label>Location Note</label>
-
             <input
-              placeholder="Add address details or landmark"
-              value={locationNote}
-              onChange={(e) => setLocationNote(e.target.value)}
+              value={form.location_note}
+              onChange={(e) =>
+                setForm((prev) => ({
+                  ...prev,
+                  location_note: e.target.value,
+                }))
+              }
+              placeholder="Example: Irbid, near Yarmouk University"
             />
           </div>
 
           <div className="input-group full-width">
             <label>Description</label>
-
             <textarea
-              rows="3"
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              placeholder="Describe the issue"
+              value={form.description}
+              onChange={(e) =>
+                setForm((prev) => ({
+                  ...prev,
+                  description: e.target.value,
+                }))
+              }
+              placeholder="Describe the problem..."
             />
           </div>
 
-          <div className="input-group full-width">
-            <label>Map Location</label>
-
-            {geoError ? (
-              <div className="message-box-card compact-message-card warning">
-                <div className="message-box-title">Notice</div>
-                <div className="message-box-body">{geoError}</div>
-              </div>
-            ) : null}
-
-            <div className="map-embed">
-              <iframe
-                title="map"
-                src={`https://maps.google.com/maps?q=${mapQuery}&z=14&output=embed`}
-                loading="lazy"
-                referrerPolicy="no-referrer-when-downgrade"
-              />
-            </div>
-          </div>
-        </div>
-
-        <button
-          className="primary"
-          onClick={submit}
-          disabled={!technicianId || loadingDates || availableDates.length === 0}
-        >
-          {paymentMethod === "online" ? "Pay & Submit" : "Submit"}
-        </button>
+          <button className="primary" type="submit" disabled={submitting}>
+            {submitting ? "Submitting..." : "Submit Request"}
+          </button>
+        </form>
       </div>
     </>
   );

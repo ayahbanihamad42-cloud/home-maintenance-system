@@ -2,35 +2,53 @@ import React, { useEffect, useState } from "react";
 import {
   View,
   Text,
-  Image,
-  ScrollView,
   TouchableOpacity,
+  ScrollView,
   StyleSheet,
-  ActivityIndicator,
+  Image,
 } from "react-native";
-import { useNavigation } from "@react-navigation/native";
-
 import Header from "../../components/Common/Header";
-import { getServices, getImageUrl } from "../../services/services";
+import API from "../../services/api";
 
-function Home() {
-  const navigation = useNavigation();
+function getBackendBaseUrl() {
+  const baseURL = API.defaults.baseURL || "";
+  return baseURL.replace(/\/api\/?$/, "");
+}
 
+function getBackendImageUrl(imageUrl) {
+  if (!imageUrl) return "";
+
+  if (
+    String(imageUrl).startsWith("http://") ||
+    String(imageUrl).startsWith("https://") ||
+    String(imageUrl).startsWith("data:image/")
+  ) {
+    return imageUrl;
+  }
+
+  return `${getBackendBaseUrl()}${imageUrl}`;
+}
+
+function Home({ navigation }) {
   const [services, setServices] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const [message, setMessage] = useState("");
 
   useEffect(() => {
-    getServices()
-      .then((data) => setServices(data || []))
-      .catch((err) => {
-        console.error("get services error:", err);
-        setServices([]);
-      })
-      .finally(() => setLoading(false));
+    const loadServices = async () => {
+      try {
+        const res = await API.get("/admin/services");
+        setServices(Array.isArray(res.data) ? res.data : []);
+      } catch (err) {
+        console.log("mobile services error:", err?.response?.data || err.message);
+        setMessage("Failed to load services.");
+      }
+    };
+
+    loadServices();
   }, []);
 
   const openService = (service) => {
-    navigation.navigate("Services", {
+    navigation.navigate("TechniciansByService", {
       service: service.name,
     });
   };
@@ -40,32 +58,28 @@ function Home() {
       <Header />
 
       <ScrollView contentContainerStyle={styles.container}>
-        <Text style={styles.title}>Home Maintenance Services</Text>
-        <Text style={styles.subtitle}>Choose the service you need</Text>
+        <View style={styles.card}>
+          <Text style={styles.title}>Welcome to our services:</Text>
+          <Text style={styles.subtitle}>Choose the service you need</Text>
 
-        {loading ? (
-          <ActivityIndicator size="large" color="#111" />
-        ) : services.length === 0 ? (
-          <Text style={styles.emptyText}>No services available.</Text>
-        ) : (
+          {message ? <Text style={styles.error}>{message}</Text> : null}
+
           <View style={styles.grid}>
             {services.map((service) => (
               <TouchableOpacity
-                key={service.id || service.name}
-                style={styles.serviceItem}
-                onPress={() => openService(service)}
+                key={service.id}
+                style={styles.serviceCard}
                 activeOpacity={0.85}
+                onPress={() => openService(service)}
               >
-                <View style={styles.serviceCircle}>
+                <View style={styles.imageWrap}>
                   {service.image_url ? (
                     <Image
-                      source={{ uri: getImageUrl(service.image_url) }}
-                      style={styles.serviceImage}
+                      source={{ uri: getBackendImageUrl(service.image_url) }}
+                      style={styles.image}
                     />
                   ) : (
-                    <Text style={styles.placeholderText}>
-                      {String(service.name || "?").charAt(0)}
-                    </Text>
+                    <Text style={styles.icon}>🛠️</Text>
                   )}
                 </View>
 
@@ -73,7 +87,7 @@ function Home() {
               </TouchableOpacity>
             ))}
           </View>
-        )}
+        </View>
       </ScrollView>
     </>
   );
@@ -81,76 +95,74 @@ function Home() {
 
 const styles = StyleSheet.create({
   container: {
-    padding: 18,
     backgroundColor: "#E8DCCF",
     flexGrow: 1,
+    padding: 16,
+  },
+  card: {
+    backgroundColor: "#FFF9F3",
+    borderRadius: 24,
+    borderWidth: 1,
+    borderColor: "#D8C8B8",
+    padding: 20,
     alignItems: "center",
   },
   title: {
-    fontSize: 28,
-    fontWeight: "800",
     color: "#111",
+    fontSize: 30,
+    fontWeight: "900",
     textAlign: "center",
-    marginTop: 16,
     marginBottom: 8,
   },
   subtitle: {
+    color: "#6F6257",
     fontSize: 16,
-    color: "#6B5E52",
-    textAlign: "center",
-    marginBottom: 26,
+    marginBottom: 24,
+  },
+  error: {
+    color: "#8A1F1F",
+    backgroundColor: "#FCECEC",
+    borderWidth: 1,
+    borderColor: "#F3B9B9",
+    padding: 10,
+    borderRadius: 12,
+    marginBottom: 15,
   },
   grid: {
     width: "100%",
     flexDirection: "row",
     flexWrap: "wrap",
-    justifyContent: "center",
-    gap: 24,
-    paddingBottom: 30,
+    justifyContent: "space-between",
   },
-  serviceItem: {
-    width: "42%",
+  serviceCard: {
+    width: "48%",
     alignItems: "center",
-    marginBottom: 8,
+    marginBottom: 28,
   },
-  serviceCircle: {
-    width: 145,
-    height: 145,
-    borderRadius: 72.5,
-    backgroundColor: "#FFF9F3",
+  imageWrap: {
+    width: 135,
+    height: 135,
+    borderRadius: 68,
+    backgroundColor: "#FFF",
     borderWidth: 1,
     borderColor: "#D8C8B8",
+    padding: 10,
     alignItems: "center",
     justifyContent: "center",
-    overflow: "hidden",
-    shadowColor: "#000",
-    shadowOpacity: 0.1,
-    shadowRadius: 12,
-    shadowOffset: { width: 0, height: 8 },
-    elevation: 4,
+    marginBottom: 10,
   },
-  serviceImage: {
-    width: "82%",
-    height: "82%",
-    resizeMode: "contain",
-    borderRadius: 70,
+  image: {
+    width: "100%",
+    height: "100%",
+    borderRadius: 65,
+  },
+  icon: {
+    fontSize: 45,
   },
   serviceName: {
-    marginTop: 12,
-    fontSize: 16,
-    fontWeight: "800",
-    color: "#2F241C",
-    textAlign: "center",
-  },
-  placeholderText: {
-    fontSize: 42,
-    fontWeight: "800",
     color: "#111",
-  },
-  emptyText: {
-    marginTop: 20,
-    color: "#3A3028",
-    fontSize: 16,
+    fontSize: 17,
+    fontWeight: "900",
     textAlign: "center",
   },
 });

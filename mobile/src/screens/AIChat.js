@@ -33,8 +33,7 @@ function AIChat() {
 
   const scrollViewRef = useRef(null);
 
-  const fallbackMessage =
-    "حالياً ما قدرت أوصل للخدمة، جرّب ترجع لي بعد شوي.";
+  const fallbackMessage = "AI assistant is not available right now.";
 
   const handleSend = async () => {
     const messageValue = input.trim();
@@ -70,23 +69,23 @@ function AIChat() {
         ...prev,
         {
           role: "ai",
-          text: response.reply || fallbackMessage,
-          image: response.url || response.image || null,
+          text: response?.reply || fallbackMessage,
+          image: response?.url || response?.image || null,
         },
       ]);
     } catch (error) {
-  console.log("AI MOBILE ERROR:", error.response?.data || error.message);
+      console.log("AI MOBILE ERROR:", error?.response?.data || error?.message);
 
-  setMessages((prev) => [
-    ...prev,
-    {
-      role: "ai",
-      text: error.response?.data?.reply || fallbackMessage,
-    },
-  ]);
-} finally {
-  setLoading(false);
-}
+      setMessages((prev) => [
+        ...prev,
+        {
+          role: "ai",
+          text: error?.response?.data?.reply || fallbackMessage,
+        },
+      ]);
+    } finally {
+      setLoading(false);
+    }
   };
 
   const pickImage = async () => {
@@ -107,13 +106,16 @@ function AIChat() {
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
       allowsEditing: true,
-      quality: 0.25,
+      aspect: [4, 3],
+      quality: 0.12,
       base64: true,
     });
 
-    if (!result.canceled && result.assets?.[0]?.base64) {
-      const mimeType = result.assets[0].mimeType || "image/jpeg";
-      setSelectedImage(`data:${mimeType};base64,${result.assets[0].base64}`);
+    const asset = result.assets?.[0];
+
+    if (!result.canceled && asset?.base64) {
+      const mimeType = asset.mimeType || "image/jpeg";
+      setSelectedImage(`data:${mimeType};base64,${asset.base64}`);
     }
   };
 
@@ -128,9 +130,12 @@ function AIChat() {
       <KeyboardAvoidingView
         behavior={Platform.OS === "ios" ? "padding" : "height"}
         style={styles.keyboardArea}
+        keyboardVerticalOffset={90}
       >
         <View style={styles.chatHeaderBar}>
-          <Image source={aiimage} style={styles.avatarImg} />
+          <View style={styles.aiAvatar}>
+            <Image source={aiimage} style={styles.avatarImage} />
+          </View>
 
           <View style={styles.chatTitleBlock}>
             <Text style={styles.chatTitle}>AI Assistant</Text>
@@ -140,6 +145,7 @@ function AIChat() {
 
         <ScrollView
           style={styles.messagesContainer}
+          contentContainerStyle={styles.messagesContent}
           ref={scrollViewRef}
           onContentSizeChange={() =>
             scrollViewRef.current?.scrollToEnd({ animated: true })
@@ -154,13 +160,13 @@ function AIChat() {
               ]}
             >
               {m.image ? (
-                <Image source={{ uri: m.image }} style={styles.sentImage} />
+                <Image source={{ uri: m.image }} style={styles.messageImage} />
               ) : null}
 
               <Text
                 style={[
                   styles.messageText,
-                  m.role === "user" ? styles.myText : styles.otherText,
+                  m.role === "ai" ? styles.otherText : styles.myText,
                 ]}
               >
                 {m.text}
@@ -170,7 +176,8 @@ function AIChat() {
 
           {loading ? (
             <View style={[styles.messageBubble, styles.otherMessage]}>
-              <ActivityIndicator size="small" color="#000" />
+              <ActivityIndicator size="small" color="#111" />
+              <Text style={styles.otherText}> Thinking...</Text>
             </View>
           ) : null}
         </ScrollView>
@@ -183,25 +190,30 @@ function AIChat() {
               style={styles.removeBtn}
               onPress={removeSelectedImage}
             >
-              <Text style={styles.removeBtnText}>Remove</Text>
+              <Text style={styles.removeText}>Remove</Text>
             </TouchableOpacity>
           </View>
         ) : null}
 
-        <View style={styles.chatInputArea}>
-          <TouchableOpacity onPress={pickImage} style={styles.iconBtn}>
-            <Text style={styles.iconText}>📷</Text>
+        <View style={styles.inputArea}>
+          <TouchableOpacity style={styles.iconBtn} onPress={pickImage}>
+            <Text style={styles.iconBtnText}>📷</Text>
           </TouchableOpacity>
 
           <TextInput
-            style={styles.chatInput}
-            placeholder="Ask anything..."
+            style={styles.input}
+            placeholder="Ask the assistant..."
             value={input}
             onChangeText={setInput}
+            multiline={false}
           />
 
-          <TouchableOpacity style={styles.sendBtn} onPress={handleSend}>
-            <Text style={styles.sendBtnText}>Send</Text>
+          <TouchableOpacity
+            style={[styles.sendBtn, loading && { opacity: 0.6 }]}
+            disabled={loading}
+            onPress={handleSend}
+          >
+            <Text style={styles.sendText}>Send</Text>
           </TouchableOpacity>
         </View>
       </KeyboardAvoidingView>
@@ -218,40 +230,51 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   chatHeaderBar: {
-    flexDirection: "row",
-    padding: 15,
-    borderBottomWidth: 1,
-    borderBottomColor: "#eee",
-    alignItems: "center",
     backgroundColor: "#111",
+    paddingHorizontal: 18,
+    paddingVertical: 22,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 16,
   },
-  avatarImg: {
-    width: 42,
-    height: 42,
-    borderRadius: 21,
-    marginRight: 10,
+  aiAvatar: {
+    width: 76,
+    height: 76,
+    borderRadius: 38,
+    backgroundColor: "#FFF9F3",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  avatarImage: {
+    width: 48,
+    height: 48,
+    resizeMode: "contain",
   },
   chatTitleBlock: {
     flex: 1,
   },
   chatTitle: {
-    fontSize: 16,
-    fontWeight: "bold",
-    color: "#fff",
+    color: "#FFF",
+    fontSize: 28,
+    fontWeight: "900",
   },
   chatSubtitle: {
-    fontSize: 12,
-    color: "#ddd",
+    color: "#D9CEC2",
+    fontSize: 16,
+    marginTop: 4,
   },
   messagesContainer: {
     flex: 1,
-    padding: 15,
+  },
+  messagesContent: {
+    padding: 18,
+    paddingBottom: 28,
   },
   messageBubble: {
-    maxWidth: "82%",
-    padding: 12,
-    borderRadius: 15,
-    marginBottom: 10,
+    maxWidth: "86%",
+    borderRadius: 18,
+    padding: 14,
+    marginBottom: 12,
   },
   myMessage: {
     alignSelf: "flex-end",
@@ -259,85 +282,96 @@ const styles = StyleSheet.create({
   },
   otherMessage: {
     alignSelf: "flex-start",
-    backgroundColor: "#F8F1EA",
+    backgroundColor: "#FFF9F3",
     borderWidth: 1,
-    borderColor: "#D8C7B5",
+    borderColor: "#D8C8B8",
   },
   messageText: {
-    fontSize: 15,
-    lineHeight: 22,
+    fontSize: 16,
+    lineHeight: 24,
   },
   myText: {
-    color: "#fff",
+    color: "#FFF",
   },
   otherText: {
-    color: "#000",
+    color: "#111",
   },
-  sentImage: {
-    width: 220,
+  messageImage: {
+    width: 250,
     height: 180,
-    borderRadius: 10,
-    marginBottom: 7,
+    resizeMode: "cover",
+    borderRadius: 12,
+    marginBottom: 8,
   },
   previewBox: {
     flexDirection: "row",
     alignItems: "center",
-    paddingHorizontal: 12,
-    paddingVertical: 8,
+    gap: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    backgroundColor: "#F6EDE2",
     borderTopWidth: 1,
-    borderTopColor: "#ddd",
-    backgroundColor: "#F8F1EA",
+    borderTopColor: "#D8C8B8",
   },
   previewImage: {
-    width: 75,
-    height: 60,
-    borderRadius: 8,
-    marginRight: 10,
+    width: 90,
+    height: 70,
+    borderRadius: 12,
   },
   removeBtn: {
     backgroundColor: "#111",
-    paddingVertical: 7,
-    paddingHorizontal: 12,
-    borderRadius: 8,
-  },
-  removeBtnText: {
-    color: "#fff",
-    fontWeight: "bold",
-  },
-  chatInputArea: {
-    flexDirection: "row",
-    padding: 10,
-    borderTopWidth: 1,
-    borderTopColor: "#ddd",
-    alignItems: "center",
-    backgroundColor: "#E8DCCF",
-  },
-  chatInput: {
-    flex: 1,
-    backgroundColor: "#F8F1EA",
-    borderRadius: 20,
-    paddingHorizontal: 15,
     paddingVertical: 8,
-    marginRight: 10,
-    borderWidth: 1,
-    borderColor: "#D8C7B5",
+    paddingHorizontal: 14,
+    borderRadius: 999,
+  },
+  removeText: {
+    color: "#FFF",
+    fontWeight: "800",
+  },
+  inputArea: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    padding: 10,
+    backgroundColor: "#FFF9F3",
+    borderTopWidth: 1,
+    borderTopColor: "#D8C8B8",
   },
   iconBtn: {
-    padding: 7,
-    marginRight: 5,
+    width: 54,
+    height: 54,
+    borderRadius: 27,
+    backgroundColor: "#F6EDE2",
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1,
+    borderColor: "#D8C8B8",
   },
-  iconText: {
-    fontSize: 20,
+  iconBtnText: {
+    fontSize: 22,
+  },
+  input: {
+    flex: 1,
+    height: 54,
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: "#D8C8B8",
+    backgroundColor: "#F6EDE2",
+    paddingHorizontal: 18,
+    fontSize: 16,
   },
   sendBtn: {
+    height: 54,
+    borderRadius: 27,
     backgroundColor: "#111",
-    paddingVertical: 9,
-    paddingHorizontal: 16,
-    borderRadius: 20,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 20,
   },
-  sendBtnText: {
-    color: "#fff",
-    fontWeight: "bold",
+  sendText: {
+    color: "#FFF",
+    fontSize: 16,
+    fontWeight: "900",
   },
 });
 

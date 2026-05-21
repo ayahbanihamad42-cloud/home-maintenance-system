@@ -160,7 +160,12 @@ function TechniciansByService() {
 
                   <button
                     className="primary"
-                    onClick={() => navigate(`/request/${tech.technicianId}`)}
+                    onClick={() => navigate(`/request/${tech.id || tech.technicianId}`, {
+  state: {
+    technician: tech,
+    service: tech.service,
+  },
+})}
                   >
                     Book Now
                   </button>

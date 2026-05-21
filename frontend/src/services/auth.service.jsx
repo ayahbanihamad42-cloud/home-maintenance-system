@@ -13,7 +13,8 @@ export const setUser = (user) => {
     email: user.email,
     role: user.role,
     phone: user.phone || null,
-    city: user.city || null
+    city: user.city || null,
+    dob: user.dob || null,
   };
 
   localStorage.setItem("user", JSON.stringify(safeUser));

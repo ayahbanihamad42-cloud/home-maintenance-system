@@ -1,8 +1,10 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   createTechnicianGalleryPost,
+  deleteTechnicianGalleryPost,
   getMyTechnicianGallery,
+  updateTechnicianGalleryPost,
 } from "../../services/technicianService";
 
 function TechnicianGalleryManager() {
@@ -10,15 +12,60 @@ function TechnicianGalleryManager() {
 
   const [posts, setPosts] = useState([]);
   const [showCreate, setShowCreate] = useState(false);
-  const [description, setDescription] = useState("");
-  const [locationText, setLocationText] = useState("");
-  const [images, setImages] = useState([]);
-  const [message, setMessage] = useState("");
 
-  const loadPosts = () => {
-    getMyTechnicianGallery()
-      .then((data) => setPosts(data || []))
-      .catch(() => setPosts([]));
+  const [editingPostId, setEditingPostId] = useState(null);
+  const [description, setDescription] = useState("");
+  const [locationNote, setLocationNote] = useState("");
+  const [images, setImages] = useState([]);
+
+  const [message, setMessage] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [openMenuId, setOpenMenuId] = useState(null);
+
+  const isEditing = useMemo(() => Boolean(editingPostId), [editingPostId]);
+
+  const parseImages = (value) => {
+    if (!value) return [];
+
+    if (Array.isArray(value)) {
+      return value.filter(Boolean);
+    }
+
+    try {
+      const parsed = JSON.parse(value);
+      return Array.isArray(parsed) ? parsed.filter(Boolean) : [];
+    } catch {
+      return [];
+    }
+  };
+
+  const getPostLocation = (post) => {
+    if (post.location_note) return post.location_note;
+
+    const text = post.description || "";
+    const match = text.match(/Location:\s*(.+)$/i);
+    return match ? match[1].trim() : "";
+  };
+
+  const cleanDescription = (post) => {
+    const text = post.description || "";
+    return text.replace(/\n\nLocation:\s*.+$/i, "").trim();
+  };
+
+  const loadPosts = async () => {
+    try {
+      const data = await getMyTechnicianGallery();
+
+      const fixed = (data || []).map((post) => ({
+        ...post,
+        images: parseImages(post.images),
+      }));
+
+      setPosts(fixed);
+    } catch (err) {
+      console.log("FRONT gallery load error:", err?.response?.data || err.message);
+      setPosts([]);
+    }
   };
 
   useEffect(() => {
@@ -56,48 +103,100 @@ function TechnicianGalleryManager() {
   };
 
   const handleImages = async (e) => {
-    const files = Array.from(e.target.files || []).slice(0, 6);
+    const files = Array.from(e.target.files || []);
+
+    if (!files.length) return;
 
     try {
       const compressed = await Promise.all(files.map(compressImage));
-      setImages(compressed);
+
+      setImages((prev) => [...prev, ...compressed].slice(0, 6));
       setMessage("");
     } catch {
       setMessage("Failed to read images.");
     }
   };
 
+  const removeImage = (index) => {
+    setImages((prev) => prev.filter((_, i) => i !== index));
+  };
+
+  const resetForm = () => {
+    setEditingPostId(null);
+    setDescription("");
+    setLocationNote("");
+    setImages([]);
+    setShowCreate(false);
+    setOpenMenuId(null);
+    setMessage("");
+  };
+
+  const startCreate = () => {
+    resetForm();
+    setShowCreate(true);
+  };
+
+  const startEdit = (post) => {
+    setEditingPostId(post.id);
+    setDescription(cleanDescription(post));
+    setLocationNote(getPostLocation(post));
+    setImages(parseImages(post.images));
+    setShowCreate(true);
+    setOpenMenuId(null);
+    setMessage("");
+  };
+
   const submitPost = async (e) => {
     e.preventDefault();
-
-    if (images.length === 0) {
-      setMessage("Choose at least one image.");
-      return;
-    }
 
     if (!description.trim()) {
       setMessage("Write a caption first.");
       return;
     }
 
-    const finalDescription = locationText.trim()
-      ? `${description.trim()}\n\nLocation: ${locationText.trim()}`
-      : description.trim();
+    if (!images.length) {
+      setMessage("Choose at least one image.");
+      return;
+    }
 
     try {
-      await createTechnicianGalleryPost({
-        description: finalDescription,
-        images,
-      });
+      setSaving(true);
 
-      setImages([]);
-      setDescription("");
-      setLocationText("");
-      setShowCreate(false);
-      setMessage("");
-      loadPosts();
+      const payload = {
+        description: description.trim(),
+        location_note: locationNote.trim(),
+        images,
+      };
+
+      if (isEditing) {
+        await updateTechnicianGalleryPost(editingPostId, payload);
+      } else {
+        await createTechnicianGalleryPost(payload);
+      }
+
+      resetForm();
+      await loadPosts();
     } catch (err) {
-      setMessage(err?.response?.data?.message || "Failed to add post.");
+      setMessage(err?.response?.data?.message || "Failed to save post.");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const deletePost = async (postId) => {
+    const ok = window.confirm("Are you sure you want to delete this post?");
+    if (!ok) return;
+
+    try {
+      await deleteTechnicianGalleryPost(postId);
+
+      if (editingPostId === postId) {
+        resetForm();
+      }
+
+      await loadPosts();
+    } catch (err) {
+      setMessage(err?.response?.data?.message || "Failed to delete post.");
     }
   };
 
@@ -114,7 +213,7 @@ function TechnicianGalleryManager() {
         <button
           type="button"
           className="gallery-plus-circle"
-          onClick={() => setShowCreate(true)}
+          onClick={startCreate}
         >
           +
         </button>
@@ -128,7 +227,7 @@ function TechnicianGalleryManager() {
 
       {showCreate ? (
         <div className="create-post-card">
-          <h3>Create New Work Post</h3>
+          <h3>{isEditing ? "Edit Work Post" : "Create New Work Post"}</h3>
 
           <form onSubmit={submitPost}>
             <label>Images</label>
@@ -143,7 +242,32 @@ function TechnicianGalleryManager() {
             {images.length > 0 ? (
               <div className="create-preview-grid">
                 {images.map((img, index) => (
-                  <img key={index} src={img} alt={`preview ${index + 1}`} />
+                  <div
+                    key={`${index}-${img.slice(0, 15)}`}
+                    style={{ position: "relative" }}
+                  >
+                    <img src={img} alt={`preview ${index + 1}`} />
+
+                    <button
+                      type="button"
+                      onClick={() => removeImage(index)}
+                      style={{
+                        position: "absolute",
+                        top: 6,
+                        right: 6,
+                        width: 28,
+                        height: 28,
+                        borderRadius: "50%",
+                        border: "none",
+                        background: "#b00020",
+                        color: "#fff",
+                        fontWeight: 900,
+                        cursor: "pointer",
+                      }}
+                    >
+                      ×
+                    </button>
+                  </div>
                 ))}
               </div>
             ) : null}
@@ -161,14 +285,16 @@ function TechnicianGalleryManager() {
             <input
               type="text"
               placeholder="Example: Irbid, customer house, office..."
-              value={locationText}
-              onChange={(e) => setLocationText(e.target.value)}
+              value={locationNote}
+              onChange={(e) => setLocationNote(e.target.value)}
             />
 
             <div className="create-post-actions">
-              <button type="submit">Post</button>
+              <button type="submit" disabled={saving}>
+                {saving ? "Saving..." : isEditing ? "Update Post" : "Post"}
+              </button>
 
-              <button type="button" onClick={() => setShowCreate(false)}>
+              <button type="button" onClick={resetForm}>
                 Cancel
               </button>
             </div>
@@ -180,18 +306,123 @@ function TechnicianGalleryManager() {
         <div className="gallery-empty-text">No posts yet.</div>
       ) : (
         <div className="pinterest-gallery">
-          {posts.map((post) => (
-            <button
-              type="button"
-              className="pinterest-post"
-              key={post.id}
-              onClick={() => openPost(post)}
-            >
-              <img src={post.images?.[0]} alt="work post" />
+          {posts.map((post) => {
+            const postImages = parseImages(post.images);
+            const firstImage = postImages[0];
 
-              <div className="pinterest-caption">{post.description}</div>
-            </button>
-          ))}
+            return (
+              <div
+                key={post.id}
+                className="pinterest-post"
+                style={{ position: "relative" }}
+              >
+                <button
+                  type="button"
+                  onClick={() =>
+                    setOpenMenuId((prev) => (prev === post.id ? null : post.id))
+                  }
+                  style={{
+                    position: "absolute",
+                    top: 10,
+                    right: 10,
+                    zIndex: 5,
+                    width: 36,
+                    height: 36,
+                    borderRadius: "50%",
+                    border: "none",
+                    background: "#111",
+                    color: "#fff",
+                    fontSize: 24,
+                    fontWeight: 900,
+                    cursor: "pointer",
+                  }}
+                >
+                  ⋮
+                </button>
+
+                {openMenuId === post.id ? (
+                  <div
+                    style={{
+                      position: "absolute",
+                      top: 52,
+                      right: 10,
+                      zIndex: 6,
+                      background: "#fff9f3",
+                      border: "1px solid #d8c8b8",
+                      borderRadius: 12,
+                      overflow: "hidden",
+                      minWidth: 140,
+                      boxShadow: "0 8px 20px rgba(0,0,0,0.15)",
+                    }}
+                  >
+                    <button
+                      type="button"
+                      onClick={() => startEdit(post)}
+                      style={{
+                        display: "block",
+                        width: "100%",
+                        padding: "10px 14px",
+                        border: "none",
+                        background: "transparent",
+                        textAlign: "left",
+                        fontWeight: 800,
+                        cursor: "pointer",
+                      }}
+                    >
+                      Edit
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => deletePost(post.id)}
+                      style={{
+                        display: "block",
+                        width: "100%",
+                        padding: "10px 14px",
+                        border: "none",
+                        background: "transparent",
+                        textAlign: "left",
+                        fontWeight: 800,
+                        color: "#b00020",
+                        cursor: "pointer",
+                      }}
+                    >
+                      Delete
+                    </button>
+                  </div>
+                ) : null}
+
+                <button
+                  type="button"
+                  onClick={() => openPost(post)}
+                  style={{
+                    border: "none",
+                    background: "transparent",
+                    padding: 0,
+                    width: "100%",
+                    cursor: "pointer",
+                    textAlign: "left",
+                  }}
+                >
+                  {firstImage ? (
+                    <img src={firstImage} alt="work post" />
+                  ) : (
+                    <div className="gallery-empty-text">No image</div>
+                  )}
+
+                  <div className="pinterest-caption">
+                    {cleanDescription(post)}
+
+                    {getPostLocation(post) ? (
+                      <div style={{ marginTop: 8, color: "#555" }}>
+                        📍 {getPostLocation(post)}
+                      </div>
+                    ) : null}
+                  </div>
+                </button>
+              </div>
+            );
+          })}
         </div>
       )}
     </div>

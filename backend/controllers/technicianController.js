@@ -1,455 +1,632 @@
 import { db } from "../database/connection.js";
 
-const parseGalleryImages = (value) => {
-  if (!value) return [];
-
-  if (Array.isArray(value)) return value;
-
-  try {
-    const parsed = JSON.parse(value);
-    return Array.isArray(parsed) ? parsed : [];
-  } catch {
-    return [];
-  }
+const normalizeTime = (time) => {
+  if (!time) return null;
+  const value = String(time).trim();
+  if (/^\d{2}:\d{2}:\d{2}$/.test(value)) return value;
+  if (/^\d{2}:\d{2}$/.test(value)) return `${value}:00`;
+  return value;
 };
 
-const normalizeGalleryPost = (post) => ({
-  ...post,
-  images: parseGalleryImages(post.images),
-});
+const timeToMinutes = (time) => {
+  const [h, m] = String(time).slice(0, 5).split(":").map(Number);
+  return h * 60 + (m || 0);
+};
+
+const addMinutes = (time, minutes) => {
+  const [h, m] = String(time).slice(0, 5).split(":").map(Number);
+  const date = new Date(2000, 0, 1, h, m || 0, 0);
+  date.setMinutes(date.getMinutes() + Number(minutes));
+  return date.toTimeString().slice(0, 8);
+};
+
+const formatDate = (date) => {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, "0");
+  const d = String(date.getDate()).padStart(2, "0");
+  return `${y}-${m}-${d}`;
+};
 
 const findMyTechnicianId = (userId, callback) => {
   db.query(
-    "SELECT id FROM technicians WHERE user_id = ?",
+    "SELECT id FROM technicians WHERE user_id = ? LIMIT 1",
     [userId],
     (err, rows) => {
       if (err) return callback(err);
-      if (!rows.length) return callback(null, null);
-      callback(null, rows[0].id);
+      callback(null, rows?.[0]?.id || null);
     }
   );
 };
 
-// Fetch technicians by service
 export const getTechniciansByService = (req, res) => {
-  const { service } = req.params;
+  const service = decodeURIComponent(req.params.service || "").trim();
 
-  const q = `
+  db.query(
+    `
     SELECT 
       t.id AS technicianId,
+      t.id,
       t.user_id,
-      u.name,
-      u.city,
-      u.phone,
       t.service,
       t.experience,
       t.price_per_hour,
-      COALESCE(AVG(r.rating), 0) AS rating
-    FROM technicians t
-    JOIN users u ON t.user_id = u.id
-    LEFT JOIN ratings r ON r.technician_id = t.id
-    WHERE LOWER(t.service) = LOWER(?)
-    GROUP BY 
-      t.id,
-      t.user_id,
-      u.name,
-      u.city,
-      u.phone,
-      t.service,
-      t.experience,
-      t.price_per_hour
-    ORDER BY rating DESC
-  `;
-
-  db.query(q, [service], (err, rows) => {
-    if (err) {
-      console.error("getTechniciansByService error:", err);
-      return res.status(500).json({ message: "Server error" });
-    }
-
-    res.json(rows || []);
-  });
-};
-// Fetch technician availability
-export const getAvailability = (req, res) => {
-  const { id } = req.params;
-  const { date } = req.query;
-
-  const q = `
-    SELECT id, start_time
-    FROM technician_availability
-    WHERE technician_id = ?
-      AND available_date = ?
-      AND is_booked = FALSE
-    ORDER BY start_time ASC
-  `;
-
-  db.query(q, [id, date], (err, result) => {
-    if (err) {
-      console.error("getAvailability error:", err);
-      return res.status(500).json({ message: "Server error" });
-    }
-
-    res.json(result || []);
-  });
-};
-
-// Create technician availability
-export const createAvailability = (req, res) => {
-  const { day, start_time, end_time } = req.body;
-
-  if (req.user.role !== "technician" && req.user.role !== "admin") {
-    return res
-      .status(403)
-      .json({ message: "Only technician/admin can manage availability" });
-  }
-
-  db.query(
-    "SELECT id FROM technicians WHERE user_id = ?",
-    [req.user.id],
-    (err, rows) => {
-      if (err) {
-        console.error("createAvailability lookup error:", err);
-        return res.status(500).json({ message: "Server error" });
-      }
-
-      if (!rows.length) {
-        return res.status(404).json({ message: "Technician profile not found" });
-      }
-
-      const technicianId = rows[0].id;
-
-      db.query(
-        `INSERT INTO technician_availability (technician_id, available_date, start_time, end_time)
-         VALUES (?,?,?,?)`,
-        [technicianId, day, start_time, end_time],
-        (insertErr, result) => {
-          if (insertErr) {
-            console.error("createAvailability insert error:", insertErr);
-            return res.status(500).json({ message: "Server error" });
-          }
-
-          res.json({ message: "Availability saved", id: result.insertId });
-        }
-      );
-    }
-  );
-};
-
-// Fetch technician profile with rating
-export const getTechnicianProfile = (req, res) => {
-  const { id } = req.params;
-
-  const q = `
-    SELECT
-      t.id AS technicianId,
-      t.user_id,
       u.name,
       u.email,
       u.phone,
       u.city,
+      COALESCE(AVG(r.rating), 0) AS rating
+    FROM technicians t
+    JOIN users u ON u.id = t.user_id
+    LEFT JOIN ratings r ON r.technician_id = t.id
+    WHERE LOWER(TRIM(t.service)) = LOWER(TRIM(?))
+    GROUP BY t.id, t.user_id, t.service, t.experience, t.price_per_hour,
+             u.name, u.email, u.phone, u.city
+    ORDER BY t.id DESC
+    `,
+    [service],
+    (err, rows) => {
+      if (err) return res.status(500).json({ message: err.sqlMessage || err.message });
+      res.json(rows || []);
+    }
+  );
+};
+
+export const getTechnicianById = (req, res) => {
+  db.query(
+    `
+    SELECT 
+      t.id AS technicianId,
+      t.id,
+      t.user_id,
       t.service,
       t.experience,
       t.price_per_hour,
+      u.name,
+      u.email,
+      u.phone,
+      u.city,
       COALESCE(AVG(r.rating), 0) AS rating
     FROM technicians t
-    JOIN users u ON t.user_id = u.id
+    JOIN users u ON u.id = t.user_id
     LEFT JOIN ratings r ON r.technician_id = t.id
     WHERE t.id = ?
-    GROUP BY 
-      t.id,
-      t.user_id,
-      u.name,
-      u.email,
-      u.phone,
-      u.city,
-      t.service,
-      t.experience,
-      t.price_per_hour
-  `;
-
-  db.query(q, [id], (err, rows) => {
-    if (err) {
-      console.error("getTechnicianProfile error:", err);
-      return res.status(500).json({ message: "Server error" });
-    }
-
-    if (!rows.length) {
-      return res.status(404).json({ message: "Technician not found" });
-    }
-
-    res.json(rows[0]);
-  });
-};
-
-// Fetch technician by user ID
-export const getTechnicianByUserId = (req, res) => {
-  const { userId } = req.params;
-
-  const q = `
-    SELECT 
-      t.id AS technicianId,
-      t.user_id,
-      u.name,
-      t.service,
-      t.experience,
-      t.price_per_hour
-    FROM technicians t
-    JOIN users u ON t.user_id = u.id
-    WHERE t.user_id = ?
-  `;
-
-  db.query(q, [userId], (err, rows) => {
-    if (err) {
-      console.error("getTechnicianByUserId error:", err);
-      return res.status(500).json({ message: "Server error" });
-    }
-
-    if (!rows.length) {
-      return res.status(404).json({ message: "Technician not found" });
-    }
-
-    res.json(rows[0]);
-  });
-};
-
-// Update technician price per hour
-export const updateTechnicianPrice = (req, res) => {
-  const { price_per_hour } = req.body;
-  const parsedPrice = Number(price_per_hour);
-
-  if (req.user.role !== "technician" && req.user.role !== "admin") {
-    return res.status(403).json({ message: "Not authorized" });
-  }
-
-  if (Number.isNaN(parsedPrice) || parsedPrice < 0) {
-    return res.status(400).json({ message: "Invalid price_per_hour" });
-  }
-
-  db.query(
-    "UPDATE technicians SET price_per_hour = ? WHERE user_id = ?",
-    [parsedPrice, req.user.id],
-    (err, result) => {
-      if (err) {
-        console.error("updateTechnicianPrice error:", err);
-        return res.status(500).json({ message: "Server error" });
-      }
-
-      if (!result.affectedRows) {
-        return res.status(404).json({ message: "Technician profile not found" });
-      }
-
-      res.json({
-        message: "Technician price updated",
-        price_per_hour: parsedPrice,
-      });
+    GROUP BY t.id, t.user_id, t.service, t.experience, t.price_per_hour,
+             u.name, u.email, u.phone, u.city
+    LIMIT 1
+    `,
+    [req.params.id],
+    (err, rows) => {
+      if (err) return res.status(500).json({ message: err.sqlMessage || err.message });
+      if (!rows.length) return res.status(404).json({ message: "Technician not found" });
+      res.json(rows[0]);
     }
   );
 };
 
-// Fetch maintenance requests for technician
-export const getTechnicianRequests = (req, res) => {
-  const { id } = req.params;
+export const getTechnicianByUserId = (req, res) => {
+  db.query(
+    `
+    SELECT 
+      t.id AS technicianId,
+      t.id,
+      t.user_id,
+      t.service,
+      t.experience,
+      t.price_per_hour,
+      u.name,
+      u.email,
+      u.phone,
+      u.city
+    FROM technicians t
+    JOIN users u ON u.id = t.user_id
+    WHERE t.user_id = ?
+    LIMIT 1
+    `,
+    [req.params.userId],
+    (err, rows) => {
+      if (err) return res.status(500).json({ message: err.sqlMessage || err.message });
+      if (!rows.length) return res.status(404).json({ message: "Technician not found" });
+      res.json(rows[0]);
+    }
+  );
+};
 
-  if (req.user.role === "admin") {
-    return db.query(
-      "SELECT * FROM maintenance_requests WHERE technician_id = ? ORDER BY created_at DESC",
-      [id],
+export const updateTechnicianPrice = (req, res) => {
+  findMyTechnicianId(req.user.id, (lookupErr, technicianId) => {
+    if (lookupErr) return res.status(500).json({ message: "Server error" });
+    if (!technicianId) return res.status(404).json({ message: "Technician not found" });
+
+    db.query(
+      "UPDATE technicians SET price_per_hour = ? WHERE id = ?",
+      [Number(req.body.price_per_hour || 0), technicianId],
+      (err) => {
+        if (err) return res.status(500).json({ message: err.sqlMessage || err.message });
+        res.json({ message: "Price updated" });
+      }
+    );
+  });
+};
+
+export const getMyAvailability = (req, res) => {
+  findMyTechnicianId(req.user.id, (lookupErr, technicianId) => {
+    if (lookupErr) return res.status(500).json({ message: "Server error" });
+    if (!technicianId) return res.status(404).json({ message: "Technician not found" });
+
+    db.query(
+      `
+      SELECT id, technician_id, available_date, start_time, end_time, is_booked
+      FROM technician_availability
+      WHERE technician_id = ?
+      ORDER BY available_date DESC, start_time
+      `,
+      [technicianId],
       (err, rows) => {
-        if (err) {
-          console.error("getTechnicianRequests admin error:", err);
-          return res.status(500).json({ message: "Server error" });
-        }
-
+        if (err) return res.status(500).json({ message: err.sqlMessage || err.message });
         res.json(rows || []);
       }
     );
-  }
-
-  if (req.user.role !== "technician") {
-    return res.status(403).json({ message: "Not authorized" });
-  }
-
-  db.query(
-    "SELECT id FROM technicians WHERE user_id = ?",
-    [req.user.id],
-    (err, techRows) => {
-      if (err) {
-        console.error("getTechnicianRequests lookup error:", err);
-        return res.status(500).json({ message: "Server error" });
-      }
-
-      if (!techRows.length || Number(techRows[0].id) !== Number(id)) {
-        return res.status(403).json({ message: "Not authorized" });
-      }
-
-      db.query(
-        "SELECT * FROM maintenance_requests WHERE technician_id = ? ORDER BY created_at DESC",
-        [id],
-        (err2, rows) => {
-          if (err2) {
-            console.error("getTechnicianRequests fetch error:", err2);
-            return res.status(500).json({ message: "Server error" });
-          }
-
-          res.json(rows || []);
-        }
-      );
-    }
-  );
-};
-
-// Public: fetch gallery posts for technician profile
-export const getTechnicianGallery = (req, res) => {
-  const { id } = req.params;
-
-  db.query(
-    `SELECT id, technician_id, description, images, created_at
-     FROM technician_work_posts
-     WHERE technician_id = ?
-     ORDER BY created_at DESC`,
-    [id],
-    (err, rows) => {
-      if (err) {
-        console.error("getTechnicianGallery error:", err);
-        return res.status(500).json({ message: "Server error" });
-      }
-
-      res.json((rows || []).map(normalizeGalleryPost));
-    }
-  );
-};
-
-// Technician: fetch own gallery posts
-export const getMyGallery = (req, res) => {
-  if (req.user.role !== "technician" && req.user.role !== "admin") {
-    return res.status(403).json({ message: "Not authorized" });
-  }
-
-  findMyTechnicianId(req.user.id, (lookupErr, technicianId) => {
-    if (lookupErr) {
-      console.error("getMyGallery lookup error:", lookupErr);
-      return res.status(500).json({ message: "Server error" });
-    }
-
-    if (!technicianId) {
-      return res.status(404).json({ message: "Technician profile not found" });
-    }
-
-    db.query(
-      `SELECT id, technician_id, description, images, created_at
-       FROM technician_work_posts
-       WHERE technician_id = ?
-       ORDER BY created_at DESC`,
-      [technicianId],
-      (err, rows) => {
-        if (err) {
-          console.error("getMyGallery error:", err);
-          return res.status(500).json({ message: "Server error" });
-        }
-
-        res.json((rows || []).map(normalizeGalleryPost));
-      }
-    );
   });
 };
 
-// Technician: create gallery post with multiple images
-export const createGalleryPost = (req, res) => {
-  const { description, images } = req.body;
+export const createAvailability = (req, res) => {
+  const { available_date, start_time, end_time } = req.body;
 
-  if (req.user.role !== "technician" && req.user.role !== "admin") {
-    return res.status(403).json({ message: "Only technicians can create posts" });
-  }
-
-  if (!description || !description.trim()) {
-    return res.status(400).json({ message: "Description is required" });
-  }
-
-  if (!Array.isArray(images) || images.length === 0) {
-    return res.status(400).json({ message: "At least one image is required" });
-  }
-
-  if (images.length > 6) {
-    return res.status(400).json({ message: "Maximum 6 images per post" });
-  }
-
-  const safeImages = images.filter(
-    (img) => typeof img === "string" && img.startsWith("data:image/")
-  );
-
-  if (!safeImages.length) {
-    return res.status(400).json({ message: "Invalid image format" });
+  if (!available_date || !start_time || !end_time) {
+    return res.status(400).json({ message: "Date, start time and end time are required" });
   }
 
   findMyTechnicianId(req.user.id, (lookupErr, technicianId) => {
-    if (lookupErr) {
-      console.error("createGalleryPost lookup error:", lookupErr);
-      return res.status(500).json({ message: "Server error" });
-    }
-
-    if (!technicianId) {
-      return res.status(404).json({ message: "Technician profile not found" });
-    }
+    if (lookupErr) return res.status(500).json({ message: "Server error" });
+    if (!technicianId) return res.status(404).json({ message: "Technician not found" });
 
     db.query(
-      `INSERT INTO technician_work_posts (technician_id, description, images)
-       VALUES (?, ?, ?)`,
-      [technicianId, description.trim(), JSON.stringify(safeImages)],
+      `
+      INSERT INTO technician_availability
+      (technician_id, available_date, start_time, end_time, is_booked)
+      VALUES (?, ?, ?, ?, 0)
+      `,
+      [technicianId, available_date, normalizeTime(start_time), normalizeTime(end_time)],
       (err, result) => {
-        if (err) {
-          console.error("createGalleryPost insert error:", err);
-          return res.status(500).json({ message: "Server error" });
-        }
+        if (err) return res.status(500).json({ message: err.sqlMessage || err.message });
 
         res.status(201).json({
-          message: "Post created",
           id: result.insertId,
           technician_id: technicianId,
-          description: description.trim(),
-          images: safeImages,
+          available_date,
+          start_time: normalizeTime(start_time),
+          end_time: normalizeTime(end_time),
         });
       }
     );
   });
 };
 
-// Technician: delete own gallery post
-export const deleteGalleryPost = (req, res) => {
-  const { postId } = req.params;
+export const deleteAvailability = (req, res) => {
+  findMyTechnicianId(req.user.id, (lookupErr, technicianId) => {
+    if (lookupErr) return res.status(500).json({ message: "Server error" });
+    if (!technicianId) return res.status(404).json({ message: "Technician not found" });
 
-  if (req.user.role !== "technician" && req.user.role !== "admin") {
-    return res.status(403).json({ message: "Not authorized" });
+    db.query(
+      "DELETE FROM technician_availability WHERE id = ? AND technician_id = ?",
+      [req.params.id, technicianId],
+      (err, result) => {
+        if (err) return res.status(500).json({ message: err.sqlMessage || err.message });
+        if (!result.affectedRows) return res.status(404).json({ message: "Availability not found" });
+        res.json({ message: "Availability deleted" });
+      }
+    );
+  });
+};
+
+export const getMyRegularAvailability = (req, res) => {
+  findMyTechnicianId(req.user.id, (lookupErr, technicianId) => {
+    if (lookupErr) return res.status(500).json({ message: "Server error" });
+    if (!technicianId) return res.status(404).json({ message: "Technician profile not found" });
+
+    db.query(
+      `
+      SELECT *
+      FROM technician_regular_availability
+      WHERE technician_id = ?
+      ORDER BY month_start DESC, day_of_week, start_time
+      `,
+      [technicianId],
+      (err, rows) => {
+        if (err) return res.status(500).json({ message: err.sqlMessage || err.message });
+        res.json(rows || []);
+      }
+    );
+  });
+};
+
+export const createRegularAvailability = (req, res) => {
+  const { month_start, month_end, day_of_week, start_time, end_time, slot_minutes } = req.body;
+
+  const allowedDays = [
+    "All",
+    "Sunday",
+    "Monday",
+    "Tuesday",
+    "Wednesday",
+    "Thursday",
+    "Friday",
+    "Saturday",
+  ];
+
+  if (!month_start || !month_end || !day_of_week || !start_time || !end_time) {
+    return res.status(400).json({
+      message: "Month start, month end, day, start time and end time are required",
+    });
+  }
+
+  if (!allowedDays.includes(day_of_week)) {
+    return res.status(400).json({ message: "Invalid day" });
+  }
+
+  const slotMinutesNumber = Number(slot_minutes || 60);
+
+  if (!slotMinutesNumber || slotMinutesNumber < 30) {
+    return res.status(400).json({ message: "Slot duration must be 30 minutes or more" });
+  }
+
+  if (timeToMinutes(start_time) >= timeToMinutes(end_time)) {
+    return res.status(400).json({ message: "End time must be after start time" });
   }
 
   findMyTechnicianId(req.user.id, (lookupErr, technicianId) => {
-    if (lookupErr) {
-      console.error("deleteGalleryPost lookup error:", lookupErr);
-      return res.status(500).json({ message: "Server error" });
-    }
+    if (lookupErr) return res.status(500).json({ message: "Server error" });
+    if (!technicianId) return res.status(404).json({ message: "Technician profile not found" });
 
-    if (!technicianId) {
-      return res.status(404).json({ message: "Technician profile not found" });
-    }
+    db.query(
+      `
+      INSERT INTO technician_regular_availability
+      (technician_id, month_start, month_end, day_of_week, start_time, end_time, slot_minutes)
+      VALUES (?, ?, ?, ?, ?, ?, ?)
+      `,
+      [
+        technicianId,
+        month_start,
+        month_end,
+        day_of_week,
+        normalizeTime(start_time),
+        normalizeTime(end_time),
+        slotMinutesNumber,
+      ],
+      (err, result) => {
+        if (err) return res.status(500).json({ message: err.sqlMessage || err.message });
 
-    const q =
-      req.user.role === "admin"
-        ? "DELETE FROM technician_work_posts WHERE id = ?"
-        : "DELETE FROM technician_work_posts WHERE id = ? AND technician_id = ?";
+        res.status(201).json({
+          id: result.insertId,
+          technician_id: technicianId,
+          month_start,
+          month_end,
+          day_of_week,
+          start_time: normalizeTime(start_time),
+          end_time: normalizeTime(end_time),
+          slot_minutes: slotMinutesNumber,
+        });
+      }
+    );
+  });
+};
 
-    const params = req.user.role === "admin" ? [postId] : [postId, technicianId];
+export const deleteRegularAvailability = (req, res) => {
+  findMyTechnicianId(req.user.id, (lookupErr, technicianId) => {
+    if (lookupErr) return res.status(500).json({ message: "Server error" });
+    if (!technicianId) return res.status(404).json({ message: "Technician profile not found" });
 
-    db.query(q, params, (err, result) => {
-      if (err) {
-        console.error("deleteGalleryPost error:", err);
-        return res.status(500).json({ message: "Server error" });
+    db.query(
+      `
+      DELETE FROM technician_regular_availability
+      WHERE id = ? AND technician_id = ?
+      `,
+      [req.params.id, technicianId],
+      (err, result) => {
+        if (err) return res.status(500).json({ message: err.sqlMessage || err.message });
+        if (!result.affectedRows) return res.status(404).json({ message: "Regular schedule not found" });
+        res.json({ message: "Regular schedule deleted" });
+      }
+    );
+  });
+};
+
+export const getAvailabilityByTechnician = (req, res) => {
+  const { id } = req.params;
+
+  db.query(
+    `
+    SELECT scheduled_date, scheduled_time
+    FROM maintenance_requests
+    WHERE technician_id = ?
+      AND status NOT IN ('rejected', 'cancelled')
+    `,
+    [id],
+    (bookedErr, bookedRows) => {
+      if (bookedErr) {
+        return res.status(500).json({ message: bookedErr.sqlMessage || bookedErr.message });
       }
 
-      if (!result.affectedRows) {
-        return res.status(404).json({ message: "Post not found" });
-      }
+      const bookedSet = new Set(
+        (bookedRows || []).map(
+          (b) =>
+            `${String(b.scheduled_date).slice(0, 10)}_${String(b.scheduled_time).slice(0, 8)}`
+        )
+      );
 
-      res.json({ message: "Post deleted" });
-    });
+      db.query(
+        `
+        SELECT *
+        FROM technician_availability
+        WHERE technician_id = ?
+          AND available_date >= CURDATE()
+          AND COALESCE(is_booked, 0) = 0
+        `,
+        [id],
+        (oneErr, oneRows) => {
+          if (oneErr) return res.status(500).json({ message: oneErr.sqlMessage || oneErr.message });
+
+          db.query(
+            `
+            SELECT *
+            FROM technician_regular_availability
+            WHERE technician_id = ?
+              AND month_end >= CURDATE()
+            `,
+            [id],
+            (regErr, regRows) => {
+              if (regErr) return res.status(500).json({ message: regErr.sqlMessage || regErr.message });
+
+              const result = [];
+
+              for (const item of oneRows || []) {
+                const date = String(item.available_date).slice(0, 10);
+                const start = String(item.start_time).slice(0, 8);
+                const end = String(item.end_time).slice(0, 8);
+
+                if (!bookedSet.has(`${date}_${start}`)) {
+                  result.push({
+                    id: item.id,
+                    available_date: date,
+                    start_time: start,
+                    end_time: end,
+                    slot_minutes: 60,
+                    source_type: "one-time",
+                  });
+                }
+              }
+
+              for (const rule of regRows || []) {
+                const startDate = new Date(rule.month_start);
+                const endDate = new Date(rule.month_end);
+
+                for (let d = new Date(startDate); d <= endDate; d.setDate(d.getDate() + 1)) {
+                  const dateText = formatDate(d);
+                  const dayName = d.toLocaleDateString("en-US", { weekday: "long" });
+
+                  if (rule.day_of_week !== "All" && rule.day_of_week !== dayName) continue;
+
+                  let current = String(rule.start_time).slice(0, 8);
+                  const end = String(rule.end_time).slice(0, 8);
+                  const slotMinutes = Number(rule.slot_minutes || 60);
+
+                  while (timeToMinutes(addMinutes(current, slotMinutes)) <= timeToMinutes(end)) {
+                    const slotEnd = addMinutes(current, slotMinutes);
+
+                    if (!bookedSet.has(`${dateText}_${current}`)) {
+                      result.push({
+                        id: `${rule.id}-${dateText}-${current}`,
+                        available_date: dateText,
+                        start_time: current,
+                        end_time: slotEnd,
+                        slot_minutes: slotMinutes,
+                        source_type: "regular",
+                      });
+                    }
+
+                    current = slotEnd;
+                  }
+                }
+              }
+
+              result.sort((a, b) =>
+                `${a.available_date} ${a.start_time}`.localeCompare(
+                  `${b.available_date} ${b.start_time}`
+                )
+              );
+
+              res.json(result);
+            }
+          );
+        }
+      );
+    }
+  );
+};
+
+export const getMyRequests = (req, res) => {
+  findMyTechnicianId(req.user.id, (lookupErr, technicianId) => {
+    if (lookupErr) return res.status(500).json({ message: "Server error" });
+    if (!technicianId) return res.status(404).json({ message: "Technician not found" });
+
+    db.query(
+      `
+      SELECT 
+        mr.*,
+        u.name AS user_name,
+        u.phone AS user_phone
+      FROM maintenance_requests mr
+      JOIN users u ON u.id = mr.user_id
+      WHERE mr.technician_id = ?
+      ORDER BY mr.id DESC
+      `,
+      [technicianId],
+      (err, rows) => {
+        if (err) return res.status(500).json({ message: err.sqlMessage || err.message });
+        res.json(rows || []);
+      }
+    );
+  });
+};
+
+export const updateRequestStatus = (req, res) => {
+  const { requestId } = req.params;
+  const { status } = req.body;
+
+  const allowed = [
+    "pending",
+    "accepted",
+    "confirmed",
+    "on_the_way",
+    "in_progress",
+    "completed",
+    "rejected",
+    "cancelled",
+  ];
+
+  if (!allowed.includes(status)) {
+    return res.status(400).json({ message: "Invalid status" });
+  }
+
+  findMyTechnicianId(req.user.id, (lookupErr, technicianId) => {
+    if (lookupErr) return res.status(500).json({ message: "Server error" });
+    if (!technicianId) return res.status(404).json({ message: "Technician not found" });
+
+    db.query(
+      `
+      UPDATE maintenance_requests
+      SET status = ?
+      WHERE id = ? AND technician_id = ?
+      `,
+      [status, requestId, technicianId],
+      (err, result) => {
+        if (err) return res.status(500).json({ message: err.sqlMessage || err.message });
+        if (!result.affectedRows) return res.status(404).json({ message: "Request not found" });
+        res.json({ message: "Status updated" });
+      }
+    );
+  });
+};
+
+export const getTechnicianGallery = (req, res) => {
+  db.query(
+    `
+    SELECT *
+    FROM technician_work_posts
+    WHERE technician_id = ?
+    ORDER BY id DESC
+    `,
+    [req.params.id],
+    (err, rows) => {
+      if (err) return res.status(500).json({ message: err.sqlMessage || err.message });
+      res.json(rows || []);
+    }
+  );
+};
+
+export const getMyGallery = (req, res) => {
+  findMyTechnicianId(req.user.id, (lookupErr, technicianId) => {
+    if (lookupErr) return res.status(500).json({ message: "Server error" });
+    if (!technicianId) return res.status(404).json({ message: "Technician not found" });
+
+    db.query(
+      `
+      SELECT *
+      FROM technician_work_posts
+      WHERE technician_id = ?
+      ORDER BY id DESC
+      `,
+      [technicianId],
+      (err, rows) => {
+        if (err) return res.status(500).json({ message: err.sqlMessage || err.message });
+        res.json(rows || []);
+      }
+    );
+  });
+};
+
+export const createGalleryPost = (req, res) => {
+  const { description, images, location_note } = req.body;
+
+  if (!description || !images) {
+    return res.status(400).json({ message: "Description and images are required" });
+  }
+
+  findMyTechnicianId(req.user.id, (lookupErr, technicianId) => {
+    if (lookupErr) return res.status(500).json({ message: "Server error" });
+    if (!technicianId) return res.status(404).json({ message: "Technician not found" });
+
+    db.query(
+      `
+      INSERT INTO technician_work_posts
+      (technician_id, description, images, location_note)
+      VALUES (?, ?, ?, ?)
+      `,
+      [
+        technicianId,
+        description,
+        typeof images === "string" ? images : JSON.stringify(images),
+        location_note || null,
+      ],
+      (err, result) => {
+        if (err) return res.status(500).json({ message: err.sqlMessage || err.message });
+
+        res.status(201).json({
+          id: result.insertId,
+          technician_id: technicianId,
+          description,
+          images,
+          location_note,
+        });
+      }
+    );
+  });
+};
+
+export const updateGalleryPost = (req, res) => {
+  const { postId } = req.params;
+  const { description, images, location_note } = req.body;
+
+  findMyTechnicianId(req.user.id, (lookupErr, technicianId) => {
+    if (lookupErr) return res.status(500).json({ message: "Server error" });
+    if (!technicianId) return res.status(404).json({ message: "Technician not found" });
+
+    db.query(
+      `
+      UPDATE technician_work_posts
+      SET description = ?, images = ?, location_note = ?
+      WHERE id = ? AND technician_id = ?
+      `,
+      [
+        description || "",
+        typeof images === "string" ? images : JSON.stringify(images || []),
+        location_note || null,
+        postId,
+        technicianId,
+      ],
+      (err, result) => {
+        if (err) return res.status(500).json({ message: err.sqlMessage || err.message });
+        if (!result.affectedRows) return res.status(404).json({ message: "Post not found" });
+        res.json({ message: "Post updated" });
+      }
+    );
+  });
+};
+
+export const deleteGalleryPost = (req, res) => {
+  const { postId } = req.params;
+
+  findMyTechnicianId(req.user.id, (lookupErr, technicianId) => {
+    if (lookupErr) return res.status(500).json({ message: "Server error" });
+    if (!technicianId) return res.status(404).json({ message: "Technician not found" });
+
+    db.query(
+      "DELETE FROM technician_work_posts WHERE id = ? AND technician_id = ?",
+      [postId, technicianId],
+      (err, result) => {
+        if (err) return res.status(500).json({ message: err.sqlMessage || err.message });
+        if (!result.affectedRows) return res.status(404).json({ message: "Post not found" });
+        res.json({ message: "Post deleted" });
+      }
+    );
   });
 };

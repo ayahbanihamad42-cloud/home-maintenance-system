@@ -1,6 +1,6 @@
-import api from "./api";
+import API from "./api";
 
-export const createMockPayment = async (data) => {
-  const res = await api.post("/payments/create-intent", data);
+export const createPaymentIntent = async (data) => {
+  const res = await API.post("/payments/create-intent", data);
   return res.data;
 };

@@ -10,26 +10,48 @@ function GalleryPostDetails() {
   const post =
     location.state?.post || (storedPost ? JSON.parse(storedPost) : null);
 
+  const images = useMemo(() => {
+    if (!post) return [];
+
+    if (Array.isArray(post.images)) {
+      return post.images.filter(Boolean);
+    }
+
+    if (typeof post.images === "string") {
+      try {
+        const parsed = JSON.parse(post.images);
+        if (Array.isArray(parsed)) return parsed.filter(Boolean);
+      } catch {
+        return post.images
+          .split(",")
+          .map((img) => img.trim())
+          .filter(Boolean);
+      }
+    }
+
+    if (post.image_url) return [post.image_url];
+    if (post.image) return [post.image];
+
+    return [];
+  }, [post]);
+
   const [selectedImageIndex, setSelectedImageIndex] = useState(0);
 
-  const activeImage = useMemo(() => {
-    if (!post?.images?.length) return "";
-    return post.images[selectedImageIndex] || post.images[0];
-  }, [post, selectedImageIndex]);
+  const activeImage = images[selectedImageIndex] || images[0] || "";
 
   const goPrev = () => {
-    if (!post?.images?.length) return;
+    if (!images.length) return;
 
     setSelectedImageIndex((prev) =>
-      prev === 0 ? post.images.length - 1 : prev - 1
+      prev === 0 ? images.length - 1 : prev - 1
     );
   };
 
   const goNext = () => {
-    if (!post?.images?.length) return;
+    if (!images.length) return;
 
     setSelectedImageIndex((prev) =>
-      prev === post.images.length - 1 ? 0 : prev + 1
+      prev === images.length - 1 ? 0 : prev + 1
     );
   };
 
@@ -61,9 +83,13 @@ function GalleryPostDetails() {
 
         <div className="gallery-details-card">
           <div className="gallery-details-image image-slider-box">
-            <img src={activeImage} alt="work post" />
+            {activeImage ? (
+              <img src={activeImage} alt="work post" />
+            ) : (
+              <div className="empty-gallery-card">No image found.</div>
+            )}
 
-            {post.images?.length > 1 ? (
+            {images.length > 1 && (
               <>
                 <button className="slider-arrow left" onClick={goPrev}>
                   ‹
@@ -74,30 +100,34 @@ function GalleryPostDetails() {
                 </button>
 
                 <div className="image-counter">
-                  {selectedImageIndex + 1} / {post.images.length}
+                  {selectedImageIndex + 1} / {images.length}
+                </div>
+
+                <div className="details-thumbs">
+                  {images.map((img, index) => (
+                    <button
+                      type="button"
+                      key={`${img}-${index}`}
+                      className={selectedImageIndex === index ? "active" : ""}
+                      onClick={() => setSelectedImageIndex(index)}
+                    >
+                      <img src={img} alt="thumbnail" />
+                    </button>
+                  ))}
                 </div>
               </>
-            ) : null}
-
-            {post.images?.length > 1 ? (
-              <div className="details-thumbs">
-                {post.images.map((img, index) => (
-                  <button
-                    type="button"
-                    key={index}
-                    className={selectedImageIndex === index ? "active" : ""}
-                    onClick={() => setSelectedImageIndex(index)}
-                  >
-                    <img src={img} alt="thumbnail" />
-                  </button>
-                ))}
-              </div>
-            ) : null}
+            )}
           </div>
 
           <div className="gallery-details-text">
             <h2>Work Details</h2>
-            <p>{post.description}</p>
+            <p>{post.description || post.caption || "No description."}</p>
+
+            {post.location_note && (
+              <p>
+                <b>Location:</b> {post.location_note}
+              </p>
+            )}
           </div>
         </div>
       </div>

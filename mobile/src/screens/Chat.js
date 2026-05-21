@@ -1,225 +1,336 @@
-import React, { useEffect, useState, useContext, useRef } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import {
   View,
   Text,
   TextInput,
-  TouchableOpacity,
   ScrollView,
-  SafeAreaView,
-  KeyboardAvoidingView,
-  Platform,
+  TouchableOpacity,
+  StyleSheet,
   Image,
   Linking,
 } from "react-native";
-import { useRoute, useNavigation } from "@react-navigation/native";
-import * as ImagePicker from "expo-image-picker";
-import * as Location from "expo-location";
+import API from "../services/api";
 
-import Header from "../components/Common/Header";
-import { AuthContext } from "../context/AuthContext";
-import { sendChatMessage, getChatMessages } from "../services/chatService";
-import appStyles from "../styles/mobileStyles";
+const API_HOST = "http://localhost:5000";
 
-function Chat() {
-  const route = useRoute();
-  const navigation = useNavigation();
-  const { userId } = route.params;
-  const { user } = useContext(AuthContext);
+const fullUrl = (url) => {
+  if (!url) return "";
+  if (String(url).startsWith("http")) return url;
+  return `${API_HOST}${url}`;
+};
+
+export default function Chat({ navigation, route }) {
+  const params = route?.params || {};
+  const receiverId =
+    params.receiverId || params.userId || params.user?.id || params.otherUserId;
+  const receiverName = params.name || params.user?.name || "Conversation";
 
   const [messages, setMessages] = useState([]);
   const [text, setText] = useState("");
-  const [chatMessage, setChatMessage] = useState(null);
-  const scrollViewRef = useRef(null);
+  const [notice, setNotice] = useState("");
+  const scrollRef = useRef(null);
 
-  const showMessage = (type, title, body) => {
-    setChatMessage({ type, title, body });
-    setTimeout(() => setChatMessage(null), 2500);
-  };
+  const loadMessages = async () => {
+    try {
+      if (!receiverId) {
+        setNotice("Receiver id is missing.");
+        return;
+      }
 
-  const loadMessages = () => {
-    getChatMessages(userId)
-      .then((data) => setMessages(data || []))
-      .catch(() => {
-        setMessages([]);
-        showMessage("error", "Notice", "Failed to load chat messages.");
-      });
+      const res = await API.get(`/chat/${receiverId}`);
+      setMessages(Array.isArray(res.data) ? res.data : []);
+    } catch (err) {
+      console.log("chat load error:", err.response?.data || err.message);
+      setNotice(err.response?.data?.message || "Failed to load messages.");
+    }
   };
 
   useEffect(() => {
     loadMessages();
-    const interval = setInterval(loadMessages, 3000);
-    return () => clearInterval(interval);
-  }, [userId]);
+    const timer = setInterval(loadMessages, 4000);
+    return () => clearInterval(timer);
+  }, [receiverId]);
 
-  const handleSend = async (content = null, type = "text") => {
-    const messageValue = content || text;
-    if (!messageValue.trim() && type === "text") return;
-
-    const pending = {
-      sender_id: user?.id,
-      receiver_id: Number(userId),
-      message: messageValue,
-      type,
-    };
-
-    setMessages((prev) => [...prev, pending]);
-    if (type === "text") setText("");
-
+  const sendText = async () => {
     try {
-      await sendChatMessage({
-        receiver_id: Number(userId),
-        message: messageValue,
-        type,
+      if (!text.trim() || !receiverId) return;
+
+      await API.post("/chat", {
+        receiver_id: receiverId,
+        message: text.trim(),
+        type: "text",
       });
-    } catch (e) {
-      showMessage("error", "Notice", "Failed to send message.");
-    }
 
-    loadMessages();
-  };
-
-  const pickImage = async () => {
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      allowsEditing: true,
-      quality: 0.5,
-      base64: true,
-    });
-
-    if (!result.canceled) {
-      handleSend(`data:image/jpeg;base64,${result.assets[0].base64}`, "image");
+      setText("");
+      loadMessages();
+    } catch (err) {
+      console.log("send error:", err.response?.data || err.message);
+      setNotice(err.response?.data?.message || "Failed to send message.");
     }
   };
 
-  const shareLocation = async () => {
-    const { status } = await Location.requestForegroundPermissionsAsync();
-    if (status !== "granted") {
-      showMessage("warning", "Notice", "Unable to access location.");
-      return;
+  const sendLocation = async () => {
+    try {
+      if (!receiverId) return;
+
+      const fakeLocation = "https://www.google.com/maps?q=32.5317,35.8676";
+
+      await API.post("/chat", {
+        receiver_id: receiverId,
+        message: fakeLocation,
+        type: "location",
+      });
+
+      loadMessages();
+    } catch (err) {
+      console.log("location error:", err.response?.data || err.message);
+      setNotice("Failed to send location.");
+    }
+  };
+
+  const isMine = (msg) => {
+    return msg.isMine || msg.is_mine || msg.mine;
+  };
+
+  const renderMessage = (msg) => {
+    const type = msg.type || "text";
+    const content = msg.message || "";
+
+    if (type === "image" || String(content).startsWith("/images/chat/")) {
+      return <Image source={{ uri: fullUrl(content) }} style={styles.msgImage} />;
     }
 
-    const location = await Location.getCurrentPositionAsync({});
-    const locString = `https://www.google.com/maps?q=${location.coords.latitude},${location.coords.longitude}`;
-    handleSend(locString, "location");
+    if (type === "location" || String(content).includes("google.com/maps")) {
+      return (
+        <TouchableOpacity onPress={() => Linking.openURL(content)}>
+          <Text style={styles.locationText}>📍 Open Location</Text>
+        </TouchableOpacity>
+      );
+    }
+
+    return <Text style={styles.messageText}>{content}</Text>;
   };
 
   return (
-    <SafeAreaView style={appStyles.screen}>
-      <Header />
+    <View style={styles.screen}>
+      <Header navigation={navigation} />
 
-      <View style={appStyles.chatTopBar}>
-        <TouchableOpacity
-          style={appStyles.backBtn}
-          onPress={() => navigation.navigate("ChatList")}
-        >
-          <Text style={appStyles.backBtnText}>Back to Chats</Text>
+      <View style={styles.wrapper}>
+        <TouchableOpacity style={styles.backBtn} onPress={() => navigation.navigate("ChatList")}>
+          <Text style={styles.backText}>← Back to Chats</Text>
         </TouchableOpacity>
-      </View>
 
-      <KeyboardAvoidingView
-        behavior={Platform.OS === "ios" ? "padding" : "height"}
-        style={{ flex: 1 }}
-        keyboardVerticalOffset={90}
-      >
-        <View style={appStyles.chatHeaderBar}>
-          <View style={appStyles.chatAvatar}>
-            <Text>💬</Text>
-          </View>
-          <View style={appStyles.chatTitleBlock}>
-            <Text style={appStyles.chatTitle}>Conversation</Text>
-            <Text style={appStyles.chatStatus}>
-              Messages update automatically
-            </Text>
-          </View>
-        </View>
-
-        {chatMessage ? (
-          <View
-            style={[
-              appStyles.messageCard,
-              appStyles[`${chatMessage.type}Card`],
-              { marginHorizontal: 16, marginTop: 12 },
-            ]}
-          >
-            <Text style={appStyles.messageTitle}>{chatMessage.title}</Text>
-            <Text style={appStyles.messageBody}>{chatMessage.body}</Text>
-          </View>
-        ) : null}
-
-        <ScrollView
-          style={appStyles.messagesContainer}
-          ref={scrollViewRef}
-          onContentSizeChange={() =>
-            scrollViewRef.current?.scrollToEnd({ animated: true })
-          }
-        >
-          {messages.length === 0 ? (
-            <View style={appStyles.messageCard}>
-              <Text style={appStyles.messageTitle}>No messages yet</Text>
-              <Text style={appStyles.messageBody}>
-                Start the conversation by sending the first message.
-              </Text>
+        <View style={styles.chatShell}>
+          <View style={styles.chatHeader}>
+            <View style={styles.chatIcon}>
+              <Text style={styles.chatIconText}>💬</Text>
             </View>
-          ) : (
-            messages.map((m, i) => (
+            <View>
+              <Text style={styles.chatTitle}>{receiverName}</Text>
+              <Text style={styles.chatSub}>Messages update automatically</Text>
+            </View>
+          </View>
+
+          {notice ? <Text style={styles.notice}>{notice}</Text> : null}
+
+          <ScrollView
+            ref={scrollRef}
+            style={styles.messages}
+            contentContainerStyle={styles.messagesContent}
+            onContentSizeChange={() =>
+              scrollRef.current?.scrollToEnd({ animated: true })
+            }
+          >
+            {messages.map((msg, index) => (
               <View
-                key={i}
+                key={msg.id || index}
                 style={[
-                  appStyles.messageBubble,
-                  m.sender_id === user?.id
-                    ? appStyles.myMessage
-                    : appStyles.otherMessage,
+                  styles.bubble,
+                  isMine(msg) ? styles.myBubble : styles.otherBubble,
                 ]}
               >
-                {m.type === "image" ? (
-                  <Image source={{ uri: m.message }} style={appStyles.sentImage} />
-                ) : m.type === "location" ? (
-                  <TouchableOpacity onPress={() => Linking.openURL(m.message)}>
-                    <Text style={appStyles.locationText}>📍 View My Location</Text>
-                  </TouchableOpacity>
-                ) : (
-                  <Text
-                    style={[
-                      appStyles.messageText,
-                      m.sender_id === user?.id
-                        ? appStyles.myText
-                        : appStyles.otherText,
-                    ]}
-                  >
-                    {m.message}
-                  </Text>
-                )}
+                {renderMessage(msg)}
               </View>
-            ))
-          )}
-        </ScrollView>
+            ))}
+          </ScrollView>
 
-        <View style={appStyles.chatInputArea}>
-          <TouchableOpacity style={appStyles.iconBtn} onPress={pickImage}>
-            <Text style={appStyles.iconBtnText}>📷</Text>
-          </TouchableOpacity>
+          <View style={styles.inputArea}>
+            <TouchableOpacity style={styles.smallBtn}>
+              <Text style={styles.smallBtnText}>📷</Text>
+            </TouchableOpacity>
 
-          <TouchableOpacity style={appStyles.iconBtn} onPress={shareLocation}>
-            <Text style={appStyles.iconBtnText}>📍</Text>
-          </TouchableOpacity>
+            <TouchableOpacity style={styles.smallBtn} onPress={sendLocation}>
+              <Text style={styles.smallBtnText}>📍</Text>
+            </TouchableOpacity>
 
-          <TextInput
-            style={appStyles.chatInput}
-            placeholder="Type a message..."
-            value={text}
-            onChangeText={setText}
-          />
+            <TextInput
+              style={styles.input}
+              value={text}
+              onChangeText={setText}
+              placeholder="Type a message..."
+            />
 
-          <TouchableOpacity
-            style={appStyles.primaryBtn}
-            onPress={() => handleSend()}
-          >
-            <Text style={appStyles.primaryBtnText}>Send</Text>
-          </TouchableOpacity>
+            <TouchableOpacity style={styles.sendBtn} onPress={sendText}>
+              <Text style={styles.sendText}>Send</Text>
+            </TouchableOpacity>
+          </View>
         </View>
-      </KeyboardAvoidingView>
-    </SafeAreaView>
+      </View>
+    </View>
   );
 }
 
-export default Chat;
+function Header({ navigation }) {
+  return (
+    <View style={styles.header}>
+      <Text style={styles.headerTitle}>Maintenance System</Text>
+      <TouchableOpacity style={styles.bell}>
+        <Text style={styles.bellText}>🔔</Text>
+      </TouchableOpacity>
+      <TouchableOpacity style={styles.logout}>
+        <Text style={styles.logoutText}>Log Out</Text>
+      </TouchableOpacity>
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  screen: { flex: 1, backgroundColor: "#e7dccc" },
+  header: {
+    minHeight: 96,
+    backgroundColor: "#faf5ef",
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 18,
+    borderBottomWidth: 1,
+    borderBottomColor: "#d8c8b8",
+  },
+  headerTitle: { flex: 1, fontSize: 26, fontWeight: "900" },
+  bell: {
+    width: 54,
+    height: 54,
+    borderRadius: 27,
+    backgroundColor: "#fff",
+    alignItems: "center",
+    justifyContent: "center",
+    marginRight: 12,
+  },
+  bellText: { fontSize: 26 },
+  logout: {
+    backgroundColor: "#111",
+    paddingHorizontal: 22,
+    paddingVertical: 16,
+    borderRadius: 28,
+  },
+  logoutText: { color: "#fff", fontWeight: "900", fontSize: 16 },
+  wrapper: { flex: 1, padding: 18 },
+  backBtn: {
+    alignSelf: "flex-start",
+    backgroundColor: "#fffaf4",
+    paddingHorizontal: 18,
+    paddingVertical: 10,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: "#d8c8b8",
+    marginBottom: 10,
+  },
+  backText: { fontWeight: "800", color: "#111" },
+  chatShell: {
+    flex: 1,
+    backgroundColor: "#fffaf4",
+    borderRadius: 24,
+    overflow: "hidden",
+    borderWidth: 1,
+    borderColor: "#d8c8b8",
+  },
+  chatHeader: {
+    backgroundColor: "#111",
+    padding: 18,
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  chatIcon: {
+    width: 52,
+    height: 52,
+    borderRadius: 26,
+    backgroundColor: "#fffaf4",
+    alignItems: "center",
+    justifyContent: "center",
+    marginRight: 14,
+  },
+  chatIconText: { fontSize: 24 },
+  chatTitle: { color: "#fff", fontSize: 22, fontWeight: "900" },
+  chatSub: { color: "#ddd", fontSize: 13 },
+  notice: {
+    backgroundColor: "#fdebed",
+    color: "#b4232b",
+    padding: 12,
+    fontSize: 15,
+  },
+  messages: { flex: 1 },
+  messagesContent: { padding: 14 },
+  bubble: {
+    maxWidth: "78%",
+    padding: 13,
+    borderRadius: 18,
+    marginBottom: 10,
+  },
+  myBubble: {
+    alignSelf: "flex-end",
+    backgroundColor: "#111",
+    borderBottomRightRadius: 4,
+  },
+  otherBubble: {
+    alignSelf: "flex-start",
+    backgroundColor: "#f7efe7",
+    borderWidth: 1,
+    borderColor: "#d8c8b8",
+    borderBottomLeftRadius: 4,
+  },
+  messageText: { fontSize: 16, color: "#111" },
+  locationText: { fontSize: 16, fontWeight: "900", color: "#0b57d0" },
+  msgImage: {
+    width: 230,
+    height: 170,
+    borderRadius: 14,
+    resizeMode: "cover",
+  },
+  inputArea: {
+    flexDirection: "row",
+    padding: 12,
+    borderTopWidth: 1,
+    borderTopColor: "#d8c8b8",
+    alignItems: "center",
+    gap: 8,
+  },
+  smallBtn: {
+    width: 44,
+    height: 44,
+    borderRadius: 14,
+    backgroundColor: "#f7efe7",
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1,
+    borderColor: "#d8c8b8",
+  },
+  smallBtnText: { fontSize: 18 },
+  input: {
+    flex: 1,
+    height: 46,
+    backgroundColor: "#f7efe7",
+    borderWidth: 1,
+    borderColor: "#d8c8b8",
+    borderRadius: 20,
+    paddingHorizontal: 14,
+    fontSize: 15,
+  },
+  sendBtn: {
+    backgroundColor: "#111",
+    paddingHorizontal: 20,
+    height: 46,
+    borderRadius: 18,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  sendText: { color: "#fff", fontWeight: "900" },
+});

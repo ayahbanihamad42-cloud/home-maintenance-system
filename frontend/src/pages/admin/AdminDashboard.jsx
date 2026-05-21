@@ -1,25 +1,22 @@
-import React, { useCallback, useEffect, useMemo, useState } from "react";
-import { getToken } from "../../services/auth.service.jsx";
+import React, { useCallback, useEffect, useState } from "react";
 import Header from "../../components/common/Header";
-import axios from "axios";
-
-function InfoRow({ label, value }) {
-  return (
-    <div style={{ display: "flex", justifyContent: "space-between", gap: 12 }}>
-      <span style={{ color: "#546e7a", fontWeight: 600 }}>{label}:</span>
-      <strong style={{ color: "#263238" }}>{value}</strong>
-    </div>
-  );
-}
+import {
+  getAdminUsers,
+  createAdminUser,
+  deleteAdminUser,
+  getAdminTechnicians,
+  createAdminTechnician,
+  deleteAdminTechnician,
+  getAdminStores,
+  createAdminStore,
+  deleteAdminStore,
+  getAdminServices,
+  createAdminService,
+  deleteAdminService,
+  getBackendImageUrl,
+} from "../../services/adminService.jsx";
 
 function AdminDashboard() {
-  const [view, setView] = useState("users");
-  const [users, setUsers] = useState([]);
-  const [technicians, setTechnicians] = useState([]);
-  const [stores, setStores] = useState([]);
-  const [services, setServices] = useState([]);
-  const [selectedProfile, setSelectedProfile] = useState(null);
-
   const emptyForm = {
     name: "",
     email: "",
@@ -28,117 +25,129 @@ function AdminDashboard() {
     password: "",
     service_id: "",
     experience: "",
+    price_per_hour: "",
     store_name: "",
     category: "",
     address: "",
     owner_id: "",
     service_name: "",
     image_url: "",
+    image_base64: "",
   };
 
+  const [view, setView] = useState("users");
+  const [users, setUsers] = useState([]);
+  const [technicians, setTechnicians] = useState([]);
+  const [stores, setStores] = useState([]);
+  const [services, setServices] = useState([]);
   const [form, setForm] = useState(emptyForm);
-
-  const API = useMemo(
-    () =>
-      axios.create({
-        baseURL: "http://localhost:5000/api",
-        headers: { Authorization: `Bearer ${getToken()}` },
-      }),
-    []
-  );
-
-  const fetchServices = useCallback(async () => {
-    try {
-      const res = await API.get("/admin/services");
-      setServices(res.data || []);
-    } catch (error) {
-      console.log(error.response?.data?.message || error.message);
-    }
-  }, [API]);
-
-  const fetchData = useCallback(async () => {
-    try {
-      if (view === "users") {
-        const res = await API.get("/admin/users");
-        setUsers(res.data || []);
-      } else if (view === "technicians") {
-        const res = await API.get("/admin/technicians");
-        setTechnicians(res.data || []);
-      } else if (view === "stores") {
-        const res = await API.get("/admin/stores");
-        setStores(res.data || []);
-      } else if (view === "services") {
-        const res = await API.get("/admin/services");
-        setServices(res.data || []);
-      }
-    } catch (error) {
-      alert(error.response?.data?.message || error.message);
-    }
-  }, [API, view]);
-
-  useEffect(() => {
-    fetchData();
-  }, [fetchData]);
-
-  useEffect(() => {
-    fetchServices();
-  }, [fetchServices]);
+  const [selectedProfile, setSelectedProfile] = useState(null);
+  const [loading, setLoading] = useState(false);
 
   const resetForm = () => {
     setForm(emptyForm);
   };
 
-  const handleDeleteUser = async (userId) => {
-    if (!window.confirm("Are you sure you want to delete this user?")) return;
-
+  const loadServices = useCallback(async () => {
     try {
-      await API.delete(`/admin/users/${userId}`);
-      setSelectedProfile(null);
-      fetchData();
-    } catch (error) {
-      alert(error.response?.data?.message || error.message);
+      const data = await getAdminServices();
+      setServices(Array.isArray(data) ? data : []);
+    } catch (err) {
+      console.log("loadServices error:", err?.response?.data || err.message);
+      setServices([]);
     }
+  }, []);
+
+  const loadData = useCallback(async () => {
+    try {
+      setLoading(true);
+
+      if (view === "users") {
+        const data = await getAdminUsers();
+        setUsers(Array.isArray(data) ? data : []);
+      }
+
+      if (view === "technicians") {
+        const data = await getAdminTechnicians();
+        setTechnicians(Array.isArray(data) ? data : []);
+      }
+
+      if (view === "stores") {
+        const data = await getAdminStores();
+        setStores(Array.isArray(data) ? data : []);
+      }
+
+      if (view === "services") {
+        const data = await getAdminServices();
+        setServices(Array.isArray(data) ? data : []);
+      }
+    } catch (err) {
+      alert(err?.response?.data?.message || err.message);
+    } finally {
+      setLoading(false);
+    }
+  }, [view]);
+
+  useEffect(() => {
+    loadData();
+  }, [loadData]);
+
+  useEffect(() => {
+    loadServices();
+  }, [loadServices]);
+
+  const compressImageFile = (file) => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      const image = new Image();
+
+      reader.onload = () => {
+        image.src = reader.result;
+      };
+
+      image.onload = () => {
+        const canvas = document.createElement("canvas");
+        const maxSize = 800;
+        const scale = Math.min(maxSize / image.width, maxSize / image.height, 1);
+
+        canvas.width = image.width * scale;
+        canvas.height = image.height * scale;
+
+        const ctx = canvas.getContext("2d");
+        ctx.drawImage(image, 0, 0, canvas.width, canvas.height);
+
+        resolve(canvas.toDataURL("image/jpeg", 0.75));
+      };
+
+      reader.onerror = reject;
+      image.onerror = reject;
+
+      reader.readAsDataURL(file);
+    });
   };
 
-  const handleDeleteTechnician = async (technicianId) => {
-    if (!window.confirm("Are you sure you want to delete this technician?")) return;
+  const handleServiceImageFile = async (e) => {
+    const file = e.target.files?.[0];
+
+    if (!file) return;
 
     try {
-      await API.delete(`/admin/technicians/${technicianId}`);
-      setSelectedProfile(null);
-      fetchData();
-    } catch (error) {
-      alert(error.response?.data?.message || error.message);
-    }
-  };
+      const compressed = await compressImageFile(file);
 
-  const handleDeleteStore = async (storeId) => {
-    if (!window.confirm("Are you sure you want to delete this store?")) return;
-
-    try {
-      await API.delete(`/admin/stores/${storeId}`);
-      fetchData();
-    } catch (error) {
-      alert(error.response?.data?.message || error.message);
-    }
-  };
-
-  const handleDeleteService = async (serviceId) => {
-    if (!window.confirm("Are you sure you want to delete this service?")) return;
-
-    try {
-      await API.delete(`/admin/services/${serviceId}`);
-      fetchData();
-      fetchServices();
-    } catch (error) {
-      alert(error.response?.data?.message || error.message);
+      setForm((prev) => ({
+        ...prev,
+        image_base64: compressed,
+        image_url: "",
+      }));
+    } catch {
+      alert("Failed to read image.");
     }
   };
 
   const handleAdd = async () => {
     try {
       if (view === "users") {
-        await API.post("/admin/users", {
+        await createAdminUser({
           name: form.name,
           email: form.email,
           phone: form.phone,
@@ -146,8 +155,10 @@ function AdminDashboard() {
           password: form.password,
           role: "user",
         });
-      } else if (view === "technicians") {
-        await API.post("/admin/technicians", {
+      }
+
+      if (view === "technicians") {
+        await createAdminTechnician({
           name: form.name,
           email: form.email,
           phone: form.phone,
@@ -155,38 +166,62 @@ function AdminDashboard() {
           password: form.password,
           service_id: form.service_id,
           experience: form.experience,
+          price_per_hour: form.price_per_hour,
         });
-      } else if (view === "stores") {
-        await API.post("/admin/stores", {
+      }
+
+      if (view === "stores") {
+        await createAdminStore({
           store_name: form.store_name,
           category: form.category,
           city: form.city,
           address: form.address,
           owner_id: form.owner_id || null,
         });
-      } else if (view === "services") {
-        await API.post("/admin/services", {
+      }
+
+      if (view === "services") {
+        await createAdminService({
           name: form.service_name,
           image_url: form.image_url,
+          image_base64: form.image_base64,
         });
-
-        fetchServices();
       }
 
       resetForm();
-      fetchData();
+      await loadData();
+      await loadServices();
+
       alert("Added successfully.");
-    } catch (error) {
-      alert(error.response?.data?.message || error.message);
+    } catch (err) {
+      alert(err?.response?.data?.message || err.message);
     }
   };
 
-  const getAddTitle = () => {
-    if (view === "users") return "Add User";
-    if (view === "technicians") return "Add Technician";
-    if (view === "stores") return "Add Store";
-    return "Add Service";
+  const handleDelete = async (type, id) => {
+    if (!window.confirm("Are you sure you want to delete this item?")) return;
+
+    try {
+      if (type === "user") await deleteAdminUser(id);
+      if (type === "technician") await deleteAdminTechnician(id);
+      if (type === "store") await deleteAdminStore(id);
+      if (type === "service") await deleteAdminService(id);
+
+      setSelectedProfile(null);
+      await loadData();
+      await loadServices();
+    } catch (err) {
+      alert(err?.response?.data?.message || err.message);
+    }
   };
+
+  const changeView = (nextView) => {
+    setView(nextView);
+    resetForm();
+    setSelectedProfile(null);
+  };
+
+  const activeClass = (name) => (view === name ? "primary" : "btn-outline");
 
   return (
     <>
@@ -195,33 +230,34 @@ function AdminDashboard() {
       <div className="container">
         <h2>Admin Dashboard</h2>
 
-        <div
-          style={{
-            marginBottom: "20px",
-            display: "flex",
-            gap: "10px",
-            flexWrap: "wrap",
-          }}
-        >
-          <button className="primary" onClick={() => setView("users")}>
+        <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginBottom: 20 }}>
+          <button className={activeClass("users")} onClick={() => changeView("users")}>
             Manage Users
           </button>
 
-          <button className="secondary" onClick={() => setView("technicians")}>
+          <button
+            className={activeClass("technicians")}
+            onClick={() => changeView("technicians")}
+          >
             Manage Technicians
           </button>
 
-          <button className="secondary" onClick={() => setView("stores")}>
+          <button className={activeClass("stores")} onClick={() => changeView("stores")}>
             Manage Stores
           </button>
 
-          <button className="secondary" onClick={() => setView("services")}>
+          <button
+            className={activeClass("services")}
+            onClick={() => changeView("services")}
+          >
             Manage Services
           </button>
         </div>
 
+        {loading ? <div className="panel">Loading...</div> : null}
+
         {view === "users" ? (
-          <div style={{ width: "100%", overflowX: "auto" }}>
+          <div style={{ overflowX: "auto" }}>
             <table className="card" style={{ width: "100%", minWidth: 750 }}>
               <thead>
                 <tr>
@@ -252,7 +288,10 @@ function AdminDashboard() {
                       </button>
                     </td>
                     <td>
-                      <button className="btn-outline" onClick={() => handleDeleteUser(u.id)}>
+                      <button
+                        className="btn-outline"
+                        onClick={() => handleDelete("user", u.id)}
+                      >
                         Delete
                       </button>
                     </td>
@@ -264,7 +303,7 @@ function AdminDashboard() {
         ) : null}
 
         {view === "technicians" ? (
-          <div style={{ width: "100%", overflowX: "auto" }}>
+          <div style={{ overflowX: "auto" }}>
             <table className="card" style={{ width: "100%", minWidth: 950 }}>
               <thead>
                 <tr>
@@ -273,8 +312,9 @@ function AdminDashboard() {
                   <th>Phone</th>
                   <th>City</th>
                   <th>Service</th>
-                  <th>Service Image</th>
-                  <th>Experience</th>
+                  <th>Image</th>
+                  <th>Exp</th>
+                  <th>Price/hr</th>
                   <th>View</th>
                   <th>Delete</th>
                 </tr>
@@ -291,7 +331,7 @@ function AdminDashboard() {
                     <td>
                       {t.service_image ? (
                         <img
-                          src={`http://localhost:5000${t.service_image}`}
+                          src={getBackendImageUrl(t.service_image)}
                           alt={t.service}
                           style={{
                             width: 46,
@@ -304,11 +344,14 @@ function AdminDashboard() {
                         "-"
                       )}
                     </td>
-                    <td>{t.experience} yrs</td>
+                    <td>{t.experience || 0}</td>
+                    <td>{Number(t.price_per_hour || 0).toFixed(2)}</td>
                     <td>
                       <button
                         className="btn-outline"
-                        onClick={() => setSelectedProfile({ type: "technician", data: t })}
+                        onClick={() =>
+                          setSelectedProfile({ type: "technician", data: t })
+                        }
                       >
                         View
                       </button>
@@ -316,7 +359,7 @@ function AdminDashboard() {
                     <td>
                       <button
                         className="btn-outline"
-                        onClick={() => handleDeleteTechnician(t.technicianId)}
+                        onClick={() => handleDelete("technician", t.technicianId)}
                       >
                         Delete
                       </button>
@@ -329,11 +372,11 @@ function AdminDashboard() {
         ) : null}
 
         {view === "stores" ? (
-          <div style={{ width: "100%", overflowX: "auto" }}>
-            <table className="card" style={{ width: "100%", minWidth: 850 }}>
+          <div style={{ overflowX: "auto" }}>
+            <table className="card" style={{ width: "100%", minWidth: 800 }}>
               <thead>
                 <tr>
-                  <th>Store Name</th>
+                  <th>Store</th>
                   <th>Category</th>
                   <th>City</th>
                   <th>Address</th>
@@ -351,7 +394,10 @@ function AdminDashboard() {
                     <td>{s.address || "-"}</td>
                     <td>{s.owner_name || "-"}</td>
                     <td>
-                      <button className="btn-outline" onClick={() => handleDeleteStore(s.id)}>
+                      <button
+                        className="btn-outline"
+                        onClick={() => handleDelete("store", s.id)}
+                      >
                         Delete
                       </button>
                     </td>
@@ -363,7 +409,7 @@ function AdminDashboard() {
         ) : null}
 
         {view === "services" ? (
-          <div style={{ width: "100%", overflowX: "auto" }}>
+          <div style={{ overflowX: "auto" }}>
             <table className="card" style={{ width: "100%", minWidth: 650 }}>
               <thead>
                 <tr>
@@ -378,23 +424,29 @@ function AdminDashboard() {
                 {services.map((s) => (
                   <tr key={s.id}>
                     <td>
-                      <img
-                        src={`http://localhost:5000${s.image_url}`}
-                        alt={s.name}
-                        style={{
-                          width: 55,
-                          height: 55,
-                          borderRadius: "50%",
-                          objectFit: "cover",
-                          border: "2px solid #111",
-                          background: "#fff",
-                        }}
-                      />
+                      {s.image_url ? (
+                        <img
+                          src={getBackendImageUrl(s.image_url)}
+                          alt={s.name}
+                          style={{
+                            width: 55,
+                            height: 55,
+                            borderRadius: "50%",
+                            objectFit: "cover",
+                            border: "2px solid #111",
+                          }}
+                        />
+                      ) : (
+                        "-"
+                      )}
                     </td>
                     <td>{s.name}</td>
                     <td>{s.image_url}</td>
                     <td>
-                      <button className="btn-outline" onClick={() => handleDeleteService(s.id)}>
+                      <button
+                        className="btn-outline"
+                        onClick={() => handleDelete("service", s.id)}
+                      >
                         Delete
                       </button>
                     </td>
@@ -405,10 +457,18 @@ function AdminDashboard() {
           </div>
         ) : null}
 
-        <div className="panel admin-form">
-          <h3 className="section-title">{getAddTitle()}</h3>
+        <div className="panel admin-form" style={{ marginTop: 25 }}>
+          <h3>
+            {view === "users"
+              ? "Add User"
+              : view === "technicians"
+              ? "Add Technician"
+              : view === "stores"
+              ? "Add Store"
+              : "Add Service"}
+          </h3>
 
-          {view === "users" || view === "technicians" ? (
+          {(view === "users" || view === "technicians") && (
             <>
               <div className="input-group">
                 <label>Name</label>
@@ -422,10 +482,9 @@ function AdminDashboard() {
               <div className="input-group">
                 <label>Email</label>
                 <input
-                  type="email"
                   value={form.email}
                   onChange={(e) => setForm({ ...form, email: e.target.value })}
-                  placeholder="Email address"
+                  placeholder="Email"
                 />
               </div>
 
@@ -434,7 +493,7 @@ function AdminDashboard() {
                 <input
                   value={form.phone}
                   onChange={(e) => setForm({ ...form, phone: e.target.value })}
-                  placeholder="Phone number"
+                  placeholder="Phone"
                 />
               </div>
 
@@ -448,18 +507,18 @@ function AdminDashboard() {
               </div>
 
               <div className="input-group">
-                <label>Temporary Password</label>
+                <label>Password</label>
                 <input
                   type="password"
                   value={form.password}
                   onChange={(e) => setForm({ ...form, password: e.target.value })}
-                  placeholder="Set a password"
+                  placeholder="Password"
                 />
               </div>
             </>
-          ) : null}
+          )}
 
-          {view === "technicians" ? (
+          {view === "technicians" && (
             <>
               <div className="input-group">
                 <label>Service</label>
@@ -467,17 +526,17 @@ function AdminDashboard() {
                   value={form.service_id}
                   onChange={(e) => setForm({ ...form, service_id: e.target.value })}
                 >
-                  <option value="">Select a service</option>
-                  {services.map((service) => (
-                    <option key={service.id} value={service.id}>
-                      {service.name}
+                  <option value="">Select service</option>
+                  {services.map((s) => (
+                    <option key={s.id} value={s.id}>
+                      {s.name}
                     </option>
                   ))}
                 </select>
               </div>
 
               <div className="input-group">
-                <label>Experience (years)</label>
+                <label>Experience</label>
                 <input
                   type="number"
                   value={form.experience}
@@ -485,16 +544,30 @@ function AdminDashboard() {
                   placeholder="0"
                 />
               </div>
-            </>
-          ) : null}
 
-          {view === "stores" ? (
+              <div className="input-group">
+                <label>Price per hour</label>
+                <input
+                  type="number"
+                  value={form.price_per_hour}
+                  onChange={(e) =>
+                    setForm({ ...form, price_per_hour: e.target.value })
+                  }
+                  placeholder="0"
+                />
+              </div>
+            </>
+          )}
+
+          {view === "stores" && (
             <>
               <div className="input-group">
                 <label>Store Name</label>
                 <input
                   value={form.store_name}
-                  onChange={(e) => setForm({ ...form, store_name: e.target.value })}
+                  onChange={(e) =>
+                    setForm({ ...form, store_name: e.target.value })
+                  }
                   placeholder="Store name"
                 />
               </div>
@@ -504,7 +577,7 @@ function AdminDashboard() {
                 <input
                   value={form.category}
                   onChange={(e) => setForm({ ...form, category: e.target.value })}
-                  placeholder="Tools, Parts, Electrical..."
+                  placeholder="Category"
                 />
               </div>
 
@@ -529,166 +602,98 @@ function AdminDashboard() {
               <div className="input-group">
                 <label>Owner User ID</label>
                 <input
-                  type="number"
                   value={form.owner_id}
                   onChange={(e) => setForm({ ...form, owner_id: e.target.value })}
                   placeholder="Optional"
                 />
               </div>
             </>
-          ) : null}
+          )}
 
-          {view === "services" ? (
+          {view === "services" && (
             <>
               <div className="input-group">
                 <label>Service Name</label>
                 <input
                   value={form.service_name}
-                  onChange={(e) => setForm({ ...form, service_name: e.target.value })}
+                  onChange={(e) =>
+                    setForm({ ...form, service_name: e.target.value })
+                  }
                   placeholder="Example: Cleaning"
                 />
               </div>
 
               <div className="input-group">
-                <label>Image URL</label>
+                <label>Service Image</label>
+
+                <input type="file" accept="image/*" onChange={handleServiceImageFile} />
+
+                {form.image_base64 ? (
+                  <img
+                    src={form.image_base64}
+                    alt="preview"
+                    style={{
+                      width: 80,
+                      height: 80,
+                      borderRadius: "50%",
+                      objectFit: "cover",
+                      marginTop: 10,
+                      border: "2px solid #111",
+                    }}
+                  />
+                ) : null}
+
                 <input
                   value={form.image_url}
-                  onChange={(e) => setForm({ ...form, image_url: e.target.value })}
-                  placeholder="/images/services/cleaning.png"
+                  onChange={(e) =>
+                    setForm({
+                      ...form,
+                      image_url: e.target.value,
+                      image_base64: "",
+                    })
+                  }
+                  placeholder="Or write URL: /images/services/plumbing.png"
+                  style={{ marginTop: 10 }}
                 />
               </div>
             </>
-          ) : null}
+          )}
 
           <button className="primary" onClick={handleAdd}>
             Add
           </button>
         </div>
-      </div>
 
-      {selectedProfile ? (
-        <div
-          onClick={() => setSelectedProfile(null)}
-          style={{
-            position: "fixed",
-            inset: 0,
-            background: "rgba(0,0,0,0.35)",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            padding: 16,
-            zIndex: 9999,
-          }}
-        >
-          <div
-            onClick={(e) => e.stopPropagation()}
-            style={{
-              width: "min(520px, 95vw)",
-              background: "#fff",
-              borderRadius: 16,
-              boxShadow: "0 18px 60px rgba(0,0,0,0.25)",
-              overflow: "hidden",
-            }}
-          >
-            <div
-              style={{
-                padding: 14,
-                background: "#f5f7fa",
-                borderBottom: "1px solid #e6e8eb",
-                display: "flex",
-                justifyContent: "space-between",
-                alignItems: "center",
-                fontWeight: 800,
-              }}
-            >
-              <span>
-                {selectedProfile.type === "user" ? "User Profile" : "Technician Profile"}
-              </span>
+        {selectedProfile ? (
+          <div className="panel" style={{ marginTop: 20 }}>
+            <h3>
+              {selectedProfile.type === "user"
+                ? "User Profile"
+                : "Technician Profile"}
+            </h3>
 
-              <button className="btn-outline" onClick={() => setSelectedProfile(null)}>
-                Close
-              </button>
-            </div>
+            <p><b>Name:</b> {selectedProfile.data.name}</p>
+            <p><b>Email:</b> {selectedProfile.data.email}</p>
+            <p><b>Phone:</b> {selectedProfile.data.phone || "-"}</p>
+            <p><b>City:</b> {selectedProfile.data.city || "-"}</p>
 
-            <div style={{ padding: 16 }}>
-              <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
-                <div
-                  style={{
-                    width: 56,
-                    height: 56,
-                    borderRadius: "50%",
-                    background: "#e3f2fd",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    fontSize: 22,
-                    fontWeight: 900,
-                    color: "#1565c0",
-                    flexShrink: 0,
-                  }}
-                >
-                  {String(selectedProfile.data.name || "?").trim().charAt(0).toUpperCase()}
-                </div>
+            {selectedProfile.type === "technician" ? (
+              <>
+                <p><b>Service:</b> {selectedProfile.data.service || "-"}</p>
+                <p><b>Experience:</b> {selectedProfile.data.experience || 0}</p>
+                <p>
+                  <b>Price/hour:</b>{" "}
+                  {Number(selectedProfile.data.price_per_hour || 0).toFixed(2)}
+                </p>
+              </>
+            ) : null}
 
-                <div style={{ flex: 1 }}>
-                  <div style={{ fontSize: 18, fontWeight: 900 }}>
-                    {selectedProfile.data.name}
-                  </div>
-
-                  <div style={{ color: "#607d8b", fontSize: 13 }}>
-                    {selectedProfile.type === "technician" ? "Technician" : "User"}
-                  </div>
-                </div>
-              </div>
-
-              <div
-                style={{
-                  marginTop: 14,
-                  background: "#f1f5f9",
-                  borderRadius: 14,
-                  padding: 14,
-                  display: "grid",
-                  gap: 10,
-                }}
-              >
-                <InfoRow label="Email" value={selectedProfile.data.email} />
-                <InfoRow label="Phone" value={selectedProfile.data.phone || "-"} />
-                <InfoRow label="City" value={selectedProfile.data.city || "-"} />
-
-                {selectedProfile.type === "technician" ? (
-                  <>
-                    <InfoRow label="Service" value={selectedProfile.data.service || "-"} />
-                    <InfoRow
-                      label="Experience"
-                      value={`${selectedProfile.data.experience || 0} yrs`}
-                    />
-                  </>
-                ) : null}
-              </div>
-
-              <div style={{ marginTop: 14, display: "flex", justifyContent: "flex-end" }}>
-                {selectedProfile.type === "user" ? (
-                  <button
-                    className="btn-outline"
-                    onClick={() => handleDeleteUser(selectedProfile.data.id)}
-                  >
-                    Delete User
-                  </button>
-                ) : (
-                  <button
-                    className="btn-outline"
-                    onClick={() =>
-                      handleDeleteTechnician(selectedProfile.data.technicianId)
-                    }
-                  >
-                    Delete Technician
-                  </button>
-                )}
-              </div>
-            </div>
+            <button className="btn-outline" onClick={() => setSelectedProfile(null)}>
+              Close
+            </button>
           </div>
-        </div>
-      ) : null}
+        ) : null}
+      </div>
     </>
   );
 }

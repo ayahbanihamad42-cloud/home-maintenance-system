@@ -1,190 +1,413 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { View, Text, ScrollView, StyleSheet, TouchableOpacity } from "react-native";
+import {
+  View,
+  Text,
+  ScrollView,
+  TextInput,
+  TouchableOpacity,
+  StyleSheet,
+  ActivityIndicator,
+} from "react-native";
 import { Picker } from "@react-native-picker/picker";
-import AsyncStorage from "@react-native-async-storage/async-storage";
-
-import Header from "../../components/Common/Header";
 import API from "../../services/api";
-import { getTechnicianByUserId } from "../../services/technicianService";
 
-function TechnicianRequests() {
-  const [requests, setRequests] = useState([]);
-  const [statusFilter, setStatusFilter] = useState("all");
+export default function MaintenanceRequest({ navigation, route }) {
+  const params = route?.params || {};
+  const technician = params.technician || {};
 
-  const loadRequests = async () => {
+  const technicianId =
+    params.technicianId || technician.technicianId || technician.id;
+
+  const [user, setUser] = useState(params.user || {});
+  const [dates, setDates] = useState([]);
+  const [times, setTimes] = useState([]);
+  const [loadingAvailability, setLoadingAvailability] = useState(false);
+
+  const [form, setForm] = useState({
+    service: params.service || technician.service || "",
+    technicianName: params.technicianName || technician.name || "",
+    scheduled_date: "",
+    scheduled_time: "",
+    estimated_hours: "1",
+    payment_method: "cash",
+    location_note: "",
+    description: "",
+    price_per_hour: String(params.price_per_hour || technician.price_per_hour || 0),
+  });
+
+  const [error, setError] = useState("");
+
+  const total = useMemo(() => {
+    return (
+      Number(form.price_per_hour || 0) * Number(form.estimated_hours || 1)
+    ).toFixed(2);
+  }, [form.price_per_hour, form.estimated_hours]);
+
+  const loadDates = async () => {
+    if (!technicianId) {
+      setError("Technician id is missing.");
+      return;
+    }
+
     try {
-      const userText = await AsyncStorage.getItem("user");
-      const user = userText ? JSON.parse(userText) : {};
+      setLoadingAvailability(true);
+      const res = await API.get(`/technicians/${technicianId}/availability`);
+      const list = Array.isArray(res.data) ? res.data : [];
 
-      const tech = await getTechnicianByUserId(user.id);
-      const res = await API.get(`/technicians/${tech.technicianId}/requests`);
+      const uniqueDates = [
+        ...new Set(
+          list
+            .filter((x) => !x.is_booked)
+            .map((x) => String(x.available_date || "").split("T")[0])
+            .filter(Boolean)
+        ),
+      ];
 
-      setRequests(res.data || []);
+      setDates(uniqueDates);
+
+      if (uniqueDates.length > 0) {
+        setForm((prev) => ({ ...prev, scheduled_date: uniqueDates[0] }));
+      }
     } catch (err) {
-      console.error("technician requests error:", err);
-      setRequests([]);
+      console.log("load dates error:", err.response?.data || err.message);
+      setDates([]);
+    } finally {
+      setLoadingAvailability(false);
+    }
+  };
+
+  const loadTimes = async () => {
+    if (!technicianId || !form.scheduled_date) return;
+
+    try {
+      const res = await API.get(`/technicians/${technicianId}/availability`, {
+        params: { date: form.scheduled_date },
+      });
+
+      const list = Array.isArray(res.data) ? res.data : [];
+
+      const slots = list
+        .filter((x) => !x.is_booked)
+        .map((x) => ({
+          id: x.id,
+          label: `${x.start_time} - ${x.end_time}`,
+          value: x.start_time,
+        }));
+
+      setTimes(slots);
+
+      if (slots.length > 0) {
+        setForm((prev) => ({ ...prev, scheduled_time: slots[0].value }));
+      } else {
+        setForm((prev) => ({ ...prev, scheduled_time: "" }));
+      }
+    } catch (err) {
+      console.log("load times error:", err.response?.data || err.message);
+      setTimes([]);
     }
   };
 
   useEffect(() => {
-    loadRequests();
-  }, []);
+    loadDates();
+  }, [technicianId]);
 
-  const filteredRequests = useMemo(() => {
-    if (statusFilter === "all") return requests;
+  useEffect(() => {
+    loadTimes();
+  }, [form.scheduled_date]);
 
-    return requests.filter(
-      (req) =>
-        String(req.status || "").toLowerCase() ===
-        String(statusFilter).toLowerCase()
-    );
-  }, [requests, statusFilter]);
-
-  const updateStatus = async (requestId, status) => {
+  const submit = async () => {
     try {
-      await API.patch(`/maintenance/${requestId}/status`, { status });
-      loadRequests();
+      setError("");
+
+      if (!technicianId) {
+        setError("Technician id is missing.");
+        return;
+      }
+
+      if (!form.scheduled_date || !form.scheduled_time) {
+        setError("Please choose available date and time.");
+        return;
+      }
+
+      if (!form.description.trim()) {
+        setError("Please enter description.");
+        return;
+      }
+
+      const payload = {
+        user_id: user?.id,
+        technician_id: technicianId,
+        service: form.service,
+        service_type: form.service,
+        description: form.description,
+        city: user?.city || "",
+        location: form.location_note,
+        location_note: form.location_note,
+        scheduled_date: form.scheduled_date,
+        scheduled_time: form.scheduled_time,
+        estimated_hours: Number(form.estimated_hours || 1),
+        payment_method: String(form.payment_method).toLowerCase(),
+        price_per_hour: Number(form.price_per_hour || 0),
+        total_price: Number(total),
+      };
+
+      const res = await API.post("/maintenance", payload);
+      const requestId = res.data?.requestId || res.data?.id;
+
+      if (form.payment_method === "online") {
+        navigation.navigate("PaymentForm", {
+          requestId,
+          amount: Number(total),
+          technicianId,
+          estimated_hours: Number(form.estimated_hours || 1),
+        });
+      } else {
+        navigation.navigate("MaintenanceHistory");
+      }
     } catch (err) {
-      console.error("update request status error:", err);
+      console.log("submit request error:", err.response?.data || err.message);
+      setError(err.response?.data?.message || "Failed to submit request.");
     }
   };
 
   return (
-    <>
-      <Header />
+    <View style={styles.screen}>
+      <Header navigation={navigation} />
 
       <ScrollView contentContainerStyle={styles.container}>
-        <Text style={styles.title}>Technician Requests</Text>
+        <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()}>
+          <Text style={styles.backText}>← Back</Text>
+        </TouchableOpacity>
 
-        <View style={styles.filterBox}>
-          <Picker selectedValue={statusFilter} onValueChange={setStatusFilter}>
-            <Picker.Item label="All requests" value="all" />
-            <Picker.Item label="Pending" value="pending" />
-            <Picker.Item label="Accepted" value="accepted" />
-            <Picker.Item label="In Progress" value="in_progress" />
-            <Picker.Item label="Completed" value="completed" />
-            <Picker.Item label="Rejected" value="rejected" />
-            <Picker.Item label="Cancelled" value="cancelled" />
-          </Picker>
-        </View>
+        <View style={styles.panel}>
+          <Text style={styles.title}>Maintenance Request</Text>
 
-        {filteredRequests.length === 0 ? (
-          <View style={styles.emptyCard}>
-            <Text style={styles.emptyText}>No requests found.</Text>
+          {error ? <Text style={styles.error}>{error}</Text> : null}
+
+          <View style={styles.grid}>
+            <View style={styles.field}>
+              <Text style={styles.label}>Service</Text>
+              <TextInput style={styles.input} value={form.service} editable={false} />
+            </View>
+
+            <View style={styles.field}>
+              <Text style={styles.label}>Technician</Text>
+              <TextInput
+                style={styles.input}
+                value={form.technicianName}
+                editable={false}
+              />
+            </View>
           </View>
-        ) : (
-          filteredRequests.map((req) => (
-            <View style={styles.card} key={req.id}>
-              <Text style={styles.cardTitle}>{req.service}</Text>
 
-              <Text style={styles.description}>{req.description}</Text>
-
-              <Text style={styles.info}>Status: {req.status}</Text>
-              <Text style={styles.info}>Date: {req.scheduled_date}</Text>
-              <Text style={styles.info}>Time: {req.scheduled_time}</Text>
-              <Text style={styles.info}>User ID: {req.user_id}</Text>
-
-              <View style={styles.actions}>
-                <TouchableOpacity
-                  style={styles.button}
-                  onPress={() => updateStatus(req.id, "accepted")}
+          <View style={styles.grid}>
+            <View style={styles.field}>
+              <Text style={styles.label}>Date</Text>
+              <View style={styles.pickerBox}>
+                <Picker
+                  selectedValue={form.scheduled_date}
+                  onValueChange={(value) =>
+                    setForm({ ...form, scheduled_date: value })
+                  }
                 >
-                  <Text style={styles.buttonText}>Accept</Text>
-                </TouchableOpacity>
-
-                <TouchableOpacity
-                  style={styles.button}
-                  onPress={() => updateStatus(req.id, "in_progress")}
-                >
-                  <Text style={styles.buttonText}>Start</Text>
-                </TouchableOpacity>
-
-                <TouchableOpacity
-                  style={styles.button}
-                  onPress={() => updateStatus(req.id, "completed")}
-                >
-                  <Text style={styles.buttonText}>Complete</Text>
-                </TouchableOpacity>
+                  <Picker.Item label="Select date" value="" />
+                  {dates.map((date) => (
+                    <Picker.Item key={date} label={date} value={date} />
+                  ))}
+                </Picker>
               </View>
             </View>
-          ))
-        )}
+
+            <View style={styles.field}>
+              <Text style={styles.label}>Time Slot</Text>
+              <View style={styles.pickerBox}>
+                <Picker
+                  selectedValue={form.scheduled_time}
+                  onValueChange={(value) =>
+                    setForm({ ...form, scheduled_time: value })
+                  }
+                >
+                  <Picker.Item label="Select time" value="" />
+                  {times.map((time) => (
+                    <Picker.Item
+                      key={time.id || time.label}
+                      label={time.label}
+                      value={time.value}
+                    />
+                  ))}
+                </Picker>
+              </View>
+            </View>
+          </View>
+
+          <View style={styles.grid}>
+            <View style={styles.field}>
+              <Text style={styles.label}>Estimated Hours</Text>
+              <TextInput
+                style={styles.input}
+                keyboardType="numeric"
+                value={form.estimated_hours}
+                onChangeText={(v) => setForm({ ...form, estimated_hours: v })}
+              />
+            </View>
+
+            <View style={styles.field}>
+              <Text style={styles.label}>Payment Method</Text>
+              <View style={styles.pickerBox}>
+                <Picker
+                  selectedValue={form.payment_method}
+                  onValueChange={(value) =>
+                    setForm({ ...form, payment_method: value })
+                  }
+                >
+                  <Picker.Item label="Cash" value="cash" />
+                  <Picker.Item label="Online" value="online" />
+                </Picker>
+              </View>
+            </View>
+          </View>
+
+          <Text style={styles.label}>Price Summary</Text>
+          <TextInput
+            style={styles.input}
+            editable={false}
+            value={`Price / hour: ${Number(form.price_per_hour || 0).toFixed(
+              2
+            )} JOD | Estimated Hours: ${
+              form.estimated_hours
+            } | Total: ${total} JOD`}
+          />
+
+          <Text style={styles.label}>Location Note</Text>
+          <TextInput
+            style={styles.input}
+            value={form.location_note}
+            onChangeText={(v) => setForm({ ...form, location_note: v })}
+            placeholder="Example: Irbid, near Yarmouk University"
+          />
+
+          <Text style={styles.label}>Description</Text>
+          <TextInput
+            style={[styles.input, styles.textArea]}
+            multiline
+            value={form.description}
+            onChangeText={(v) => setForm({ ...form, description: v })}
+            placeholder="Describe the problem..."
+          />
+
+          <TouchableOpacity style={styles.btn} onPress={submit}>
+            <Text style={styles.btnText}>
+              {form.payment_method === "online"
+                ? "Continue to Payment"
+                : "Submit Request"}
+            </Text>
+          </TouchableOpacity>
+
+          {loadingAvailability ? (
+            <ActivityIndicator color="#111" style={{ marginTop: 20 }} />
+          ) : null}
+        </View>
       </ScrollView>
-    </>
+    </View>
+  );
+}
+
+function Header({ navigation }) {
+  return (
+    <View style={styles.header}>
+      <Text style={styles.headerTitle}>Maintenance System</Text>
+      <TouchableOpacity style={styles.bell}>
+        <Text style={styles.bellText}>🔔</Text>
+      </TouchableOpacity>
+      <TouchableOpacity style={styles.logout}>
+        <Text style={styles.logoutText}>Log Out</Text>
+      </TouchableOpacity>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    padding: 15,
-    backgroundColor: "#E8DCCF",
-    flexGrow: 1,
+  screen: { flex: 1, backgroundColor: "#e7dccc" },
+  header: {
+    minHeight: 96,
+    backgroundColor: "#faf5ef",
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 18,
+    borderBottomWidth: 1,
+    borderBottomColor: "#d8c8b8",
   },
-  title: {
-    fontSize: 24,
-    fontWeight: "800",
-    color: "#111",
-    marginBottom: 12,
-  },
-  filterBox: {
-    height: 44,
-    borderRadius: 999,
-    borderWidth: 1,
-    borderColor: "#D8C8B8",
-    backgroundColor: "#F6EDE2",
-    overflow: "hidden",
+  headerTitle: { flex: 1, fontSize: 26, fontWeight: "900" },
+  bell: {
+    width: 54,
+    height: 54,
+    borderRadius: 27,
+    backgroundColor: "#fff",
+    alignItems: "center",
     justifyContent: "center",
+    marginRight: 12,
+  },
+  bellText: { fontSize: 26 },
+  logout: {
+    backgroundColor: "#111",
+    paddingHorizontal: 22,
+    paddingVertical: 16,
+    borderRadius: 28,
+  },
+  logoutText: { color: "#fff", fontWeight: "900", fontSize: 16 },
+  container: { padding: 24, paddingBottom: 70 },
+  backBtn: {
+    backgroundColor: "#111",
+    alignSelf: "flex-start",
+    paddingHorizontal: 28,
+    paddingVertical: 18,
+    borderRadius: 28,
+    marginBottom: 24,
+  },
+  backText: { color: "#fff", fontSize: 20, fontWeight: "900" },
+  panel: {
+    backgroundColor: "#fffaf4",
+    borderRadius: 28,
+    padding: 26,
+    borderWidth: 1,
+    borderColor: "#d8c8b8",
+  },
+  title: { fontSize: 38, fontWeight: "900", marginBottom: 20 },
+  error: {
+    backgroundColor: "#fdebed",
+    color: "#b4232b",
+    padding: 14,
+    borderRadius: 14,
+    fontSize: 17,
     marginBottom: 16,
   },
-  card: {
-    backgroundColor: "#FFF9F3",
-    borderRadius: 18,
+  grid: { flexDirection: "row", gap: 12 },
+  field: { flex: 1 },
+  label: { fontSize: 17, fontWeight: "900", marginBottom: 8, marginTop: 14 },
+  input: {
+    backgroundColor: "#f7efe7",
     borderWidth: 1,
-    borderColor: "#D8C8B8",
-    padding: 16,
-    marginBottom: 14,
-  },
-  cardTitle: {
-    fontSize: 20,
-    fontWeight: "800",
-    color: "#111",
-  },
-  description: {
-    color: "#3A3028",
-    marginVertical: 8,
-    lineHeight: 20,
-  },
-  info: {
-    color: "#3A3028",
-    marginBottom: 4,
-  },
-  actions: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 8,
-    marginTop: 12,
-  },
-  button: {
-    backgroundColor: "#111",
-    borderRadius: 999,
-    paddingVertical: 9,
-    paddingHorizontal: 14,
-  },
-  buttonText: {
-    color: "#FFF",
-    fontWeight: "700",
-  },
-  emptyCard: {
-    backgroundColor: "#FFF9F3",
-    padding: 18,
+    borderColor: "#d8c8b8",
     borderRadius: 16,
-    alignItems: "center",
+    paddingHorizontal: 16,
+    minHeight: 56,
+    fontSize: 17,
+  },
+  pickerBox: {
+    backgroundColor: "#f7efe7",
     borderWidth: 1,
-    borderColor: "#D8C8B8",
+    borderColor: "#d8c8b8",
+    borderRadius: 16,
+    overflow: "hidden",
   },
-  emptyText: {
-    color: "#3A3028",
+  textArea: { height: 120, textAlignVertical: "top", paddingTop: 14 },
+  btn: {
+    backgroundColor: "#111",
+    alignSelf: "flex-start",
+    marginTop: 18,
+    paddingHorizontal: 28,
+    paddingVertical: 18,
+    borderRadius: 20,
   },
+  btnText: { color: "#fff", fontSize: 17, fontWeight: "900" },
 });
-
-export default TechnicianRequests;

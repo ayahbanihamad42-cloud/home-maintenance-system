@@ -1,103 +1,146 @@
 import React, { useEffect, useRef, useState } from "react";
-import API from "../../services/api";
 import Header from "../../components/common/Header";
-import TechnicianProfileGallery from "../../pages/technician/TechnicianGalleryManager.jsx";
+import API from "../../services/api";
+import TechnicianProfileGallery from "../technician/TechnicianGalleryManager";
 
 function UserProfile() {
+  const currentUser = JSON.parse(localStorage.getItem("user") || "{}");
+
   const [profile, setProfile] = useState(null);
-  const user = JSON.parse(localStorage.getItem("user"));
 
   const [menuOpen, setMenuOpen] = useState(false);
+  const [submenu, setSubmenu] = useState(null);
+
   const [showEditModal, setShowEditModal] = useState(false);
   const [showPhotoModal, setShowPhotoModal] = useState(false);
 
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
+  const [city, setCity] = useState("");
+  const [dob, setDob] = useState("");
 
-  const [profileMessage, setProfileMessage] = useState(null);
   const [photoPreview, setPhotoPreview] = useState("");
+  const [profileMessage, setProfileMessage] = useState(null);
 
   const fileInputRef = useRef(null);
 
-  useEffect(() => {
-    API.get(`/users/${user.id}`).then(res => {
+  const formatDate = (value) => {
+    if (!value) return "";
+    return String(value).split("T")[0];
+  };
+
+  const loadProfile = async () => {
+    try {
+      const res = await API.get(`/users/${currentUser.id}`);
+
       setProfile(res.data);
       setEmail(res.data.email || "");
       setPhone(res.data.phone || "");
+      setCity(res.data.city || "");
+      setDob(formatDate(res.data.dob));
 
-      const savedPhoto = localStorage.getItem(`profile_photo_${user.id}`);
-      if (savedPhoto) {
-        setPhotoPreview(savedPhoto);
-      }
-    });
-  }, [user.id]);
-
-  if (!profile) return <div className="loader">Loading...</div>;
-
-  const resetEditForm = () => {
-    setEmail(profile?.email || "");
-    setPhone(profile?.phone || "");
+      const savedPhoto = localStorage.getItem(`profile_photo_${currentUser.id}`);
+      if (savedPhoto) setPhotoPreview(savedPhoto);
+    } catch (err) {
+      console.error("profile load error:", err);
+      setProfileMessage({
+        type: "error",
+        title: "Error",
+        body: "Failed to load profile.",
+      });
+    }
   };
 
-  const submitProfileUpdate = async () => {
-    if (!email) {
-      setProfileMessage({
-        type: "warning",
-        title: "Notice",
-        body: "Email is required."
-      });
-      return;
-    }
+  useEffect(() => {
+    if (currentUser?.id) loadProfile();
+  }, [currentUser?.id]);
 
+  const openSoonMessage = (name) => {
+    setMenuOpen(false);
+    setSubmenu(null);
+
+    setProfileMessage({
+      type: "warning",
+      title: name,
+      body: "We will add this feature soon.",
+    });
+  };
+
+  const handleSaveProfile = async () => {
     try {
-      await API.patch(`/users/${user.id}`, { email, phone });
+      const payload = {
+        email,
+        phone,
+        city,
+        dob,
+      };
 
-      try {
-        await API.post(`/users/${user.id}/send-verification`, { email });
-      } catch (err) {
-        console.error("Verification email service error");
-      }
+      await API.patch(`/users/${currentUser.id}`, payload);
 
-      setProfile((prev) => ({ ...prev, email, phone }));
+      await API.post("/users/send-profile-update-email", {
+        userId: currentUser.id,
+        ...payload,
+      });
+
+      const updatedProfile = {
+        ...profile,
+        ...payload,
+      };
+
+      setProfile(updatedProfile);
+
+      localStorage.setItem(
+        "user",
+        JSON.stringify({
+          ...currentUser,
+          email,
+          phone,
+          city,
+          dob,
+        })
+      );
+
+      setShowEditModal(false);
 
       setProfileMessage({
         type: "success",
         title: "Saved Successfully",
-        body: "Profile updated. Please review your email."
+        body: "Profile updated successfully and we sent an email.",
       });
+    } catch (err) {
+      console.error("profile update error:", err);
 
-      setTimeout(() => {
-        setShowEditModal(false);
-      }, 1800);
-    } catch (error) {
       setProfileMessage({
         type: "error",
-        title: "Notice",
-        body: error.response?.data?.message || "Failed to update profile."
+        title: "Error",
+        body: err.response?.data?.message || "Failed to update profile.",
       });
     }
   };
 
-  const handlePhotoChange = (event) => {
-    const file = event.target.files?.[0];
+  const handlePhotoChange = (e) => {
+    const file = e.target.files?.[0];
     if (!file) return;
 
     const reader = new FileReader();
+
     reader.onloadend = () => {
-      const imageData = reader.result;
-      setPhotoPreview(imageData);
-      localStorage.setItem(`profile_photo_${user.id}`, imageData);
+      localStorage.setItem(`profile_photo_${currentUser.id}`, reader.result);
+      setPhotoPreview(reader.result);
+
+      setShowPhotoModal(false);
 
       setProfileMessage({
         type: "success",
         title: "Saved Successfully",
-        body: "Profile photo updated."
+        body: "Profile photo updated successfully.",
       });
-
-      setShowPhotoModal(false);
     };
+
     reader.readAsDataURL(file);
   };
+
+  if (!profile) return null;
 
   return (
     <>
@@ -109,9 +152,9 @@ function UserProfile() {
             <div className="profile-identity">
               <div className="avatar profile-avatar-large">
                 {photoPreview ? (
-                  <img src={photoPreview} alt="Profile" className="avatar-image" />
+                  <img src={photoPreview} alt="profile" className="avatar-image" />
                 ) : (
-                  profile.name.charAt(0)
+                  profile.name?.charAt(0)?.toUpperCase()
                 )}
               </div>
 
@@ -123,141 +166,191 @@ function UserProfile() {
 
             <div className="profile-settings-wrapper">
               <button
+                type="button"
                 className="profile-settings-btn"
-                onClick={() => setMenuOpen((prev) => !prev)}
+                onClick={() => {
+                  setMenuOpen((prev) => !prev);
+                  setSubmenu(null);
+                }}
               >
                 ⚙
               </button>
 
-              {menuOpen ? (
+              {menuOpen && (
                 <div className="profile-settings-menu">
                   <button
+                    type="button"
                     onClick={() => {
-                      resetEditForm();
-                      setProfileMessage(null);
                       setShowEditModal(true);
                       setMenuOpen(false);
+                      setSubmenu(null);
                     }}
                   >
                     Edit Contact
                   </button>
 
                   <button
+                    type="button"
                     onClick={() => {
                       setShowPhotoModal(true);
                       setMenuOpen(false);
+                      setSubmenu(null);
                     }}
                   >
                     Edit Photo
                   </button>
 
                   <button
-                    onClick={() => {
-                      setProfileMessage({
-                        type: "warning",
-                        title: "Notice",
-                        body: "Language setting will be added here."
-                      });
-                      setMenuOpen(false);
-                    }}
+                    type="button"
+                    onClick={() => setSubmenu(submenu === "language" ? null : "language")}
                   >
-                    Language
+                    Language ▸
                   </button>
 
                   <button
-                    onClick={() => {
-                      setProfileMessage({
-                        type: "warning",
-                        title: "Notice",
-                        body: "Theme setting will be added here."
-                      });
-                      setMenuOpen(false);
-                    }}
+                    type="button"
+                    onClick={() => setSubmenu(submenu === "theme" ? null : "theme")}
                   >
-                    Theme
+                    Theme ▸
                   </button>
+
+                  {submenu === "language" && (
+                    <div
+                      style={{
+                        position: "absolute",
+                        top: "96px",
+                        right: "230px",
+                        minWidth: "180px",
+                        background: "#fffaf4",
+                        border: "1px solid #eadfce",
+                        borderRadius: "18px",
+                        boxShadow: "0 18px 34px rgba(0,0,0,0.14)",
+                        padding: "10px",
+                        zIndex: 40,
+                      }}
+                    >
+                      <button type="button" onClick={() => openSoonMessage("Arabic")}>
+                        Arabic
+                      </button>
+
+                      <button type="button" onClick={() => openSoonMessage("English")}>
+                        English
+                      </button>
+                    </div>
+                  )}
+
+                  {submenu === "theme" && (
+                    <div
+                      style={{
+                        position: "absolute",
+                        top: "144px",
+                        right: "230px",
+                        minWidth: "180px",
+                        background: "#fffaf4",
+                        border: "1px solid #eadfce",
+                        borderRadius: "18px",
+                        boxShadow: "0 18px 34px rgba(0,0,0,0.14)",
+                        padding: "10px",
+                        zIndex: 40,
+                      }}
+                    >
+                      <button type="button" onClick={() => openSoonMessage("Light Theme")}>
+                        Light
+                      </button>
+
+                      <button type="button" onClick={() => openSoonMessage("Dark Theme")}>
+                        Dark
+                      </button>
+                    </div>
+                  )}
                 </div>
-              ) : null}
+              )}
             </div>
           </div>
 
-          {profileMessage ? (
-            <div className={`message-box-card profile-message-box ${profileMessage.type}`}>
+          {profileMessage && (
+            <div className={`message-box-card ${profileMessage.type}`}>
               <div className="message-box-title">{profileMessage.title}</div>
               <div className="message-box-body">{profileMessage.body}</div>
             </div>
-          ) : null}
+          )}
 
           <div className="profile-info">
-            <p><b>Email:</b> {profile.email}</p>
-            <p><b>Phone:</b> {profile.phone || "Not set"}</p>
-            <p><b>City:</b> {profile.city}</p>
-            <p><b>Birth Date:</b> {new Date(profile.dob).toLocaleDateString()}</p>
+            <p>
+              <b>Email:</b> {profile.email || "-"}
+            </p>
+
+            <p>
+              <b>Phone:</b> {profile.phone || "-"}
+            </p>
+
+            <p>
+              <b>City:</b> {profile.city || "-"}
+            </p>
+
+            <p>
+              <b>Birth Date:</b> {formatDate(profile.dob) || "-"}
+            </p>
           </div>
-          {JSON.parse(localStorage.getItem("user") || "{}")?.role === "technician" ? (
-  <TechnicianProfileGallery />
-) : null}
+
+          {profile.role === "technician" && profile.technician_id && (
+            <TechnicianProfileGallery technicianId={profile.technician_id} />
+          )}
         </div>
       </div>
 
-      {showEditModal ? (
-        <div className="modal-overlay" onClick={() => setShowEditModal(false)}>
-          <div className="modal" onClick={(event) => event.stopPropagation()}>
+      {showEditModal && (
+        <div className="modal-overlay">
+          <div className="modal">
             <h3>Update Contact</h3>
 
             <div className="input-group">
               <label>Email</label>
-              <input
-                type="email"
-                value={email}
-                onChange={(event) => setEmail(event.target.value)}
-                placeholder="name@example.com"
-              />
+              <input value={email} onChange={(e) => setEmail(e.target.value)} />
             </div>
 
             <div className="input-group">
               <label>Phone</label>
-              <input
-                type="tel"
-                value={phone}
-                onChange={(event) => setPhone(event.target.value)}
-                placeholder="Phone number"
-              />
+              <input value={phone} onChange={(e) => setPhone(e.target.value)} />
             </div>
 
-            {profileMessage ? (
-              <div className={`message-box-card inside-modal ${profileMessage.type}`}>
-                <div className="message-box-title">{profileMessage.title}</div>
-                <div className="message-box-body">{profileMessage.body}</div>
-              </div>
-            ) : null}
+            <div className="input-group">
+              <label>City</label>
+              <input value={city} onChange={(e) => setCity(e.target.value)} />
+            </div>
+
+            <div className="input-group">
+              <label>Birth Date</label>
+              <input type="date" value={dob} onChange={(e) => setDob(e.target.value)} />
+            </div>
 
             <div className="modal-actions">
-              <button className="secondary" onClick={() => setShowEditModal(false)}>
+              <button className="secondary" type="button" onClick={() => setShowEditModal(false)}>
                 Cancel
               </button>
-              <button className="primary" onClick={submitProfileUpdate}>
+
+              <button className="primary" type="button" onClick={handleSaveProfile}>
                 Save
               </button>
             </div>
           </div>
         </div>
-      ) : null}
+      )}
 
-      {showPhotoModal ? (
-        <div className="modal-overlay" onClick={() => setShowPhotoModal(false)}>
-          <div className="modal" onClick={(event) => event.stopPropagation()}>
-            <h3>Update Profile Photo</h3>
+      {showPhotoModal && (
+        <div className="modal-overlay">
+          <div className="modal">
+            <h3>Update Photo</h3>
 
-            {photoPreview ? (
-              <div className="profile-photo-preview-wrap">
-                <img
-                  src={photoPreview}
-                  alt="Preview"
-                  className="profile-photo-preview"
-                />
+            <div className="profile-photo-preview-wrap">
+              <div className="avatar profile-avatar-large">
+                {photoPreview ? (
+                  <img src={photoPreview} alt="preview" className="avatar-image" />
+                ) : (
+                  profile.name?.charAt(0)?.toUpperCase()
+                )}
               </div>
-            ) : null}
+            </div>
 
             <div className="input-group">
               <label>Select Image</label>
@@ -270,13 +363,13 @@ function UserProfile() {
             </div>
 
             <div className="modal-actions">
-              <button className="secondary" onClick={() => setShowPhotoModal(false)}>
+              <button className="secondary" type="button" onClick={() => setShowPhotoModal(false)}>
                 Cancel
               </button>
             </div>
           </div>
         </div>
-      ) : null}
+      )}
     </>
   );
 }

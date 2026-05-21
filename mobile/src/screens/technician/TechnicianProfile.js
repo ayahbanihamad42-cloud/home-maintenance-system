@@ -2,243 +2,350 @@ import React, { useEffect, useState } from "react";
 import {
   View,
   Text,
-  Button,
   ScrollView,
-  StyleSheet,
-  ActivityIndicator,
-  Image,
   TouchableOpacity,
+  StyleSheet,
+  Image,
+  ActivityIndicator,
 } from "react-native";
-import { useRoute, useNavigation } from "@react-navigation/native";
-
 import API from "../../services/api";
-import Header from "../../components/Common/Header";
-import { getTechnicianGallery } from "../../services/technicianService";
 
-function TechnicianProfile() {
-  const route = useRoute();
-  const navigation = useNavigation();
+const API_HOST = "http://localhost:5000";
 
-  const { technicianId } = route.params || {};
+const getImageUrl = (url) => {
+  if (!url) return null;
+  if (String(url).startsWith("http")) return url;
+  return `${API_HOST}${url}`;
+};
 
-  const [tech, setTech] = useState(null);
-  const [posts, setPosts] = useState([]);
+export default function TechnicianProfile({ navigation, route }) {
+  const params = route?.params || {};
+  const initialTech = params.technician || {};
+  const technicianId =
+    params.technicianId || initialTech.technicianId || initialTech.id;
 
-  useEffect(() => {
+  const [tech, setTech] = useState(initialTech);
+  const [gallery, setGallery] = useState([]);
+  const [loading, setLoading] = useState(false);
+
+  const loadProfile = async () => {
     if (!technicianId) return;
 
-    API.get(`/technicians/${technicianId}`)
-      .then((res) => setTech(res.data))
-      .catch((err) => console.error(err));
-  }, [technicianId]);
+    try {
+      setLoading(true);
+      const res = await API.get(`/technicians/${technicianId}`);
+      setTech(res.data || initialTech);
+    } catch (err) {
+      console.log("profile error:", err.response?.data || err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
 
-  useEffect(() => {
+  const loadGallery = async () => {
     if (!technicianId) return;
 
-    getTechnicianGallery(technicianId)
-      .then((data) => setPosts(data || []))
-      .catch(() => setPosts([]));
+    try {
+      const res = await API.get(`/technicians/${technicianId}/gallery`);
+      setGallery(Array.isArray(res.data) ? res.data : []);
+    } catch (err) {
+      console.log("gallery error:", err.response?.data || err.message);
+      setGallery([]);
+    }
+  };
+
+  useEffect(() => {
+    loadProfile();
+    loadGallery();
   }, [technicianId]);
 
-  if (!tech) {
+  if (!technicianId) {
     return (
-      <View style={styles.loaderContainer}>
-        <ActivityIndicator size="large" color="#111" />
+      <View style={styles.screen}>
+        <Header navigation={navigation} />
+        <View style={styles.notice}>
+          <Text style={styles.noticeTitle}>Notice</Text>
+          <Text style={styles.noticeText}>Technician id is missing.</Text>
+        </View>
       </View>
     );
   }
 
   return (
-    <>
-      <Header />
+    <View style={styles.screen}>
+      <Header navigation={navigation} />
 
       <ScrollView contentContainerStyle={styles.container}>
-        <View style={styles.card}>
-          <Text style={styles.name}>{tech.name}</Text>
+        <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()}>
+          <Text style={styles.backText}>← Back</Text>
+        </TouchableOpacity>
 
-          <Text style={styles.specialty}>{tech.service} Specialist</Text>
+        {loading ? (
+          <ActivityIndicator size="large" color="#111" />
+        ) : (
+          <>
+            <View style={styles.card}>
+              <Text style={styles.name}>{tech.name || "Technician"}</Text>
+              <Text style={styles.service}>{tech.service || "-"}</Text>
 
-          <View style={styles.stats}>
-            <Text style={styles.statItem}>
-              <Text style={styles.bold}>Experience: </Text>
-              {tech.experience} Years
-            </Text>
+              <Text style={styles.line}>City: {tech.city || "-"}</Text>
+              <Text style={styles.line}>Phone: {tech.phone || "-"}</Text>
+              <Text style={styles.line}>
+                Experience: {tech.experience || 0} years
+              </Text>
+              <Text style={styles.line}>
+                Price: {Number(tech.price_per_hour || 0).toFixed(2)} JOD/hour
+              </Text>
+              <Text style={styles.line}>
+                Rating: ⭐ {tech.rating || tech.average_rating || "0.0"}
+              </Text>
 
-            <Text style={styles.statItem}>
-              <Text style={styles.bold}>Rating: </Text>
-              ⭐ {Number(tech.rating || 0).toFixed(1)}
-            </Text>
+              <Text style={styles.bio}>
+                {tech.bio || "Experienced technician ready to help."}
+              </Text>
 
-            <Text style={styles.statItem}>
-              <Text style={styles.bold}>Price / hour: </Text>
-              {Number(tech.price_per_hour || 0).toFixed(2)} JOD
-            </Text>
-          </View>
-
-          <View style={styles.contact}>
-            <Text>
-              <Text style={styles.bold}>City: </Text>
-              {tech.city || "Not provided"}
-            </Text>
-
-            <Text>
-              <Text style={styles.bold}>Phone: </Text>
-              {tech.phone || "Not provided"}
-            </Text>
-
-            <Text>
-              <Text style={styles.bold}>Email: </Text>
-              {tech.email || "Not provided"}
-            </Text>
-          </View>
-
-          <Text style={styles.bio}>
-            {tech.bio || "Experienced technician ready to help."}
-          </Text>
-
-          <View style={styles.actions}>
-            <Button
-              title="Send Message"
-              onPress={() => navigation.navigate("Chat", { userId: tech.user_id })}
-              color="#111"
-            />
-          </View>
-        </View>
-
-        <View style={styles.galleryWrapper}>
-          <View style={styles.divider} />
-
-          <Text style={styles.galleryTitle}>Work Gallery</Text>
-
-          {posts.length === 0 ? (
-            <Text style={styles.empty}>No work posts yet.</Text>
-          ) : (
-            <View style={styles.grid}>
-              {posts.map((post) => (
+              <View style={styles.actions}>
                 <TouchableOpacity
-                  key={post.id}
-                  style={styles.post}
+                  style={styles.btn}
                   onPress={() =>
-                    navigation.navigate("GalleryPostDetails", { post })
+                    navigation.navigate("Chat", {
+                      userId: tech.user_id,
+                      receiverId: tech.user_id,
+                      name: tech.name,
+                      user: {
+                        id: tech.user_id,
+                        name: tech.name,
+                      },
+                    })
                   }
                 >
-                  <Image
-                    source={{ uri: post.images?.[0] }}
-                    style={styles.postImage}
-                  />
-
-                  <Text style={styles.caption} numberOfLines={2}>
-                    {post.description}
-                  </Text>
+                  <Text style={styles.btnText}>Send Message</Text>
                 </TouchableOpacity>
-              ))}
+
+                <TouchableOpacity
+                  style={styles.btn}
+                  onPress={() =>
+                    navigation.navigate("MaintenanceRequest", {
+                      technicianId,
+                      technician: tech,
+                      service: tech.service,
+                      technicianName: tech.name,
+                      price_per_hour: tech.price_per_hour,
+                    })
+                  }
+                >
+                  <Text style={styles.btnText}>Book Now</Text>
+                </TouchableOpacity>
+              </View>
             </View>
-          )}
-        </View>
+
+            <View style={styles.galleryBox}>
+              <Text style={styles.galleryTitle}>Work Gallery</Text>
+
+              {gallery.length === 0 ? (
+                <Text style={styles.empty}>No gallery posts yet.</Text>
+              ) : (
+                gallery.map((post) => {
+                  let imgs = [];
+                  try {
+                    imgs = JSON.parse(post.images || "[]");
+                  } catch {
+                    imgs = [];
+                  }
+
+                  return (
+                    <View key={post.id} style={styles.post}>
+                      <Text style={styles.postCaption}>
+                        {post.description || post.caption || ""}
+                      </Text>
+
+                      {post.location_note ? (
+                        <Text style={styles.postLocation}>
+                          📍 {post.location_note}
+                        </Text>
+                      ) : null}
+
+                      <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+                        {imgs.map((img, index) => (
+                          <Image
+                            key={`${post.id}-${index}`}
+                            source={{ uri: getImageUrl(img) }}
+                            style={styles.postImg}
+                          />
+                        ))}
+                      </ScrollView>
+                    </View>
+                  );
+                })
+              )}
+            </View>
+          </>
+        )}
       </ScrollView>
-    </>
+    </View>
+  );
+}
+
+function Header({ navigation }) {
+  const [open, setOpen] = useState(false);
+
+  return (
+    <View style={styles.header}>
+      <TouchableOpacity style={styles.menuBtn} onPress={() => setOpen(!open)}>
+        <Text style={styles.menuText}>☰</Text>
+      </TouchableOpacity>
+
+      <Text style={styles.headerTitle}>Maintenance System</Text>
+
+      <TouchableOpacity style={styles.bell}>
+        <Text style={styles.bellText}>🔔</Text>
+      </TouchableOpacity>
+
+      <TouchableOpacity style={styles.logout}>
+        <Text style={styles.logoutText}>Log Out</Text>
+      </TouchableOpacity>
+
+      {open && (
+        <View style={styles.menu}>
+          <TouchableOpacity onPress={() => navigation.navigate("Home")}>
+            <Text style={styles.menuItem}>Home</Text>
+          </TouchableOpacity>
+          <TouchableOpacity onPress={() => navigation.navigate("MaintenanceHistory")}>
+            <Text style={styles.menuItem}>History</Text>
+          </TouchableOpacity>
+          <TouchableOpacity onPress={() => navigation.navigate("UserProfile")}>
+            <Text style={styles.menuItem}>Profile</Text>
+          </TouchableOpacity>
+          <TouchableOpacity onPress={() => navigation.navigate("AIChat")}>
+            <Text style={styles.menuItem}>AI Assistant</Text>
+          </TouchableOpacity>
+          <TouchableOpacity onPress={() => navigation.navigate("ChatList")}>
+            <Text style={styles.menuItem}>Chat</Text>
+          </TouchableOpacity>
+        </View>
+      )}
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    padding: 15,
-    backgroundColor: "#E8DCCF",
-    flexGrow: 1,
+  screen: { flex: 1, backgroundColor: "#e7dccc" },
+  header: {
+    minHeight: 96,
+    backgroundColor: "#faf5ef",
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 18,
+    borderBottomWidth: 1,
+    borderBottomColor: "#d8c8b8",
+    zIndex: 100,
   },
+  menuBtn: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: "#fff",
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1,
+    borderColor: "#d8c8b8",
+  },
+  menuText: { fontSize: 34, fontWeight: "900" },
+  headerTitle: { flex: 1, fontSize: 26, fontWeight: "900", marginLeft: 12 },
+  bell: {
+    width: 54,
+    height: 54,
+    borderRadius: 27,
+    backgroundColor: "#fff",
+    alignItems: "center",
+    justifyContent: "center",
+    marginRight: 12,
+    borderWidth: 1,
+    borderColor: "#d8c8b8",
+  },
+  bellText: { fontSize: 26 },
+  logout: {
+    backgroundColor: "#111",
+    paddingHorizontal: 22,
+    paddingVertical: 16,
+    borderRadius: 28,
+  },
+  logoutText: { color: "#fff", fontWeight: "900", fontSize: 16 },
+  menu: {
+    position: "absolute",
+    top: 88,
+    left: 18,
+    width: 230,
+    backgroundColor: "#fffaf4",
+    borderRadius: 18,
+    padding: 12,
+    borderWidth: 1,
+    borderColor: "#d8c8b8",
+    elevation: 10,
+  },
+  menuItem: { fontSize: 18, fontWeight: "800", paddingVertical: 12 },
+  container: { padding: 24, paddingBottom: 60 },
+  backBtn: {
+    backgroundColor: "#111",
+    alignSelf: "flex-start",
+    paddingHorizontal: 28,
+    paddingVertical: 18,
+    borderRadius: 28,
+    marginBottom: 24,
+  },
+  backText: { color: "#fff", fontSize: 20, fontWeight: "900" },
   card: {
-    backgroundColor: "#FFF9F3",
-    padding: 20,
-    borderRadius: 18,
-    marginBottom: 20,
+    backgroundColor: "#fffaf4",
+    borderRadius: 28,
+    padding: 28,
     borderWidth: 1,
-    borderColor: "#D8C8B8",
+    borderColor: "#d8c8b8",
+    marginBottom: 24,
   },
-  name: {
-    fontSize: 24,
-    fontWeight: "800",
-    marginBottom: 5,
-    color: "#111",
+  name: { fontSize: 44, fontWeight: "900", marginBottom: 12 },
+  service: { fontSize: 28, fontWeight: "900", marginBottom: 18 },
+  line: { fontSize: 23, marginTop: 10, color: "#3d342d" },
+  bio: { fontSize: 22, marginTop: 28, color: "#3d342d", lineHeight: 32 },
+  actions: { flexDirection: "row", gap: 14, marginTop: 28, flexWrap: "wrap" },
+  btn: {
+    backgroundColor: "#111",
+    paddingVertical: 18,
+    paddingHorizontal: 28,
+    borderRadius: 30,
   },
-  specialty: {
-    fontSize: 16,
-    color: "#3A3028",
-    marginBottom: 15,
-    fontWeight: "700",
-  },
-  stats: {
-    marginBottom: 15,
-  },
-  statItem: {
-    fontSize: 14,
-    marginBottom: 5,
-    color: "#111",
-  },
-  bold: {
-    fontWeight: "800",
-  },
-  contact: {
-    marginBottom: 15,
-    gap: 6,
-  },
-  bio: {
-    fontSize: 14,
-    marginBottom: 15,
-    color: "#3A3028",
-    lineHeight: 21,
-  },
-  actions: {
-    alignItems: "flex-start",
-  },
-  galleryWrapper: {
-    backgroundColor: "#FFF9F3",
-    borderRadius: 18,
+  btnText: { color: "#fff", fontSize: 18, fontWeight: "900" },
+  galleryBox: {
+    backgroundColor: "#fffaf4",
+    borderRadius: 28,
+    padding: 24,
     borderWidth: 1,
-    borderColor: "#D8C8B8",
-    padding: 15,
-    marginBottom: 30,
+    borderColor: "#d8c8b8",
   },
-  divider: {
-    height: 1,
-    backgroundColor: "#D8C8B8",
+  galleryTitle: { fontSize: 32, fontWeight: "900", marginBottom: 18 },
+  empty: { fontSize: 20, color: "#6b5e55" },
+  post: {
+    padding: 16,
+    backgroundColor: "#f7efe7",
+    borderRadius: 20,
     marginBottom: 18,
   },
-  galleryTitle: {
-    fontSize: 21,
-    fontWeight: "800",
-    color: "#111",
-    marginBottom: 14,
-  },
-  empty: {
-    color: "#3A3028",
-  },
-  grid: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 12,
-  },
-  post: {
-    width: "48%",
-    backgroundColor: "#FFF9F3",
+  postCaption: { fontSize: 19, fontWeight: "700", marginBottom: 8 },
+  postLocation: { fontSize: 17, marginBottom: 12 },
+  postImg: {
+    width: 170,
+    height: 130,
     borderRadius: 16,
-    overflow: "hidden",
+    marginRight: 10,
+    backgroundColor: "#e7dccc",
+  },
+  notice: {
+    margin: 24,
+    backgroundColor: "#fffaf4",
+    borderRadius: 28,
+    padding: 28,
     borderWidth: 1,
-    borderColor: "#D8C8B8",
+    borderColor: "#d8c8b8",
   },
-  postImage: {
-    width: "100%",
-    height: 170,
-  },
-  caption: {
-    padding: 10,
-    color: "#2C251F",
-    lineHeight: 19,
-  },
-  loaderContainer: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-  },
+  noticeTitle: { fontSize: 34, fontWeight: "900" },
+  noticeText: { fontSize: 22, marginTop: 14 },
 });
-
-export default TechnicianProfile;

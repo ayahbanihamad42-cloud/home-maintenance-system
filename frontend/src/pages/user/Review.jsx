@@ -1,109 +1,142 @@
-// Import React hooks
-import React, { useEffect, useMemo, useState } from "react";
-
-// Import router hooks
-import { useNavigate, useParams } from "react-router-dom";
-
-// Import services for maintenance requests and ratings
-import { getRequestById } from "../../services/maintenanceService";
-import { getRatingByRequest, submitRating } from "../../services/ratingService";
-
-// Import shared header
+import React, { useEffect, useState } from "react";
+import { useLocation, useNavigate, useParams } from "react-router-dom";
 import Header from "../../components/common/Header";
-
-// Import API instance
 import API from "../../services/api";
 
-// Component to review a maintenance request
-function ReviewRequest() {
-  // Get requestId from URL
-  const { requestId } = useParams();
-
-  // State to store request details
-  const [req, setReq] = useState(null);
-
-  // Technician related states
-  const [technicianName, setTechnicianName] = useState("");
-  const [technicianUserId, setTechnicianUserId] = useState(null);
-
-  // Rating form states
-  const [rating, setRating] = useState(5);
-  const [comment, setComment] = useState("");
-  const [submitMessage, setSubmitMessage] = useState("");
-
-  // Store existing rating if already submitted
-  const [existingRating, setExistingRating] = useState(null);
-
-  // Navigation hook
+function Review() {
+  const { id } = useParams();
+  const location = useLocation();
   const navigate = useNavigate();
 
-  // Fetch maintenance request details
-  useEffect(() => {
-    getRequestById(requestId)
-      .then((data) => setReq(data))
-      .catch(() => setReq(null));
-  }, [requestId]);
+  const [request, setRequest] = useState(location.state?.createdRequest || null);
+  const [message, setMessage] = useState(null);
+  const [rating, setRating] = useState(5);
+  const [comment, setComment] = useState("");
+  const [submittingReview, setSubmittingReview] = useState(false);
+  const [cancelling, setCancelling] = useState(false);
 
-  // Fetch existing rating for this request (if any)
-  useEffect(() => {
-    getRatingByRequest(requestId)
-      .then((data) => {
-        if (data) {
-          setExistingRating(data);
-          setRating(data.rating);
-          setComment(data.comment || "");
-        }
-      })
-      .catch(() => {
-        setExistingRating(null);
+  const formatDate = (value) => {
+    if (!value) return "-";
+    return String(value).split("T")[0];
+  };
+
+  const formatDateTime = (value) => {
+    if (!value) return "-";
+    const d = new Date(value);
+    if (Number.isNaN(d.getTime())) return value;
+    return d.toLocaleString();
+  };
+
+  const normalizedStatus = String(request?.status || "pending").toLowerCase();
+
+  const canCancel = normalizedStatus === "pending";
+  const canReview = normalizedStatus === "completed";
+
+  const loadRequest = async () => {
+    try {
+      const res = await API.get(`/maintenance/${id}`);
+      setRequest(res.data);
+    } catch (err) {
+      console.error("review load error:", err);
+      setMessage({
+        type: "error",
+        title: "Error",
+        body: "Failed to load request details.",
       });
-  }, [requestId]);
+    }
+  };
 
-  // Fetch technician details based on technician_id
   useEffect(() => {
-    if (!req?.technician_id) return;
+    if (id) loadRequest();
+  }, [id]);
 
-    API.get(`/technicians/${req.technician_id}`)
-      .then((res) => {
-        setTechnicianName(res.data?.name || "");
-        setTechnicianUserId(res.data?.user_id || null);
-      })
-      .catch(() => {
-        setTechnicianName("");
-        setTechnicianUserId(null);
+  const cancelRequest = async () => {
+    if (!canCancel) {
+      setMessage({
+        type: "warning",
+        title: "Cannot Cancel",
+        body: "This request is already accepted or started, so it cannot be cancelled.",
       });
-  }, [req?.technician_id]);
+      return;
+    }
 
-  // Timeline steps shown to the user
-  const timelineSteps = useMemo(
-    () => ["Request Accepted", "On The Way", "Service in Progress", "Completed"],
-    []
-  );
+    try {
+      setCancelling(true);
 
-  // Determine which timeline step is active based on request status
-  const activeIndex = useMemo(() => {
-    const statusMap = {
-      pending: -1,
-      confirmed: 0,
-      on_the_way: 1,
-      in_progress: 2,
-      completed: 3
-    };
+      await API.put(`/maintenance/${id}/status`, {
+        status: "cancelled",
+      });
 
-    const normalizedStatus = String(req?.status || "").trim().toLowerCase();
-    return statusMap[normalizedStatus] ?? -1;
-  }, [req?.status]);
+      setRequest((prev) => ({
+        ...prev,
+        status: "cancelled",
+      }));
 
-  // Check if request is completed
-  const isCompleted =
-    String(req?.status || "").trim().toLowerCase() === "completed";
+      setMessage({
+        type: "success",
+        title: "Request Cancelled",
+        body:
+          String(request?.payment_method).toLowerCase() === "online"
+            ? "Request cancelled. The refund notification was sent."
+            : "Request cancelled successfully.",
+      });
+    } catch (err) {
+      console.error("cancel request error:", err);
 
-  // Loading state
-  if (!req) {
+      setMessage({
+        type: "error",
+        title: "Error",
+        body: err.response?.data?.message || "Failed to cancel request.",
+      });
+    } finally {
+      setCancelling(false);
+    }
+  };
+
+  const submitReview = async () => {
+    if (!canReview) {
+      setMessage({
+        type: "warning",
+        title: "Review Not Available",
+        body: "Review is available only after the request is completed.",
+      });
+      return;
+    }
+
+    try {
+      setSubmittingReview(true);
+
+      await API.post("/ratings", {
+        request_id: Number(id),
+        technician_id: request.technician_id,
+        rating,
+        comment,
+      });
+
+      setMessage({
+        type: "success",
+        title: "Review Sent",
+        body: "Thank you for your review.",
+      });
+    } catch (err) {
+      console.error("submit review error:", err);
+
+      setMessage({
+        type: "error",
+        title: "Error",
+        body: err.response?.data?.message || "Failed to submit review.",
+      });
+    } finally {
+      setSubmittingReview(false);
+    }
+  };
+
+  if (!request) {
     return (
       <>
         <Header />
         <div className="container">
+          <h2>Request Review</h2>
           <p>Loading...</p>
         </div>
       </>
@@ -112,132 +145,109 @@ function ReviewRequest() {
 
   return (
     <>
-      {/* Page header */}
       <Header />
 
-      <div className="container">
-        <div className="glass-card">
-          {/* Request basic information */}
-          <h3>Request ID: #{req.id}</h3>
-          <p><b>Service Type:</b> {req.service || "Not specified"}</p>
-          <p><b>Date:</b> {req.scheduled_date || "Not specified"}</p>
-          <p><b>Time:</b> {req.scheduled_time || "Not specified"}</p>
-          <p><b>Location:</b> {req.location_note || "Not specified"}</p>
-          <p><b>Description:</b> {req.description || "Not specified"}</p>
+      <div className="container request-container">
+        <h2>Request Review</h2>
 
-          {/* Technician info and chat button */}
-          <div
-            style={{
-              display: "flex",
-              alignItems: "center",
-              background: "#cfd8dc",
-              padding: "10px",
-              borderRadius: "10px",
-              margin: "15px 0"
-            }}
-          >
-            <span style={{ flex: 1 }}>
-              👤 Technician: {technicianName || "Assigned technician"}
+        {message && (
+          <div className={`message-box-card ${message.type}`}>
+            <div className="message-box-title">{message.title}</div>
+            <div className="message-box-body">{message.body}</div>
+          </div>
+        )}
+
+        <div className="history-card">
+          <div className="history-card-header">
+            <h3>{request.service || "Maintenance"}</h3>
+            <span className="status-pill">{request.status || "pending"}</span>
+          </div>
+
+          <p className="history-description">
+            {request.description || "No description"}
+          </p>
+
+          <div className="history-info-grid">
+            <span>
+              <b>Request Created:</b>{" "}
+              {formatDateTime(request.created_at || request.createdAt)}
             </span>
 
-            <button
-              className="primary-btn"
-              style={{ padding: "5px 15px" }}
-              onClick={() => {
-                if (technicianUserId) {
-                  navigate(`/chat/${technicianUserId}`);
-                  return;
-                }
-                setSubmitMessage("Chat will be available once a technician is assigned.");
-              }}
-            >
-              Chat
+            <span>
+              <b>Scheduled Date:</b> {formatDate(request.scheduled_date)}
+            </span>
+
+            <span>
+              <b>Scheduled Time:</b> {request.scheduled_time || "-"}
+            </span>
+
+            <span>
+              <b>Technician:</b>{" "}
+              {request.technician_name || request.technician_id || "-"}
+            </span>
+
+            <span>
+              <b>Location:</b>{" "}
+              {request.location_note || request.location || request.city || "-"}
+            </span>
+
+            <span>
+              <b>Payment:</b> {request.payment_method || "-"}
+            </span>
+
+            <span>
+              <b>Total:</b>{" "}
+              {request.total_price
+                ? `${Number(request.total_price).toFixed(2)} JOD`
+                : "-"}
+            </span>
+          </div>
+
+          {canCancel && (
+            <button className="secondary" type="button" onClick={cancelRequest}>
+              {cancelling ? "Cancelling..." : "Cancel Request"}
             </button>
-          </div>
-
-          {/* Request status timeline */}
-          <div className="timeline">
-            {timelineSteps.map((step, index) => (
-              <div
-                key={step}
-                className={`timeline-item ${activeIndex >= index ? "active" : ""}`}
-              >
-                {step}
-              </div>
-            ))}
-          </div>
-
-          {/* Rating section - only visible when request is completed */}
-          {isCompleted ? (
-            <div style={{ textAlign: "center", marginTop: "20px" }}>
-              <p>Rate your experience:</p>
-
-              {/* Rating dropdown */}
-              <select
-                value={rating}
-                onChange={(e) => setRating(Number(e.target.value))}
-                style={{ padding: "8px", borderRadius: "8px" }}
-                disabled={Boolean(existingRating)}
-              >
-                {[5, 4, 3, 2, 1].map((value) => (
-                  <option key={value} value={value}>
-                    {value} Stars
-                  </option>
-                ))}
-              </select>
-
-              {/* Comment input */}
-              <textarea
-                placeholder="Leave a comment..."
-                value={comment}
-                onChange={(e) => setComment(e.target.value)}
-                style={{
-                  width: "100%",
-                  marginTop: "10px",
-                  borderRadius: "10px",
-                  padding: "10px"
-                }}
-                disabled={Boolean(existingRating)}
-              />
-
-              {submitMessage ? <p>{submitMessage}</p> : null}
-
-              {/* Submit rating button */}
-              <button
-                className="primary-btn"
-                style={{ width: "100%", marginTop: "10px" }}
-                disabled={Boolean(existingRating)}
-                onClick={() => {
-                  if (!req?.technician_id) return;
-
-                  submitRating({
-                    technician_id: req.technician_id,
-                    request_id: req.id,
-                    rating,
-                    comment
-                  })
-                    .then(() => {
-                      setSubmitMessage("Review submitted.");
-                      setExistingRating({ rating, comment });
-                    })
-                    .catch(() => {
-                      setSubmitMessage("Failed to submit review.");
-                    });
-                }}
-              >
-                Submit Review
-              </button>
-            </div>
-          ) : (
-            <p style={{ textAlign: "center", marginTop: "20px" }}>
-              You can rate the service after it is marked as <b>Completed</b>.
-            </p>
           )}
         </div>
+
+        {canReview ? (
+          <div className="card">
+            <h3>Write Review</h3>
+
+            <div className="input-group">
+              <label>Rating</label>
+              <select value={rating} onChange={(e) => setRating(e.target.value)}>
+                <option value="5">5 Stars</option>
+                <option value="4">4 Stars</option>
+                <option value="3">3 Stars</option>
+                <option value="2">2 Stars</option>
+                <option value="1">1 Star</option>
+              </select>
+            </div>
+
+            <div className="input-group">
+              <label>Comment</label>
+              <textarea
+                value={comment}
+                onChange={(e) => setComment(e.target.value)}
+                placeholder="Write your feedback..."
+              />
+            </div>
+
+            <button className="primary" type="button" onClick={submitReview}>
+              {submittingReview ? "Sending..." : "Submit Review"}
+            </button>
+          </div>
+        ) : (
+          <p>Review is available only after the request is completed.</p>
+        )}
+
+        <button className="secondary" type="button" onClick={() => navigate("/history")}>
+          Back To History
+        </button>
       </div>
     </>
   );
 }
 
-// Export component
-export default ReviewRequest;
+export default Review;

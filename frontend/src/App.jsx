@@ -1,40 +1,43 @@
 import React from "react";
-import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
+import { BrowserRouter as Router, Routes, Route, Navigate } from "react-router-dom";
 
-import Login from "./pages/auth/Login.jsx";
-import Register from "./pages/auth/Register.jsx";
-import ForgotPassword from "./pages/auth/ForgotPassword.jsx";
-import ResetPassword from "./pages/auth/ResetPassword.jsx";
+import Welcome from "./pages/user/Welcome";
+import Home from "./pages/user/Home";
+import Login from "./pages/auth/Login";
+import Register from "./pages/auth/Register";
+import ForgotPassword from "./pages/auth/ForgotPassword";
+import ResetPassword from "./pages/auth/ResetPassword";
 
-import Welcome from "./pages/user/Welcome.jsx";
-import Home from "./pages/user/Home.jsx";
-import Profile from "./pages/user/UserProfile.jsx";
-import MaintenanceHistory from "./pages/user/MaintenanceHistory.jsx";
-import MaintenanceRequest from "./pages/user/MaintenanceRequest.jsx";
-import Review from "./pages/user/Review.jsx";
-import PaymentSuccess from "./pages/user/PaymentSuccess.jsx";
+import UserProfile from "./pages/user/UserProfile";
+import MaintenanceHistory from "./pages/user/MaintenanceHistory";
+import MaintenanceRequest from "./pages/user/MaintenanceRequest";
+import PaymentSuccess from "./pages/user/PaymentSuccess";
+import PaymentForm from "./pages/user/PaymentForm";
+import Review from "./pages/user/Review";
 
-import TechniciansByService from "./pages/technician/TechniciansByService.jsx";
-import TechnicianProfile from "./pages/technician/TechnicianProfile.jsx";
-import GalleryPostDetails from "./pages/technician/GalleryPostDetails.jsx";
-import TechnicianAvailability from "./pages/technician/TechnicianAvailability.jsx";
-import TechnicianRequests from "./pages/technician/TechnicianRequests.jsx";
-import TechnicianDashboard from "./pages/technician/TechnicianDashboard.jsx";
+import TechniciansByService from "./pages/technician/TechniciansByService";
+import TechnicianProfile from "./pages/technician/TechnicianProfile";
+import TechnicianDashboard from "./pages/technician/TechnicianDashboard";
+import TechnicianAvailability from "./pages/technician/TechnicianAvailability";
+import TechnicianRequests from "./pages/technician/TechnicianRequests";
+import TechnicianGalleryManager from "./pages/technician/TechnicianGalleryManager";
+import GalleryPostDetails from "./pages/technician/GalleryPostDetails";
 
-import AdminDashboard from "./pages/admin/AdminDashboard.jsx";
+import AdminDashboard from "./pages/admin/AdminDashboard";
 
-import AIChat from "./pages/AIChat.jsx";
-import Chat from "./pages/Chat.jsx";
 import ChatList from "./pages/ChatList";
+import Chat from "./pages/Chat";
+import AIChat from "./pages/AIChat";
 
-import ProtectedRoute from "./components/common/ProtectedRoute.jsx";
-import AdminRedirect from "./components/common/AdminRedirect.jsx";
+import ProtectedRoute from "./components/common/ProtectedRoute";
+import AdminRedirect from "./components/common/AdminRedirect";
 
 function App() {
   return (
     <Router>
       <Routes>
         <Route path="/" element={<Welcome />} />
+        <Route path="/welcome" element={<Welcome />} />
 
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
@@ -56,7 +59,7 @@ function App() {
           path="/profile"
           element={
             <ProtectedRoute allowedRoles={["user", "technician"]}>
-              <Profile />
+              <UserProfile />
             </ProtectedRoute>
           }
         />
@@ -89,10 +92,10 @@ function App() {
         />
 
         <Route
-          path="/review/:requestId"
+          path="/payment"
           element={
             <ProtectedRoute allowedRoles={["user"]}>
-              <Review />
+              <PaymentForm />
             </ProtectedRoute>
           }
         />
@@ -107,7 +110,16 @@ function App() {
         />
 
         <Route
-          path="/services/:service"
+          path="/review/:requestId"
+          element={
+            <ProtectedRoute allowedRoles={["user"]}>
+              <Review />
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/technicians/:service"
           element={
             <ProtectedRoute allowedRoles={["user"]}>
               <TechniciansByService />
@@ -125,10 +137,10 @@ function App() {
         />
 
         <Route
-          path="/technician/gallery/post/:postId"
+          path="/technician-dashboard"
           element={
-            <ProtectedRoute allowedRoles={["user", "technician"]}>
-              <GalleryPostDetails />
+            <ProtectedRoute allowedRoles={["technician"]}>
+              <TechnicianDashboard />
             </ProtectedRoute>
           }
         />
@@ -152,10 +164,19 @@ function App() {
         />
 
         <Route
-          path="/technician/dashboard"
+          path="/technician/gallery"
           element={
             <ProtectedRoute allowedRoles={["technician"]}>
-              <TechnicianDashboard />
+              <TechnicianGalleryManager />
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/technician/gallery/post/:postId"
+          element={
+            <ProtectedRoute allowedRoles={["user", "technician"]}>
+              <GalleryPostDetails />
             </ProtectedRoute>
           }
         />
@@ -165,15 +186,6 @@ function App() {
           element={
             <ProtectedRoute allowedRoles={["admin"]}>
               <AdminDashboard />
-            </ProtectedRoute>
-          }
-        />
-
-        <Route
-          path="/ai-chat"
-          element={
-            <ProtectedRoute allowedRoles={["user", "technician"]}>
-              <AIChat />
             </ProtectedRoute>
           }
         />
@@ -195,6 +207,17 @@ function App() {
             </ProtectedRoute>
           }
         />
+
+        <Route
+          path="/ai"
+          element={
+            <ProtectedRoute allowedRoles={["user", "technician"]}>
+              <AIChat />
+            </ProtectedRoute>
+          }
+        />
+
+        <Route path="*" element={<Navigate to="/home" replace />} />
       </Routes>
     </Router>
   );

@@ -3,42 +3,44 @@ import { useLocation, useNavigate, useParams } from "react-router-dom";
 import Header from "../../components/common/Header";
 
 function PaymentSuccess() {
-  const location = useLocation();
   const navigate = useNavigate();
+  const location = useLocation();
   const { requestId } = useParams();
 
-  const transactionId = location.state?.transactionId || "";
-  const totalPrice = location.state?.totalPrice || 0;
+  const amount = Number(location.state?.amount || 0);
+  const transactionId =
+    location.state?.transactionId || `mock_txn_${Date.now()}`;
 
   return (
     <>
       <Header />
 
-      <div className="container request-container">
-        <h2>Payment Successful</h2>
+      <div className="container">
+        <div className="panel" style={{ maxWidth: 900, margin: "40px auto" }}>
+          <h2>Payment Successful</h2>
 
-        <div className="request-grid">
-          <div className="input-group full-width">
+          <div className="input-group">
             <label>Request ID</label>
-            <div className="readonly-field">{requestId}</div>
+            <input value={requestId || ""} readOnly />
           </div>
 
-          <div className="input-group full-width">
+          <div className="input-group">
             <label>Transaction ID</label>
-            <div className="readonly-field">{transactionId}</div>
+            <input value={transactionId} readOnly />
           </div>
 
-          <div className="input-group full-width">
+          <div className="input-group">
             <label>Total Paid</label>
-            <div className="readonly-field">
-              {Number(totalPrice).toFixed(2)} JOD
-            </div>
+            <input value={`${amount.toFixed(2)} JOD`} readOnly />
           </div>
-        </div>
 
-        <button className="primary" onClick={() => navigate(`/review/${requestId}`)}>
-          Go to Review
-        </button>
+          <button
+            className="primary"
+            onClick={() => navigate(`/review/${requestId}`)}
+          >
+            Go to Review
+          </button>
+        </div>
       </div>
     </>
   );

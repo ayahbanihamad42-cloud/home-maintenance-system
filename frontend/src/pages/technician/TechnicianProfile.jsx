@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import Header from "../../components/common/Header";
 import API from "../../services/api";
@@ -19,9 +19,41 @@ function TechnicianProfile() {
 
   useEffect(() => {
     getTechnicianGallery(technicianId)
-      .then((posts) => setGalleryPosts(posts || []))
+      .then((posts) => setGalleryPosts(Array.isArray(posts) ? posts : []))
       .catch(() => setGalleryPosts([]));
   }, [technicianId]);
+
+  const normalizeImages = (post) => {
+    if (!post) return [];
+
+    if (Array.isArray(post.images)) {
+      return post.images.filter(Boolean);
+    }
+
+    if (typeof post.images === "string") {
+      try {
+        const parsed = JSON.parse(post.images);
+        if (Array.isArray(parsed)) return parsed.filter(Boolean);
+      } catch {
+        return post.images
+          .split(",")
+          .map((img) => img.trim())
+          .filter(Boolean);
+      }
+    }
+
+    if (post.image_url) return [post.image_url];
+    if (post.image) return [post.image];
+
+    return [];
+  };
+
+  const fixedGalleryPosts = useMemo(() => {
+    return galleryPosts.map((post) => ({
+      ...post,
+      images: normalizeImages(post),
+    }));
+  }, [galleryPosts]);
 
   const openPost = (post) => {
     sessionStorage.setItem("selectedGalleryPost", JSON.stringify(post));
@@ -83,7 +115,19 @@ function TechnicianProfile() {
 
             <button
               className="primary-btn"
-              onClick={() => navigate(`/request/${tech.technicianId}`)}
+              onClick={() =>
+                navigate(`/request/${tech.technicianId || tech.id}`, {
+                  state: {
+                    technicianId: tech.technicianId || tech.id,
+                    technician_id: tech.technicianId || tech.id,
+                    technicianName: tech.name,
+                    name: tech.name,
+                    service: tech.service,
+                    service_type: tech.service,
+                    price_per_hour: tech.price_per_hour,
+                  },
+                })
+              }
             >
               Book Now
             </button>
@@ -94,27 +138,45 @@ function TechnicianProfile() {
           <div className="public-gallery-wrapper">
             <h3 className="profile-gallery-title">Work Gallery</h3>
 
-            {galleryPosts.length === 0 ? (
+            {fixedGalleryPosts.length === 0 ? (
               <div className="gallery-empty-text">No work posts yet.</div>
             ) : (
               <div className="pinterest-gallery">
-                {galleryPosts.map((post) => (
-                  <button
-                    type="button"
-                    className="pinterest-post"
-                    key={post.id}
-                    onClick={() => openPost(post)}
-                  >
-                    <img
-                      src={post.images?.[0]}
-                      alt="Technician completed work"
-                    />
+                {fixedGalleryPosts.map((post) => {
+                  const firstImage = post.images?.[0];
 
-                    <div className="pinterest-caption">
-                      {post.description}
-                    </div>
-                  </button>
-                ))}
+                  return (
+                    <button
+                      type="button"
+                      className="pinterest-post"
+                      key={post.id}
+                      onClick={() => openPost(post)}
+                    >
+                      {firstImage ? (
+                        <img src={firstImage} alt="Technician completed work" />
+                      ) : (
+                        <div className="gallery-empty-text">No image</div>
+                      )}
+
+                      <div className="pinterest-caption">
+                        {(post.description || post.caption || "No description")
+                          .length > 55
+                          ? `${(
+                              post.description ||
+                              post.caption ||
+                              "No description"
+                            ).slice(0, 55)}...`
+                          : post.description || post.caption || "No description"}
+                      </div>
+
+                      {(post.location_note || post.location) && (
+                        <div className="pinterest-location">
+                          Location: {post.location_note || post.location}
+                        </div>
+                      )}
+                    </button>
+                  );
+                })}
               </div>
             )}
           </div>

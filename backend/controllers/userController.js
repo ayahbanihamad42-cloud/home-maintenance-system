@@ -35,7 +35,9 @@ export const updateUserPassword = async (req, res) => {
   }
 
   if (!password || password.length < 6) {
-    return res.status(400).json({ message: "Password must be at least 6 characters." });
+    return res
+      .status(400)
+      .json({ message: "Password must be at least 6 characters." });
   }
 
   try {
@@ -65,7 +67,7 @@ export const updateUserPassword = async (req, res) => {
 
 export const updateUserProfile = (req, res) => {
   const { id } = req.params;
-  const { email, phone } = req.body;
+  const { email, phone, city, dob } = req.body;
 
   if (Number(id) !== Number(req.user.id)) {
     return res.status(403).json({ message: "Not authorized" });
@@ -75,31 +77,58 @@ export const updateUserProfile = (req, res) => {
     return res.status(400).json({ message: "Email is required." });
   }
 
-  db.query("SELECT id FROM users WHERE email = ? AND id != ?", [email, id], (checkErr, rows) => {
-    if (checkErr) {
-      console.error("updateUserProfile check error:", checkErr);
-      return res.status(500).json({ message: "Server error" });
-    }
-
-    if (rows.length) {
-      return res.status(400).json({ message: "Email already in use." });
-    }
-
-    db.query(
-      "UPDATE users SET email = ?, phone = ? WHERE id = ?",
-      [email, phone || null, id],
-      (err, result) => {
-        if (err) {
-          console.error("updateUserProfile update error:", err);
-          return res.status(500).json({ message: "Server error" });
-        }
-
-        if (!result.affectedRows) {
-          return res.status(404).json({ message: "User not found" });
-        }
-
-        res.json({ message: "Profile updated" });
+  db.query(
+    "SELECT id FROM users WHERE email = ? AND id != ?",
+    [email, id],
+    (checkErr, rows) => {
+      if (checkErr) {
+        console.error("updateUserProfile check error:", checkErr);
+        return res.status(500).json({ message: "Server error" });
       }
-    );
+
+      if (rows.length) {
+        return res.status(400).json({ message: "Email already in use." });
+      }
+
+      db.query(
+        "UPDATE users SET email = ?, phone = ?, city = ?, dob = ? WHERE id = ?",
+        [email, phone || null, city || null, dob || null, id],
+        (err, result) => {
+          if (err) {
+            console.error("updateUserProfile update error:", err);
+            return res.status(500).json({ message: "Server error" });
+          }
+
+          if (!result.affectedRows) {
+            return res.status(404).json({ message: "User not found" });
+          }
+
+          res.json({
+            message: "Profile updated successfully. Email notification simulated.",
+            updated: {
+              id,
+              email,
+              phone,
+              city,
+              dob,
+            },
+          });
+        }
+      );
+    }
+  );
+};
+
+export const sendProfileUpdateEmail = (req, res) => {
+  const { email, phone, city, dob } = req.body;
+
+  console.log("PROFILE UPDATE EMAIL SIMULATION:");
+  console.log("Email:", email);
+  console.log("Phone:", phone);
+  console.log("City:", city);
+  console.log("DOB:", dob);
+
+  res.json({
+    message: "Email sent successfully.",
   });
 };

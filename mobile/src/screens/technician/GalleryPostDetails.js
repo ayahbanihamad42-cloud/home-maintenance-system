@@ -1,4 +1,4 @@
-import React, { useRef, useState } from "react";
+import React, { useMemo, useRef, useState } from "react";
 import {
   View,
   Text,
@@ -7,29 +7,35 @@ import {
   TouchableOpacity,
   StyleSheet,
   Dimensions,
+  Alert,
 } from "react-native";
 import Header from "../../components/Common/Header";
+import { deleteTechnicianGalleryPost } from "../../services/technicianService";
 
 const screenWidth = Dimensions.get("window").width;
+const imageWidth = screenWidth - 30;
 
 function GalleryPostDetails({ route, navigation }) {
-  const { post } = route.params || {};
+  const post = route?.params?.post || null;
+
   const [selectedImageIndex, setSelectedImageIndex] = useState(0);
+  const [menuOpen, setMenuOpen] = useState(false);
   const scrollRef = useRef(null);
 
-  if (!post) {
-    return (
-      <>
-        <Header />
-        <View style={styles.container}>
-          <Text>Post not found.</Text>
-        </View>
-      </>
-    );
-  }
+  const images = useMemo(() => {
+    if (!post?.images) return [];
 
-  const images = post.images || [];
-  const activeImage = images[selectedImageIndex] || images[0];
+    if (Array.isArray(post.images)) {
+      return post.images.filter(Boolean);
+    }
+
+    try {
+      const parsed = JSON.parse(post.images);
+      return Array.isArray(parsed) ? parsed.filter(Boolean) : [];
+    } catch {
+      return [];
+    }
+  }, [post]);
 
   const goToImage = (index) => {
     if (!images.length) return;
@@ -42,49 +48,132 @@ function GalleryPostDetails({ route, navigation }) {
     setSelectedImageIndex(nextIndex);
 
     scrollRef.current?.scrollTo({
-      x: nextIndex * (screenWidth - 30),
+      x: nextIndex * imageWidth,
       animated: true,
     });
   };
 
   const onScrollEnd = (event) => {
     const x = event.nativeEvent.contentOffset.x;
-    const index = Math.round(x / (screenWidth - 30));
+    const index = Math.round(x / imageWidth);
 
     if (index >= 0 && index < images.length) {
       setSelectedImageIndex(index);
     }
   };
 
+  const handleDelete = () => {
+    if (!post?.id) return;
+
+    Alert.alert("Delete Post", "Are you sure you want to delete this post?", [
+      { text: "Cancel", style: "cancel" },
+      {
+        text: "Delete",
+        style: "destructive",
+        onPress: async () => {
+          try {
+            await deleteTechnicianGalleryPost(post.id);
+            navigation.goBack();
+          } catch (err) {
+            Alert.alert(
+              "Error",
+              err?.response?.data?.message || "Failed to delete post."
+            );
+          }
+        },
+      },
+    ]);
+  };
+
+  const handleEdit = () => {
+    setMenuOpen(false);
+
+    navigation.navigate("TechnicianDashboard", {
+      openGalleryEdit: true,
+      post,
+    });
+  };
+
+  if (!post) {
+    return (
+      <>
+        <Header />
+
+        <View style={styles.container}>
+          <TouchableOpacity
+            style={styles.backButton}
+            onPress={() => navigation.goBack()}
+          >
+            <Text style={styles.backText}>← Back</Text>
+          </TouchableOpacity>
+
+          <View style={styles.emptyCard}>
+            <Text style={styles.emptyTitle}>Post Details</Text>
+            <Text style={styles.emptyText}>Post not found.</Text>
+          </View>
+        </View>
+      </>
+    );
+  }
+
   return (
     <>
       <Header />
 
       <ScrollView contentContainerStyle={styles.container}>
-        <TouchableOpacity
-          style={styles.backButton}
-          onPress={() => navigation.goBack()}
-        >
-          <Text style={styles.backText}>← Back</Text>
-        </TouchableOpacity>
+        <View style={styles.topRow}>
+          <TouchableOpacity
+            style={styles.backButton}
+            onPress={() => navigation.goBack()}
+          >
+            <Text style={styles.backText}>← Back</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.menuButton}
+            onPress={() => setMenuOpen((prev) => !prev)}
+          >
+            <Text style={styles.menuText}>⋮</Text>
+          </TouchableOpacity>
+
+          {menuOpen ? (
+            <View style={styles.menuBox}>
+              <TouchableOpacity style={styles.menuItem} onPress={handleEdit}>
+                <Text style={styles.menuItemText}>Edit post</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity style={styles.menuItem} onPress={handleDelete}>
+                <Text style={[styles.menuItemText, styles.deleteText]}>
+                  Delete post
+                </Text>
+              </TouchableOpacity>
+            </View>
+          ) : null}
+        </View>
 
         <View style={styles.card}>
           <View style={styles.sliderBox}>
-            <ScrollView
-              ref={scrollRef}
-              horizontal
-              pagingEnabled
-              showsHorizontalScrollIndicator={false}
-              onMomentumScrollEnd={onScrollEnd}
-            >
-              {images.map((img, index) => (
-                <Image
-                  key={index}
-                  source={{ uri: img }}
-                  style={styles.mainImage}
-                />
-              ))}
-            </ScrollView>
+            {images.length === 0 ? (
+              <View style={styles.noImageBox}>
+                <Text style={styles.noImageText}>No images</Text>
+              </View>
+            ) : (
+              <ScrollView
+                ref={scrollRef}
+                horizontal
+                pagingEnabled
+                showsHorizontalScrollIndicator={false}
+                onMomentumScrollEnd={onScrollEnd}
+              >
+                {images.map((img, index) => (
+                  <Image
+                    key={`${index}-${img}`}
+                    source={{ uri: img }}
+                    style={styles.mainImage}
+                  />
+                ))}
+              </ScrollView>
+            )}
 
             {images.length > 1 ? (
               <>
@@ -115,7 +204,7 @@ function GalleryPostDetails({ route, navigation }) {
             <ScrollView horizontal style={styles.thumbs}>
               {images.map((img, index) => (
                 <TouchableOpacity
-                  key={index}
+                  key={`thumb-${index}`}
                   style={[
                     styles.thumbButton,
                     selectedImageIndex === index && styles.activeThumb,
@@ -130,7 +219,9 @@ function GalleryPostDetails({ route, navigation }) {
 
           <View style={styles.textBox}>
             <Text style={styles.title}>Work Details</Text>
-            <Text style={styles.description}>{post.description}</Text>
+            <Text style={styles.description}>
+              {post.description || "No description."}
+            </Text>
           </View>
         </View>
       </ScrollView>
@@ -144,17 +235,60 @@ const styles = StyleSheet.create({
     backgroundColor: "#E8DCCF",
     flexGrow: 1,
   },
+  topRow: {
+    position: "relative",
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 14,
+  },
   backButton: {
     backgroundColor: "#111",
     borderRadius: 999,
     paddingVertical: 10,
     paddingHorizontal: 18,
     alignSelf: "flex-start",
-    marginBottom: 14,
   },
   backText: {
     color: "#FFF",
-    fontWeight: "700",
+    fontWeight: "800",
+  },
+  menuButton: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: "#111",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  menuText: {
+    color: "#FFF",
+    fontSize: 28,
+    fontWeight: "900",
+  },
+  menuBox: {
+    position: "absolute",
+    right: 0,
+    top: 50,
+    backgroundColor: "#FFF9F3",
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: "#D8C8B8",
+    overflow: "hidden",
+    zIndex: 100,
+    elevation: 8,
+    minWidth: 150,
+  },
+  menuItem: {
+    paddingVertical: 12,
+    paddingHorizontal: 14,
+  },
+  menuItemText: {
+    color: "#111",
+    fontWeight: "800",
+  },
+  deleteText: {
+    color: "#B00020",
   },
   card: {
     backgroundColor: "#FFF9F3",
@@ -168,10 +302,20 @@ const styles = StyleSheet.create({
     backgroundColor: "#111",
   },
   mainImage: {
-    width: screenWidth - 30,
+    width: imageWidth,
     height: 360,
     backgroundColor: "#111",
     resizeMode: "contain",
+  },
+  noImageBox: {
+    width: imageWidth,
+    height: 300,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  noImageText: {
+    color: "#FFF",
+    fontWeight: "800",
   },
   arrow: {
     position: "absolute",
@@ -240,6 +384,22 @@ const styles = StyleSheet.create({
   description: {
     color: "#3A3028",
     lineHeight: 22,
+  },
+  emptyCard: {
+    backgroundColor: "#FFF9F3",
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: "#D8C8B8",
+    padding: 18,
+  },
+  emptyTitle: {
+    fontSize: 22,
+    fontWeight: "800",
+    color: "#111",
+    marginBottom: 8,
+  },
+  emptyText: {
+    color: "#3A3028",
   },
 });
 

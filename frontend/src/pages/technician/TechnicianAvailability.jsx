@@ -1,81 +1,132 @@
-import { useEffect, useState } from "react";
-import API from "../../services/api";
+import React, { useEffect, useState } from "react";
 import Header from "../../components/common/Header";
+import API from "../../services/api.jsx";
+import {
+  getMyRegularAvailability,
+  createRegularAvailability,
+  deleteRegularAvailability,
+} from "../../services/technicianService";
+
+const days = [
+  "All",
+  "Sunday",
+  "Monday",
+  "Tuesday",
+  "Wednesday",
+  "Thursday",
+  "Friday",
+  "Saturday",
+];
 
 function TechnicianAvailability() {
-  const user = JSON.parse(localStorage.getItem("user"));
+  const [mode, setMode] = useState("one-time");
+  const [availability, setAvailability] = useState([]);
+  const [regularAvailability, setRegularAvailability] = useState([]);
 
-  const [technicianId, setTechnicianId] = useState(null);
-  const [technicianStatus, setTechnicianStatus] = useState("loading");
+  const [availableDate, setAvailableDate] = useState("");
+  const [monthStart, setMonthStart] = useState("");
+  const [monthEnd, setMonthEnd] = useState("");
+  const [dayOfWeek, setDayOfWeek] = useState("All");
+  const [startTime, setStartTime] = useState("");
+  const [endTime, setEndTime] = useState("");
+  const [slotMinutes, setSlotMinutes] = useState("60");
 
-  const [message, setMessage] = useState(null);
+  const [message, setMessage] = useState("");
+  const [saving, setSaving] = useState(false);
 
-  const [form, setForm] = useState({
-    day: "",
-    start_time: "",
-    end_time: ""
-  });
+  const loadOneTime = async () => {
+    try {
+      const res = await API.get("/technicians/availability/my");
+      setAvailability(Array.isArray(res.data) ? res.data : []);
+    } catch {
+      setAvailability([]);
+    }
+  };
+
+  const loadRegular = async () => {
+    try {
+      const data = await getMyRegularAvailability();
+      setRegularAvailability(Array.isArray(data) ? data : []);
+    } catch {
+      setRegularAvailability([]);
+    }
+  };
 
   useEffect(() => {
-    if (!user?.id) return;
+    loadOneTime();
+    loadRegular();
+  }, []);
 
-    setTechnicianStatus("loading");
+  const resetForm = () => {
+    setAvailableDate("");
+    setMonthStart("");
+    setMonthEnd("");
+    setDayOfWeek("All");
+    setStartTime("");
+    setEndTime("");
+    setSlotMinutes("60");
+  };
 
-    API.get(`/technicians/user/${user.id}`)
-      .then((res) => {
-        setTechnicianId(res.data.technicianId);
-        setTechnicianStatus("ready");
-        setMessage(null);
-      })
-      .catch(() => {
-        setTechnicianId(null);
-        setTechnicianStatus("error");
-      });
-  }, [user?.id]);
+  const saveAvailability = async (e) => {
+    e.preventDefault();
 
-  const submit = async () => {
-    if (!form.day || !form.start_time || !form.end_time) {
-      setMessage({
-        type: "warning",
-        title: "Notice",
-        body: "Please choose a date and time range."
-      });
-      return;
-    }
-
-    if (!technicianId && technicianStatus === "error") {
-      setMessage({
-        type: "error",
-        title: "Notice",
-        body: "Technician profile not found. Please contact the admin."
-      });
+    if (!startTime || !endTime) {
+      setMessage("Start time and end time are required.");
       return;
     }
 
     try {
-      await API.post("/technicians/availability", {
-        ...(technicianId ? { technician_id: technicianId } : {}),
-        ...form
-      });
+      setSaving(true);
+      setMessage("");
 
-      setMessage({
-        type: "success",
-        title: "Saved Successfully",
-        body: "Availability saved and email notification was sent."
-      });
+      if (mode === "one-time") {
+        if (!availableDate) {
+          setMessage("Date is required.");
+          return;
+        }
 
-      setForm({
-        day: "",
-        start_time: "",
-        end_time: ""
-      });
-    } catch (error) {
-      setMessage({
-        type: "error",
-        title: "Notice",
-        body: error.response?.data?.message || "Failed to save availability."
-      });
+        await API.post("/technicians/availability", {
+          available_date: availableDate,
+          start_time: startTime,
+          end_time: endTime,
+        });
+
+        await loadOneTime();
+      } else {
+        if (!monthStart || !monthEnd) {
+          setMessage("Month start and month end are required.");
+          return;
+        }
+
+        await createRegularAvailability({
+          month_start: monthStart,
+          month_end: monthEnd,
+          day_of_week: dayOfWeek,
+          start_time: startTime,
+          end_time: endTime,
+          slot_minutes: Number(slotMinutes),
+        });
+
+        await loadRegular();
+      }
+
+      resetForm();
+      setMessage("Availability saved successfully.");
+    } catch (err) {
+      setMessage(err?.response?.data?.message || "Failed to save availability.");
+    } finally {
+      setSaving(false);
     }
+  };
+
+  const deleteOneTime = async (id) => {
+    await API.delete(`/technicians/availability/${id}`);
+    await loadOneTime();
+  };
+
+  const deleteRegular = async (id) => {
+    await deleteRegularAvailability(id);
+    await loadRegular();
   };
 
   return (
@@ -83,46 +134,173 @@ function TechnicianAvailability() {
       <Header />
 
       <div className="container">
-        <h2 className="section-title">Set Availability</h2>
+        <div className="panel" style={{ maxWidth: 900, margin: "40px auto" }}>
+          <h2>Technician Availability</h2>
 
-        {message ? (
-          <div className={`message-box-card availability-message-box ${message.type}`}>
-            <div className="message-box-title">{message.title}</div>
-            <div className="message-box-body">{message.body}</div>
-          </div>
-        ) : null}
+          {message ? <div className="mini-error">{message}</div> : null}
 
-        <div className="panel">
-          <div className="input-group">
-            <label>Date</label>
-            <input
-              type="date"
-              value={form.day}
-              onChange={e => setForm({ ...form, day: e.target.value })}
-            />
-          </div>
+          <div style={{ display: "flex", gap: 12, marginBottom: 22 }}>
+            <button
+              type="button"
+              className={mode === "one-time" ? "primary" : "btn-outline"}
+              onClick={() => {
+                setMode("one-time");
+                resetForm();
+                setMessage("");
+              }}
+            >
+              One-Time Availability
+            </button>
 
-          <div className="input-group">
-            <label>Start Time</label>
-            <input
-              type="time"
-              value={form.start_time}
-              onChange={e => setForm({ ...form, start_time: e.target.value })}
-            />
-          </div>
-
-          <div className="input-group">
-            <label>End Time</label>
-            <input
-              type="time"
-              value={form.end_time}
-              onChange={e => setForm({ ...form, end_time: e.target.value })}
-            />
+            <button
+              type="button"
+              className={mode === "regular" ? "primary" : "btn-outline"}
+              onClick={() => {
+                setMode("regular");
+                resetForm();
+                setMessage("");
+              }}
+            >
+              Regular Monthly Schedule
+            </button>
           </div>
 
-          <button className="primary" onClick={submit}>
-            Save
-          </button>
+          <form onSubmit={saveAvailability}>
+            {mode === "regular" ? (
+              <>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
+                  <div className="input-group">
+                    <label>Month Start</label>
+                    <input
+                      type="date"
+                      value={monthStart}
+                      onChange={(e) => setMonthStart(e.target.value)}
+                    />
+                  </div>
+
+                  <div className="input-group">
+                    <label>Month End</label>
+                    <input
+                      type="date"
+                      value={monthEnd}
+                      onChange={(e) => setMonthEnd(e.target.value)}
+                    />
+                  </div>
+                </div>
+
+                <div className="input-group">
+                  <label>Day Of Week</label>
+                  <select
+                    value={dayOfWeek}
+                    onChange={(e) => setDayOfWeek(e.target.value)}
+                  >
+                    {days.map((day) => (
+                      <option key={day} value={day}>
+                        {day}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </>
+            ) : (
+              <div className="input-group">
+                <label>Date</label>
+                <input
+                  type="date"
+                  value={availableDate}
+                  onChange={(e) => setAvailableDate(e.target.value)}
+                />
+              </div>
+            )}
+
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
+              <div className="input-group">
+                <label>Start Time</label>
+                <input
+                  type="time"
+                  value={startTime}
+                  onChange={(e) => setStartTime(e.target.value)}
+                />
+              </div>
+
+              <div className="input-group">
+                <label>End Time</label>
+                <input
+                  type="time"
+                  value={endTime}
+                  onChange={(e) => setEndTime(e.target.value)}
+                />
+              </div>
+            </div>
+
+            {mode === "regular" && (
+              <div className="input-group">
+                <label>Each Request Duration</label>
+                <select
+                  value={slotMinutes}
+                  onChange={(e) => setSlotMinutes(e.target.value)}
+                >
+                  <option value="30">30 minutes</option>
+                  <option value="60">1 hour</option>
+                  <option value="90">1.5 hours</option>
+                  <option value="120">2 hours</option>
+                  <option value="180">3 hours</option>
+                </select>
+              </div>
+            )}
+
+            <button className="primary" type="submit" disabled={saving}>
+              {saving ? "Saving..." : "Save Availability"}
+            </button>
+          </form>
+
+          <hr style={{ margin: "28px 0", borderColor: "#d8c8b8" }} />
+
+          {mode === "one-time" ? (
+            <>
+              <h3>One-Time Availability</h3>
+
+              {availability.length === 0 ? (
+                <div className="empty-gallery-card">No availability added.</div>
+              ) : (
+                <div className="history-list">
+                  {availability.map((item) => (
+                    <div className="history-card" key={item.id}>
+                      <p><b>Date:</b> {String(item.available_date || "").slice(0, 10)}</p>
+                      <p><b>Time:</b> {item.start_time} - {item.end_time}</p>
+
+                      <button className="btn-outline" onClick={() => deleteOneTime(item.id)}>
+                        Delete
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </>
+          ) : (
+            <>
+              <h3>Regular Monthly Schedule</h3>
+
+              {regularAvailability.length === 0 ? (
+                <div className="empty-gallery-card">No regular schedule added.</div>
+              ) : (
+                <div className="history-list">
+                  {regularAvailability.map((item) => (
+                    <div className="history-card" key={item.id}>
+                      <p><b>Month:</b> {String(item.month_start).slice(0, 10)} → {String(item.month_end).slice(0, 10)}</p>
+                      <p><b>Day:</b> {item.day_of_week}</p>
+                      <p><b>Time:</b> {item.start_time} - {item.end_time}</p>
+                      <p><b>Each Request:</b> {item.slot_minutes} minutes</p>
+
+                      <button className="btn-outline" onClick={() => deleteRegular(item.id)}>
+                        Delete
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </>
+          )}
         </div>
       </div>
     </>

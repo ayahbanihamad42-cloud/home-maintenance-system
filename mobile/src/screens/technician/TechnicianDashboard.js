@@ -1,125 +1,99 @@
 import React from "react";
-import { View, Text, TouchableOpacity, StyleSheet, ScrollView } from "react-native";
-import { useNavigation } from "@react-navigation/native";
+import { View, Text, ScrollView, TouchableOpacity, StyleSheet } from "react-native";
 
-import Header from "../../components/Common/Header";
-
-function TechnicianDashboard() {
-  const navigation = useNavigation();
+export default function TechnicianDashboard({ navigation, route }) {
+  const user = route?.params?.user || {};
 
   return (
-    <>
-      <Header />
+    <View style={styles.screen}>
+      <Header navigation={navigation} />
 
-      <ScrollView style={styles.container}>
+      <ScrollView contentContainerStyle={styles.container}>
         <Text style={styles.title}>Technician Dashboard</Text>
+        <Text style={styles.subtitle}>Manage your work and requests</Text>
 
-        <View style={styles.panel}>
-          <View style={styles.dashboardGrid}>
-            <View style={styles.dashboardCard}>
-              <Text style={styles.cardTitle}>Assigned Requests</Text>
-              <Text style={styles.cardText}>
-                Track and manage current requests.
-              </Text>
+        <TouchableOpacity
+          style={styles.card}
+          onPress={() => navigation.navigate("TechnicianAvailability", { user })}
+        >
+          <Text style={styles.cardTitle}>Availability</Text>
+          <Text style={styles.cardText}>Add your available dates and times.</Text>
+        </TouchableOpacity>
 
-              <View style={styles.cardActions}>
-                <TouchableOpacity
-                  style={styles.button}
-                  onPress={() => navigation.navigate("TechnicianRequests")}
-                >
-                  <Text style={styles.buttonText}>View Requests</Text>
-                </TouchableOpacity>
-              </View>
-            </View>
+        <TouchableOpacity
+          style={styles.card}
+          onPress={() => navigation.navigate("TechnicianRequests", { user })}
+        >
+          <Text style={styles.cardTitle}>Requests</Text>
+          <Text style={styles.cardText}>View and manage customer requests.</Text>
+        </TouchableOpacity>
 
-            <View style={styles.dashboardCard}>
-              <Text style={styles.cardTitle}>Availability</Text>
-              <Text style={styles.cardText}>
-                Set your working hours for new bookings.
-              </Text>
-
-              <View style={styles.cardActions}>
-                <TouchableOpacity
-                  style={styles.button}
-                  onPress={() => navigation.navigate("TechnicianAvailability")}
-                >
-                  <Text style={styles.buttonText}>Set Availability</Text>
-                </TouchableOpacity>
-              </View>
-            </View>
-
-            <View style={styles.dashboardCard}>
-              <Text style={styles.cardTitle}>Work Gallery</Text>
-              <Text style={styles.cardText}>
-                Add posts with multiple images and details about completed work.
-              </Text>
-
-              <View style={styles.cardActions}>
-                <TouchableOpacity
-                  style={styles.button}
-                  onPress={() => navigation.navigate("TechnicianGallery")}
-                >
-                  <Text style={styles.buttonText}>Manage Gallery</Text>
-                </TouchableOpacity>
-              </View>
-            </View>
-          </View>
-        </View>
+        <TouchableOpacity
+          style={styles.card}
+          onPress={() => navigation.navigate("TechnicianProfile", { user })}
+        >
+          <Text style={styles.cardTitle}>Work Gallery</Text>
+          <Text style={styles.cardText}>Open your profile and manage gallery posts.</Text>
+        </TouchableOpacity>
       </ScrollView>
-    </>
+    </View>
+  );
+}
+
+function Header({ navigation }) {
+  return (
+    <View style={styles.header}>
+      <Text style={styles.headerTitle}>Maintenance System</Text>
+      <TouchableOpacity style={styles.bell}>
+        <Text style={styles.bellText}>🔔</Text>
+      </TouchableOpacity>
+      <TouchableOpacity style={styles.logout}>
+        <Text style={styles.logoutText}>Log Out</Text>
+      </TouchableOpacity>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    padding: 15,
-    backgroundColor: "#E8DCCF",
+  screen: { flex: 1, backgroundColor: "#e7dccc" },
+  header: {
+    minHeight: 96,
+    backgroundColor: "#faf5ef",
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 18,
+    borderBottomWidth: 1,
+    borderBottomColor: "#d8c8b8",
   },
-  title: {
-    fontSize: 22,
-    fontWeight: "bold",
-    marginBottom: 10,
-    color: "#111",
+  headerTitle: { flex: 1, fontSize: 26, fontWeight: "900" },
+  bell: {
+    width: 54,
+    height: 54,
+    borderRadius: 27,
+    backgroundColor: "#fff",
+    alignItems: "center",
+    justifyContent: "center",
+    marginRight: 12,
   },
-  panel: {
-    backgroundColor: "#FFF9F3",
-    padding: 15,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: "#D8C8B8",
-  },
-  dashboardGrid: {
-    gap: 15,
-  },
-  dashboardCard: {
-    width: "100%",
-    backgroundColor: "#F8F1E8",
-    padding: 15,
-    borderRadius: 10,
-    marginBottom: 15,
-  },
-  cardTitle: {
-    fontSize: 18,
-    fontWeight: "bold",
-    marginBottom: 5,
-  },
-  cardText: {
-    fontSize: 14,
-    marginBottom: 10,
-  },
-  cardActions: {
-    marginTop: 5,
-  },
-  button: {
+  bellText: { fontSize: 26 },
+  logout: {
     backgroundColor: "#111",
-    paddingVertical: 10,
-    borderRadius: 8,
+    paddingHorizontal: 22,
+    paddingVertical: 16,
+    borderRadius: 28,
   },
-  buttonText: {
-    color: "#fff",
-    textAlign: "center",
-    fontWeight: "700",
+  logoutText: { color: "#fff", fontWeight: "900", fontSize: 16 },
+  container: { padding: 24, paddingBottom: 60 },
+  title: { fontSize: 42, fontWeight: "900", marginBottom: 10 },
+  subtitle: { fontSize: 23, color: "#6b5e55", marginBottom: 28 },
+  card: {
+    backgroundColor: "#fffaf4",
+    borderRadius: 28,
+    padding: 30,
+    borderWidth: 1,
+    borderColor: "#d8c8b8",
+    marginBottom: 22,
   },
+  cardTitle: { fontSize: 34, fontWeight: "900", marginBottom: 16 },
+  cardText: { fontSize: 22, color: "#3d342d", lineHeight: 32 },
 });
-
-export default TechnicianDashboard;

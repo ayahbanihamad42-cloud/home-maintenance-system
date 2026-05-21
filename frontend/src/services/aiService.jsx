@@ -4,6 +4,7 @@ export const chatWithAI = async (message, image = null) => {
   const res = await api.post("/ai/chat", {
     message,
     image,
+    requestId: Date.now(),
   });
 
   return res.data;

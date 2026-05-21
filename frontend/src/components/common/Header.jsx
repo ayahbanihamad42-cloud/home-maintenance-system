@@ -1,148 +1,163 @@
-import React, { useState, useEffect, useRef } from "react";
-import { Link, useNavigate } from "react-router-dom";
-import { getNotifications } from "../../services/notificationService.jsx";
+import React, { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
+import {
+  getNotificationFeed,
+  markNotificationAsRead,
+} from "../../services/notificationService.jsx";
 
 function Header() {
   const navigate = useNavigate();
-  const user = JSON.parse(localStorage.getItem("user"));
-  const role = user?.role;
+  const user = JSON.parse(localStorage.getItem("user") || "{}");
+  const role = String(user.role || "").toLowerCase();
 
   const [showNotifications, setShowNotifications] = useState(false);
-  const [notificationFeed, setNotificationFeed] = useState([]);
+  const [notifications, setNotifications] = useState([]);
 
-  const notificationRef = useRef(null);
-
-  const handleLogout = () => {
-    localStorage.clear();
-    navigate("/");
+  const loadNotifications = async () => {
+    try {
+      const data = await getNotificationFeed();
+      setNotifications(Array.isArray(data) ? data : []);
+    } catch (err) {
+      console.error("notifications error:", err);
+      setNotifications([]);
+    }
   };
 
   useEffect(() => {
-    if (!user) return;
+    loadNotifications();
+  }, []);
 
-    const req = getNotifications();
+  const logout = () => {
+    localStorage.removeItem("token");
+    localStorage.removeItem("user");
+    navigate("/login");
+  };
 
-    if (!req || typeof req.then !== "function") {
-      setNotificationFeed([]);
+  const goHome = () => {
+    if (role === "technician") navigate("/technician-dashboard");
+    else if (role === "admin") navigate("/admin");
+    else navigate("/home");
+  };
+
+  const handleNotificationClick = async (n) => {
+    if (String(n.id).startsWith("stored-")) {
+      const realId = String(n.id).replace("stored-", "");
+      await markNotificationAsRead(realId).catch(() => null);
+      // بعد ما يتم تعليمه كمقروء، يفضل إعادة تحميل الإشعارات ليختفي المقروء وتتحدث القائمة
+      loadNotifications();
+    }
+
+    setShowNotifications(false);
+
+    if (n.type === "message" && n.chatUserId) {
+      navigate(`/chat/${n.chatUserId}`);
       return;
     }
 
-    req
-      .then((res) => {
-        const feed = res?.data || res || [];
-        setNotificationFeed(feed);
-      })
-      .catch(() => setNotificationFeed([]));
-  }, [user]);
-
-  useEffect(() => {
-    const handleClickOutside = (event) => {
-      if (
-        notificationRef.current &&
-        !notificationRef.current.contains(event.target)
-      ) {
-        setShowNotifications(false);
-      }
-    };
-
-    if (showNotifications) {
-      document.addEventListener("mousedown", handleClickOutside);
+    if (n.type === "request") {
+      if (role === "technician") navigate("/technician/requests");
+      else navigate("/history");
+      return;
     }
 
-    return () =>
-      document.removeEventListener("mousedown", handleClickOutside);
-  }, [showNotifications]);
+    navigate("/history");
+  };
 
   return (
     <div className="navbar">
-      <div className="navbar-brand">Maintenance System</div>
+      <div className="navbar-brand" onClick={goHome}>
+        Maintenance System
+      </div>
 
-      {user ? (
-        <>
-          <div className="navbar-links">
-            {role === "technician" ? (
-              <>
-                <Link to="/technician/dashboard">Dashboard</Link>
-                <Link to="/profile">Profile</Link>
-                <Link to="/ai-chat">AI Assistant</Link>
-                <Link to="/chat">Chat</Link>
-              </>
-            ) : (
-              <>
-                <Link to="/home">Home</Link>
-                <Link to="/history">Requests History</Link>
-                <Link to="/profile">Profile</Link>
-                <Link to="/ai-chat">AI Assistant</Link>
-                <Link to="/chat">Chat</Link>
-              </>
-            )}
-          </div>
-
-          <div className="navbar-actions">
-            <div className="notification-wrapper" ref={notificationRef}>
-              <button
-                className="icon-button"
-                type="button"
-                aria-label="Notifications"
-                onClick={() => setShowNotifications((prev) => !prev)}
-              >
-                🔔
-              </button>
-
-              {showNotifications ? (
-                <div className="notification-dropdown">
-                  <div className="notification-title">Notifications</div>
-
-                  {notificationFeed.length === 0 ? (
-                    <div className="notification-empty">
-                      No notifications yet.
-                    </div>
-                  ) : (
-                    <ul>
-                      {notificationFeed.map((item) => (
-                        <li key={item.id}>
-                          <button
-                            type="button"
-                            className="notification-item"
-                            onClick={() => {
-                              setShowNotifications(false);
-
-                              if (item.type === "message" && item.chatUserId) {
-                                navigate(`/chat/${item.chatUserId}`);
-                              } else if (item.type === "request") {
-                                if (role === "technician") {
-                                  navigate("/technician/requests");
-                                } else if (item.requestId) {
-                                  navigate(`/review/${item.requestId}`);
-                                }
-                              }
-                            }}
-                          >
-                            <div className="notification-item-title">
-                              {item.title}
-                            </div>
-                            <div className="notification-item-body">
-                              {item.body}
-                            </div>
-                          </button>
-                        </li>
-                      ))}
-                    </ul>
-                  )}
-                </div>
-              ) : null}
-            </div>
-
-            <button className="logout-btn" onClick={handleLogout}>
-              Log Out
+      <div className="navbar-links">
+        {role === "technician" ? (
+          <>
+            <button className="link-button" onClick={() => navigate("/technician-dashboard")}>
+              Dashboard
             </button>
-          </div>
-        </>
-      ) : (
-        <div className="navbar-links">
-          Welcome to our Home Maintenance System
+            <button className="link-button" onClick={() => navigate("/profile")}>
+              Profile
+            </button>
+            <button className="link-button" onClick={() => navigate("/ai")}>
+              AI Assistant
+            </button>
+            <button className="link-button" onClick={() => navigate("/chat")}>
+              Chat
+            </button>
+          </>
+        ) : role === "admin" ? (
+          <button className="link-button" onClick={() => navigate("/admin")}>
+            Dashboard
+          </button>
+        ) : (
+          <>
+            <button className="link-button" onClick={() => navigate("/home")}>
+              Home
+            </button>
+            <button className="link-button" onClick={() => navigate("/history")}>
+              Requests History
+            </button>
+            <button className="link-button" onClick={() => navigate("/profile")}>
+              Profile
+            </button>
+            <button className="link-button" onClick={() => navigate("/ai")}>
+              AI Assistant
+            </button>
+            <button className="link-button" onClick={() => navigate("/chat")}>
+              Chat
+            </button>
+          </>
+        )}
+      </div>
+
+      <div className="navbar-actions">
+        <div className="notification-wrapper">
+          <button
+            className="icon-button"
+            onClick={() => setShowNotifications(!showNotifications)}
+          >
+            🔔
+          </button>
+
+          {notifications.length > 0 && (
+            <span className="badge">
+              {notifications.length}
+            </span>
+          )}
+
+          {showNotifications && (
+            <div className="notification-dropdown">
+              <div className="notification-title">
+                Notifications
+              </div>
+
+              <ul>
+                {notifications.map((n) => (
+                  <li key={n.id}>
+                    <button
+                      className="notification-item"
+                      onClick={() => handleNotificationClick(n)}
+                    >
+                      <div className="notification-item-title">
+                        {n.title}
+                      </div>
+
+                      
+                      <div className="notification-item-body">
+                        {n.body} 
+                      </div>
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
         </div>
-      )}
+
+        <button className="logout-btn" onClick={logout}>
+          Log Out
+        </button>
+      </div>
     </div>
   );
 }

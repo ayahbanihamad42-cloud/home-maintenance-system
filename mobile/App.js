@@ -1,7 +1,6 @@
 import React from "react";
 import { NavigationContainer } from "@react-navigation/native";
-import { createStackNavigator } from "@react-navigation/stack";
-import { AuthProvider } from "./src/context/AuthContext";
+import { createNativeStackNavigator } from "@react-navigation/native-stack";
 
 import Welcome from "./src/screens/user/Welcome";
 import Login from "./src/screens/auth/Login";
@@ -10,179 +9,57 @@ import ForgotPassword from "./src/screens/auth/ForgotPassword";
 import ResetPassword from "./src/screens/auth/ResetPassword";
 
 import Home from "./src/screens/user/Home";
-import Profile from "./src/screens/user/UserProfile";
-import MaintenanceHistory from "./src/screens/user/MaintenanceHistory";
 import MaintenanceRequest from "./src/screens/user/MaintenanceRequest";
-import Review from "./src/screens/user/Review";
+import MaintenanceHistory from "./src/screens/user/MaintenanceHistory";
 import PaymentSuccess from "./src/screens/user/PaymentSuccess";
+import Review from "./src/screens/user/Review";
+import UserProfile from "./src/screens/user/UserProfile";
 
-import TechniciansByService from "./src/screens/technician/TechniciansByService";
-import TechnicianProfile from "./src/screens/technician/TechnicianProfile";
-import TechnicianAvailability from "./src/screens/technician/TechnicianAvailability";
-import TechnicianRequests from "./src/screens/technician/TechnicianRequests";
 import TechnicianDashboard from "./src/screens/technician/TechnicianDashboard";
-import GalleryPostDetails from "./src/screens/technician/GalleryPostDetails";
+import TechnicianRequests from "./src/screens/technician/TechnicianRequests";
+import TechnicianAvailability from "./src/screens/technician/TechnicianAvailability";
+import TechnicianProfile from "./src/screens/technician/TechnicianProfile";
+import TechniciansByService from "./src/screens/technician/TechniciansByService";
 
-import AdminDashboard from "./src/screens/Admin/AdminDashboard";
-
-import AIChat from "./src/screens/AIChat";
-import Chat from "./src/screens/Chat";
 import ChatList from "./src/screens/ChatList";
+import Chat from "./src/screens/Chat";
+import AIChat from "./src/screens/AIChat";
 
-import ProtectedRoute from "./src/components/Common/ProtectedRoute";
-import AdminRedirect from "./src/components/Common/AdminRedirect";
+const Stack = createNativeStackNavigator();
 
-const Stack = createStackNavigator();
-
-function App() {
+export default function App() {
   return (
-    <AuthProvider>
-      <NavigationContainer>
-        <Stack.Navigator
-          initialRouteName="Welcome"
-          screenOptions={{
-            headerShown: false,
-          }}
-        >
-          <Stack.Screen name="Welcome" component={Welcome} />
-          <Stack.Screen name="Login" component={Login} />
-          <Stack.Screen name="Register" component={Register} />
-          <Stack.Screen name="ForgotPassword" component={ForgotPassword} />
-          <Stack.Screen name="ResetPassword" component={ResetPassword} />
+    <NavigationContainer>
+      <Stack.Navigator
+        initialRouteName="Welcome"
+        screenOptions={{
+          headerShown: false,
+        }}
+      >
+        <Stack.Screen name="Welcome" component={Welcome} />
 
-          <Stack.Screen name="Home">
-            {() => (
-              <ProtectedRoute allowedRoles={["user", "technician", "admin"]}>
-                <AdminRedirect>
-                  <Home />
-                </AdminRedirect>
-              </ProtectedRoute>
-            )}
-          </Stack.Screen>
+        <Stack.Screen name="Login" component={Login} />
+        <Stack.Screen name="Register" component={Register} />
+        <Stack.Screen name="ForgotPassword" component={ForgotPassword} />
+        <Stack.Screen name="ResetPassword" component={ResetPassword} />
 
-          <Stack.Screen name="Profile">
-            {() => (
-              <ProtectedRoute allowedRoles={["user", "technician"]}>
-                <Profile />
-              </ProtectedRoute>
-            )}
-          </Stack.Screen>
+        <Stack.Screen name="Home" component={Home} />
+        <Stack.Screen name="MaintenanceRequest" component={MaintenanceRequest} />
+        <Stack.Screen name="MaintenanceHistory" component={MaintenanceHistory} />
+        <Stack.Screen name="PaymentSuccess" component={PaymentSuccess} />
+        <Stack.Screen name="Review" component={Review} />
+        <Stack.Screen name="UserProfile" component={UserProfile} />
 
-          <Stack.Screen name="History">
-            {() => (
-              <ProtectedRoute allowedRoles={["user"]}>
-                <MaintenanceHistory />
-              </ProtectedRoute>
-            )}
-          </Stack.Screen>
+        <Stack.Screen name="TechnicianDashboard" component={TechnicianDashboard} />
+        <Stack.Screen name="TechnicianRequests" component={TechnicianRequests} />
+        <Stack.Screen name="TechnicianAvailability" component={TechnicianAvailability} />
+        <Stack.Screen name="TechnicianProfile" component={TechnicianProfile} />
+        <Stack.Screen name="TechniciansByService" component={TechniciansByService} />
 
-          <Stack.Screen name="MaintenanceRequest">
-            {() => (
-              <ProtectedRoute allowedRoles={["user"]}>
-                <MaintenanceRequest />
-              </ProtectedRoute>
-            )}
-          </Stack.Screen>
-
-          <Stack.Screen name="Review">
-            {() => (
-              <ProtectedRoute allowedRoles={["user"]}>
-                <Review />
-              </ProtectedRoute>
-            )}
-          </Stack.Screen>
-
-          <Stack.Screen name="PaymentSuccess">
-            {() => (
-              <ProtectedRoute allowedRoles={["user"]}>
-                <PaymentSuccess />
-              </ProtectedRoute>
-            )}
-          </Stack.Screen>
-
-          <Stack.Screen name="Services">
-            {() => (
-              <ProtectedRoute allowedRoles={["user"]}>
-                <TechniciansByService />
-              </ProtectedRoute>
-            )}
-          </Stack.Screen>
-
-          <Stack.Screen name="TechnicianProfile">
-            {() => (
-              <ProtectedRoute allowedRoles={["user"]}>
-                <TechnicianProfile />
-              </ProtectedRoute>
-            )}
-          </Stack.Screen>
-
-          <Stack.Screen name="GalleryPostDetails">
-            {() => (
-              <ProtectedRoute allowedRoles={["user", "technician"]}>
-                <GalleryPostDetails />
-              </ProtectedRoute>
-            )}
-          </Stack.Screen>
-
-          <Stack.Screen name="TechnicianDashboard">
-            {() => (
-              <ProtectedRoute allowedRoles={["technician"]}>
-                <TechnicianDashboard />
-              </ProtectedRoute>
-            )}
-          </Stack.Screen>
-
-          <Stack.Screen name="TechnicianAvailability">
-            {() => (
-              <ProtectedRoute allowedRoles={["technician"]}>
-                <TechnicianAvailability />
-              </ProtectedRoute>
-            )}
-          </Stack.Screen>
-
-          <Stack.Screen name="TechnicianRequests">
-            {() => (
-              <ProtectedRoute allowedRoles={["technician"]}>
-                <TechnicianRequests />
-              </ProtectedRoute>
-            )}
-          </Stack.Screen>
-
-          <Stack.Screen name="AdminDashboard">
-            {() => (
-              <ProtectedRoute allowedRoles={["admin"]}>
-                <AdminDashboard />
-              </ProtectedRoute>
-            )}
-          </Stack.Screen>
-
-          <Stack.Screen name="AIChat">
-            {() => (
-              <ProtectedRoute allowedRoles={["user", "technician"]}>
-                <AIChat />
-              </ProtectedRoute>
-            )}
-          </Stack.Screen>
-
-          <Stack.Screen name="ChatList">
-            {() => (
-              <ProtectedRoute allowedRoles={["user", "technician"]}>
-                <ChatList />
-              </ProtectedRoute>
-            )}
-          </Stack.Screen>
-
-          <Stack.Screen name="Chat">
-            {() => (
-              <ProtectedRoute allowedRoles={["user", "technician"]}>
-                <Chat />
-              </ProtectedRoute>
-            )}
-          </Stack.Screen>
-        </Stack.Navigator>
-      </NavigationContainer>
-    </AuthProvider>
+        <Stack.Screen name="ChatList" component={ChatList} />
+        <Stack.Screen name="Chat" component={Chat} />
+        <Stack.Screen name="AIChat" component={AIChat} />
+      </Stack.Navigator>
+    </NavigationContainer>
   );
 }
-
-export default App;

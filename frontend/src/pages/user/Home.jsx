@@ -1,40 +1,72 @@
-import React from "react";
+import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import plumbingImg from "../../images/plumbing.png";
-import electricalImg from "../../images/Electrical.png";
-import paintingImg from "../../images/Painting.png";
-import decorationImg from "../../images/Decoration.png";
-import Header from "../../components/common/Header.jsx";
-import "../../index.css";
+import Header from "../../components/common/Header";
+import API from "../../services/api.jsx";
+
+function getBackendImageUrl(imageUrl) {
+  if (!imageUrl) return "";
+
+  if (
+    String(imageUrl).startsWith("http://") ||
+    String(imageUrl).startsWith("https://") ||
+    String(imageUrl).startsWith("data:image/")
+  ) {
+    return imageUrl;
+  }
+
+  const cleanPath = String(imageUrl).startsWith("/")
+    ? String(imageUrl)
+    : `/${imageUrl}`;
+
+  return `http://localhost:5000${cleanPath}`;
+}
 
 function Home() {
   const navigate = useNavigate();
+  const [services, setServices] = useState([]);
 
-  const services = [
-    { name: "Plumbing", img: plumbingImg },
-    { name: "Electrical", img: electricalImg },
-    { name: "Painting", img: paintingImg },
-    { name: "Decoration", img: decorationImg },
-  ];
+  useEffect(() => {
+    API.get("/admin/services")
+      .then((res) => {
+        setServices(Array.isArray(res.data) ? res.data : []);
+      })
+      .catch((err) => {
+        console.error("load services error:", err);
+        setServices([]);
+      });
+  }, []);
 
   return (
     <>
       <Header />
 
       <div className="home-container">
-        <h2 className="home-title">Welcome to our services:</h2>
+        <h1 className="home-title">Welcome to our services:</h1>
 
         <div className="services-container">
-          {services.map((s, i) => (
-            <div key={i} className="service-item">
-              <div
+          {services.map((service) => (
+            <div className="service-item" key={service.id}>
+              <button
+                type="button"
                 className="service-circle"
-                onClick={() => navigate(`/services/${s.name}`)}
+                onClick={() =>
+                  navigate(`/technicians/${encodeURIComponent(service.name)}`)
+                }
               >
-                <img src={s.img} alt={s.name} width="24" height="24" />
-              </div>
+                {service.image_url ? (
+                  <img
+                    src={getBackendImageUrl(service.image_url)}
+                    alt={service.name}
+                    onError={(e) => {
+                      e.currentTarget.style.display = "none";
+                    }}
+                  />
+                ) : (
+                  <span className="service-fallback-icon">🛠️</span>
+                )}
+              </button>
 
-              <div className="service-name">{s.name}</div>
+              <div className="service-name">{service.name}</div>
             </div>
           ))}
         </div>

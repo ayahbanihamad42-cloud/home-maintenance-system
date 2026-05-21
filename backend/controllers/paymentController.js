@@ -1,8 +1,8 @@
 export const createMockPayment = async (req, res) => {
   try {
-    const { amount, technicianId, hoursRequested } = req.body;
+    const { amount, technicianId, estimated_hours, hoursRequested } = req.body;
 
-    if (!amount || amount <= 0) {
+    if (!amount || Number(amount) <= 0) {
       return res.status(400).json({ message: "Invalid payment amount" });
     }
 
@@ -12,9 +12,9 @@ export const createMockPayment = async (req, res) => {
       success: true,
       transactionId,
       status: "paid",
-      amount,
+      amount: Number(amount),
       technicianId,
-      hoursRequested,
+      estimated_hours: estimated_hours || hoursRequested || 1,
       message: "Mock payment completed successfully",
     });
   } catch (error) {

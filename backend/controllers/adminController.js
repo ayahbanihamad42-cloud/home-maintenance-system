@@ -1,370 +1,270 @@
+import fs from "fs";
+import path from "path";
+import { fileURLToPath } from "url";
+import bcrypt from "bcrypt";
 import { db } from "../database/connection.js";
-import bcrypt from "bcryptjs";
 
-/* =========================
-   USERS
-========================= */
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
+const safeImagePath = (imageUrl) => {
+  if (!imageUrl) return "";
+  if (String(imageUrl).startsWith("/") || String(imageUrl).startsWith("http")) {
+    return imageUrl;
+  }
+  return `/${imageUrl}`;
+};
+
+const saveBase64ServiceImage = (name, imageBase64) => {
+  const matches = String(imageBase64).match(
+    /^data:image\/([a-zA-Z0-9]+);base64,(.+)$/
+  );
+
+  if (!matches) {
+    throw new Error("Invalid image format");
+  }
+
+  const ext = matches[1] === "jpeg" ? "jpg" : matches[1];
+  const base64Data = matches[2];
+
+  const safeName = String(name || "service")
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, "-")
+    .replace(/[^a-z0-9-]/g, "");
+
+  const fileName = `${safeName || "service"}-${Date.now()}.${ext}`;
+  const servicesDir = path.join(__dirname, "..", "images", "services");
+
+  if (!fs.existsSync(servicesDir)) {
+    fs.mkdirSync(servicesDir, { recursive: true });
+  }
+
+  fs.writeFileSync(
+    path.join(servicesDir, fileName),
+    Buffer.from(base64Data, "base64")
+  );
+
+  return `/images/services/${fileName}`;
+};
+
+/* USERS */
 export const getAllUsers = (req, res) => {
-  db.query(
-    "SELECT id, name, email, phone, city, role FROM users ORDER BY id DESC",
-    (err, rows) => {
-      if (err) {
-        console.error("getAllUsers error:", err);
-        return res.status(500).json({ message: "Server error" });
-      }
+  db.query("SELECT * FROM users ORDER BY id DESC", (err, rows) => {
+    if (err) return res.status(500).json({ message: err.sqlMessage || err.message });
+    res.json(rows || []);
+  });
+};
 
+export const createUser = async (req, res) => {
+  try {
+    const { name, email, phone, dob, city, password, role } = req.body;
+
+    if (!name || !email || !password || !role) {
+      return res.status(400).json({ message: "Name, email, password and role are required" });
+    }
+
+    const hashedPassword = await bcrypt.hash(password, 10);
+
+    db.query(
+      `
+      INSERT INTO users (name, email, phone, dob, city, password, role, is_verified)
+      VALUES (?, ?, ?, ?, ?, ?, ?, 1)
+      `,
+      [name, email, phone || null, dob || null, city || null, hashedPassword, role],
+      (err, result) => {
+        if (err) return res.status(500).json({ message: err.sqlMessage || err.message });
+        res.status(201).json({ id: result.insertId, message: "User created" });
+      }
+    );
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+};
+
+export const deleteUser = (req, res) => {
+  db.query("DELETE FROM users WHERE id = ?", [req.params.id], (err, result) => {
+    if (err) return res.status(500).json({ message: err.sqlMessage || err.message });
+    if (!result.affectedRows) return res.status(404).json({ message: "User not found" });
+    res.json({ message: "User deleted" });
+  });
+};
+
+/* TECHNICIANS */
+export const getAllTechnicians = (req, res) => {
+  db.query(
+    `
+    SELECT 
+      t.id AS technicianId,
+      t.user_id,
+      t.service,
+      t.experience,
+      t.price_per_hour,
+      u.name,
+      u.email,
+      u.phone,
+      u.city
+    FROM technicians t
+    JOIN users u ON u.id = t.user_id
+    ORDER BY t.id DESC
+    `,
+    (err, rows) => {
+      if (err) return res.status(500).json({ message: err.sqlMessage || err.message });
       res.json(rows || []);
     }
   );
 };
 
-export const createUser = async (req, res) => {
-  const { name, email, phone, city, password, role } = req.body;
-
-  if (!name || !email || !password) {
-    return res.status(400).json({ message: "Missing required fields" });
-  }
-
-  try {
-    db.query("SELECT id FROM users WHERE email = ?", [email], async (err, rows) => {
-      if (err) {
-        console.error("createUser check error:", err);
-        return res.status(500).json({ message: "Server error" });
-      }
-
-      if (rows.length) {
-        return res.status(400).json({ message: "Email already registered" });
-      }
-
-      const hash = await bcrypt.hash(password, 10);
-
-      db.query(
-        `
-        INSERT INTO users (name, email, phone, city, password, role)
-        VALUES (?, ?, ?, ?, ?, ?)
-        `,
-        [name, email, phone || null, city || null, hash, role || "user"],
-        (insertErr, result) => {
-          if (insertErr) {
-            console.error("createUser insert error:", insertErr);
-            return res.status(500).json({ message: "Server error" });
-          }
-
-          res.json({ message: "User created", id: result.insertId });
-        }
-      );
-    });
-  } catch (error) {
-    console.error("createUser error:", error);
-    res.status(500).json({ message: "Server error" });
-  }
-};
-
-export const deleteUser = (req, res) => {
-  const { id } = req.params;
-
-  db.query("DELETE FROM users WHERE id = ?", [id], (err, result) => {
-    if (err) {
-      console.error("deleteUser error:", err);
-      return res.status(500).json({ message: "Server error" });
-    }
-
-    if (!result.affectedRows) {
-      return res.status(404).json({ message: "User not found" });
-    }
-
-    res.json({ message: "User deleted" });
-  });
-};
-
-/* =========================
-   TECHNICIANS
-========================= */
-
-export const getAllTechnicians = (req, res) => {
-  const q = `
-    SELECT 
-      t.id AS technicianId,
-      u.id AS userId,
-      u.name,
-      u.email,
-      u.phone,
-      u.city,
-      t.service_id,
-      COALESCE(s.name, t.service) AS service,
-      s.image_url AS service_image,
-      t.experience
-    FROM users u
-    JOIN technicians t ON u.id = t.user_id
-    LEFT JOIN services s ON t.service_id = s.id
-    ORDER BY t.id DESC
-  `;
-
-  db.query(q, (err, rows) => {
-    if (err) {
-      console.error("getAllTechnicians error:", err);
-      return res.status(500).json({ message: "Server error" });
-    }
-
-    res.json(rows || []);
-  });
-};
-
 export const createTechnician = async (req, res) => {
-  const { name, email, phone, city, password, service_id, experience } = req.body;
-
-  if (!name || !email || !password || !service_id) {
-    return res.status(400).json({ message: "Missing required fields" });
-  }
-
   try {
-    db.query("SELECT id FROM users WHERE email = ?", [email], async (err, rows) => {
-      if (err) {
-        console.error("createTechnician check email error:", err);
-        return res.status(500).json({ message: "Server error" });
-      }
+    const { name, email, phone, city, password, service, experience, price_per_hour } = req.body;
 
-      if (rows.length) {
-        return res.status(400).json({ message: "Email already registered" });
-      }
+    if (!name || !email || !password || !service) {
+      return res.status(400).json({ message: "Name, email, password and service are required" });
+    }
 
-      db.query("SELECT id, name FROM services WHERE id = ?", [service_id], async (serviceErr, serviceRows) => {
-        if (serviceErr) {
-          console.error("createTechnician check service error:", serviceErr);
-          return res.status(500).json({ message: "Server error" });
-        }
+    const hashedPassword = await bcrypt.hash(password, 10);
 
-        if (!serviceRows.length) {
-          return res.status(404).json({ message: "Service not found" });
-        }
-
-        const serviceName = serviceRows[0].name;
-        const hash = await bcrypt.hash(password, 10);
+    db.query(
+      `
+      INSERT INTO users (name, email, phone, city, password, role, is_verified)
+      VALUES (?, ?, ?, ?, ?, 'technician', 1)
+      `,
+      [name, email, phone || null, city || null, hashedPassword],
+      (userErr, userResult) => {
+        if (userErr) return res.status(500).json({ message: userErr.sqlMessage || userErr.message });
 
         db.query(
           `
-          INSERT INTO users (name, email, phone, city, password, role)
-          VALUES (?, ?, ?, ?, ?, 'technician')
+          INSERT INTO technicians (user_id, service, experience, price_per_hour)
+          VALUES (?, ?, ?, ?)
           `,
-          [name, email, phone || null, city || null, hash],
-          (insertErr, userResult) => {
-            if (insertErr) {
-              console.error("createTechnician user insert error:", insertErr);
-              return res.status(500).json({ message: "Server error" });
-            }
+          [
+            userResult.insertId,
+            service,
+            Number(experience || 0),
+            Number(price_per_hour || 0),
+          ],
+          (techErr, techResult) => {
+            if (techErr) return res.status(500).json({ message: techErr.sqlMessage || techErr.message });
 
-            db.query(
-              `
-              INSERT INTO technicians (user_id, service, service_id, experience)
-              VALUES (?, ?, ?, ?)
-              `,
-              [userResult.insertId, serviceName, service_id, experience || 0],
-              (techErr, techResult) => {
-                if (techErr) {
-                  console.error("createTechnician tech insert error:", techErr);
-                  return res.status(500).json({ message: "Server error" });
-                }
-
-                res.json({
-                  message: "Technician created",
-                  id: techResult.insertId,
-                });
-              }
-            );
+            res.status(201).json({
+              id: techResult.insertId,
+              user_id: userResult.insertId,
+              message: "Technician created",
+            });
           }
         );
-      });
-    });
-  } catch (error) {
-    console.error("createTechnician error:", error);
-    res.status(500).json({ message: "Server error" });
+      }
+    );
+  } catch (err) {
+    res.status(500).json({ message: err.message });
   }
 };
 
 export const deleteTechnician = (req, res) => {
-  const { id } = req.params;
-
-  db.query("SELECT user_id FROM technicians WHERE id = ?", [id], (err, rows) => {
-    if (err) {
-      console.error("deleteTechnician select error:", err);
-      return res.status(500).json({ message: "Server error" });
-    }
-
-    if (!rows.length) {
-      return res.status(404).json({ message: "Technician not found" });
-    }
+  db.query("SELECT user_id FROM technicians WHERE id = ?", [req.params.id], (findErr, rows) => {
+    if (findErr) return res.status(500).json({ message: findErr.sqlMessage || findErr.message });
+    if (!rows.length) return res.status(404).json({ message: "Technician not found" });
 
     const userId = rows[0].user_id;
 
-    db.query("DELETE FROM technician_availability WHERE technician_id = ?", [id], (availabilityErr) => {
-      if (availabilityErr) {
-        console.error("deleteTechnician availability error:", availabilityErr);
-        return res.status(500).json({ message: "Server error" });
-      }
+    db.query("DELETE FROM technicians WHERE id = ?", [req.params.id], (techErr) => {
+      if (techErr) return res.status(500).json({ message: techErr.sqlMessage || techErr.message });
 
-      db.query("DELETE FROM technicians WHERE id = ?", [id], (techErr) => {
-        if (techErr) {
-          console.error("deleteTechnician delete tech error:", techErr);
-          return res.status(500).json({ message: "Server error" });
-        }
-
-        db.query("DELETE FROM users WHERE id = ?", [userId], (userErr) => {
-          if (userErr) {
-            console.error("deleteTechnician delete user error:", userErr);
-            return res.status(500).json({ message: "Server error" });
-          }
-
-          res.json({ message: "Technician deleted" });
-        });
+      db.query("DELETE FROM users WHERE id = ?", [userId], (userErr) => {
+        if (userErr) return res.status(500).json({ message: userErr.sqlMessage || userErr.message });
+        res.json({ message: "Technician deleted" });
       });
     });
   });
 };
 
-/* =========================
-   STORES
-========================= */
-
+/* STORES */
 export const getAllStores = (req, res) => {
-  const q = `
-    SELECT 
-      s.id,
-      s.store_name,
-      s.category,
-      s.city,
-      s.address,
-      s.owner_id,
-      u.name AS owner_name,
-      u.email AS owner_email
-    FROM stores s
-    LEFT JOIN users u ON s.owner_id = u.id
-    ORDER BY s.id DESC
-  `;
-
-  db.query(q, (err, rows) => {
-    if (err) {
-      console.error("getAllStores error:", err);
-      return res.status(500).json({ message: "Server error" });
-    }
-
+  db.query("SELECT * FROM stores ORDER BY id DESC", (err, rows) => {
+    if (err) return res.status(500).json({ message: err.sqlMessage || err.message });
     res.json(rows || []);
   });
 };
 
 export const createStore = (req, res) => {
-  const { store_name, category, city, address, owner_id } = req.body;
+  const { name, owner_name, city, phone, address } = req.body;
 
-  if (!store_name || !category || !city) {
-    return res.status(400).json({ message: "Missing required fields" });
-  }
+  if (!name) return res.status(400).json({ message: "Store name is required" });
 
   db.query(
     `
-    INSERT INTO stores (store_name, category, city, address, owner_id)
+    INSERT INTO stores (name, owner_name, city, phone, address)
     VALUES (?, ?, ?, ?, ?)
     `,
-    [store_name, category, city, address || null, owner_id || null],
+    [name, owner_name || null, city || null, phone || null, address || null],
     (err, result) => {
-      if (err) {
-        console.error("createStore error:", err);
-        return res.status(500).json({ message: "Server error" });
-      }
-
-      res.json({ message: "Store created", id: result.insertId });
+      if (err) return res.status(500).json({ message: err.sqlMessage || err.message });
+      res.status(201).json({ id: result.insertId, message: "Store created" });
     }
   );
 };
 
 export const deleteStore = (req, res) => {
-  const { id } = req.params;
-
-  db.query("DELETE FROM stores WHERE id = ?", [id], (err, result) => {
-    if (err) {
-      console.error("deleteStore error:", err);
-      return res.status(500).json({ message: "Server error" });
-    }
-
-    if (!result.affectedRows) {
-      return res.status(404).json({ message: "Store not found" });
-    }
-
+  db.query("DELETE FROM stores WHERE id = ?", [req.params.id], (err, result) => {
+    if (err) return res.status(500).json({ message: err.sqlMessage || err.message });
+    if (!result.affectedRows) return res.status(404).json({ message: "Store not found" });
     res.json({ message: "Store deleted" });
   });
 };
 
-/* =========================
-   SERVICES
-========================= */
-
+/* SERVICES */
 export const getAllServices = (req, res) => {
   db.query(
-    "SELECT id, name, image_url FROM services ORDER BY id DESC",
+    "SELECT id, name, image_url, created_at FROM services ORDER BY id DESC",
     (err, rows) => {
-      if (err) {
-        console.error("getAllServices error:", err);
-        return res.status(500).json({
-          message: err.sqlMessage || err.message || "Server error",
-        });
-      }
-
+      if (err) return res.status(500).json({ message: err.sqlMessage || err.message });
       res.json(rows || []);
     }
   );
 };
 
 export const createService = (req, res) => {
-  const { name, image_url } = req.body;
+  const { name, image_url, image_base64 } = req.body;
 
-  if (!name || !image_url) {
-    return res.status(400).json({ message: "Service name and image are required" });
+  if (!name || !String(name).trim()) {
+    return res.status(400).json({ message: "Service name is required" });
+  }
+
+  let finalImageUrl = image_url ? safeImagePath(String(image_url).trim()) : "";
+
+  try {
+    if (image_base64) {
+      finalImageUrl = saveBase64ServiceImage(name, image_base64);
+    }
+  } catch (err) {
+    return res.status(400).json({ message: err.message });
+  }
+
+  if (!finalImageUrl) {
+    return res.status(400).json({ message: "Service image is required" });
   }
 
   db.query(
     "INSERT INTO services (name, image_url) VALUES (?, ?)",
-    [name, image_url],
+    [String(name).trim(), finalImageUrl],
     (err, result) => {
-      if (err) {
-        console.error("createService error:", err);
+      if (err) return res.status(500).json({ message: err.sqlMessage || err.message });
 
-        if (err.code === "ER_DUP_ENTRY") {
-          return res.status(400).json({ message: "Service already exists" });
-        }
-
-        return res.status(500).json({ message: "Server error" });
-      }
-
-      res.json({ message: "Service created", id: result.insertId });
+      res.status(201).json({
+        id: result.insertId,
+        name: String(name).trim(),
+        image_url: finalImageUrl,
+      });
     }
   );
 };
 
 export const deleteService = (req, res) => {
-  const { id } = req.params;
-
-  db.query("SELECT id FROM technicians WHERE service_id = ?", [id], (checkErr, rows) => {
-    if (checkErr) {
-      console.error("deleteService check error:", checkErr);
-      return res.status(500).json({ message: "Server error" });
-    }
-
-    if (rows.length) {
-      return res.status(400).json({
-        message: "Cannot delete service because technicians are using it",
-      });
-    }
-
-    db.query("DELETE FROM services WHERE id = ?", [id], (err, result) => {
-      if (err) {
-        console.error("deleteService error:", err);
-        return res.status(500).json({ message: "Server error" });
-      }
-
-      if (!result.affectedRows) {
-        return res.status(404).json({ message: "Service not found" });
-      }
-
-      res.json({ message: "Service deleted" });
-    });
+  db.query("DELETE FROM services WHERE id = ?", [req.params.id], (err, result) => {
+    if (err) return res.status(500).json({ message: err.sqlMessage || err.message });
+    if (!result.affectedRows) return res.status(404).json({ message: "Service not found" });
+    res.json({ message: "Service deleted" });
   });
 };

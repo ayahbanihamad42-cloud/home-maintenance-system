@@ -1,10 +1,10 @@
-import API from "./api";
-
-export const getChatMessages = (userId) =>
-  API.get(`/chat/${userId}`).then((r) => r.data);
-
-export const sendChatMessage = (data) =>
-  API.post("/chat", data).then((r) => r.data);
+import API from "./api.jsx";
 
 export const getChatConversations = () =>
-  API.get("/chat/conversations").then((r) => r.data);
+  API.get("/chat/conversations").then((res) => res.data);
+
+export const getChatMessages = (userId) =>
+  API.get(`/chat/${userId}`).then((res) => res.data);
+
+export const sendChatMessage = (data) =>
+  API.post("/chat", data).then((res) => res.data);
