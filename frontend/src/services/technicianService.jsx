@@ -6,9 +6,9 @@ export const getTechnicians = async (service) => {
   return res.data;
 };
 
-export const getAvailability = async (techId, date) => {
+export const getAvailability = async (techId, date = "") => {
   const res = await API.get(`/technicians/${techId}/availability`, {
-    params: { date },
+    params: date ? { date } : {},
   });
   return res.data;
 };
@@ -30,31 +30,6 @@ export const getTechnicianByUserId = async (userId) => {
 
 export const updateTechnicianPrice = async (price_per_hour) => {
   const res = await API.put("/technicians/price", { price_per_hour });
-  return res.data;
-};
-
-export const getTechnicianGallery = async (technicianId) => {
-  const res = await API.get(`/technicians/${technicianId}/gallery`);
-  return res.data;
-};
-
-export const getMyTechnicianGallery = async () => {
-  const res = await API.get("/technicians/gallery/my");
-  return res.data;
-};
-
-export const createTechnicianGalleryPost = async (data) => {
-  const res = await API.post("/technicians/gallery", data);
-  return res.data;
-};
-
-export const updateTechnicianGalleryPost = async (postId, data) => {
-  const res = await API.put(`/technicians/gallery/${postId}`, data);
-  return res.data;
-};
-
-export const deleteTechnicianGalleryPost = async (postId) => {
-  const res = await API.delete(`/technicians/gallery/${postId}`);
   return res.data;
 };
 
@@ -82,5 +57,30 @@ export const createRegularAvailability = async (data) => {
 
 export const deleteRegularAvailability = async (id) => {
   const res = await API.delete(`/technicians/regular-availability/${id}`);
+  return res.data;
+};
+
+export const getMyTechnicianGallery = async () => {
+  const res = await API.get("/technicians/gallery/my");
+  return res.data;
+};
+
+export const getTechnicianGallery = async (technicianId) => {
+  const res = await API.get(`/technicians/${technicianId}/gallery`);
+  return res.data;
+};
+
+export const createTechnicianGalleryPost = async (data) => {
+  const res = await API.post("/technicians/gallery", data);
+  return res.data;
+};
+
+export const updateTechnicianGalleryPost = async (postId, data) => {
+  const res = await API.put(`/technicians/gallery/${postId}`, data);
+  return res.data;
+};
+
+export const deleteTechnicianGalleryPost = async (postId) => {
+  const res = await API.delete(`/technicians/gallery/${postId}`);
   return res.data;
 };

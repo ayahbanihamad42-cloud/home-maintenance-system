@@ -1,133 +1,129 @@
-import React, { useEffect, useState } from "react";
-import { useLocation, useNavigate, useParams } from "react-router-dom";
+import React, { useEffect, useMemo, useState } from "react";
+import { useNavigate, useParams } from "react-router-dom";
 import Header from "../../components/common/Header";
-import API from "../../services/api";
+
+import {
+  getRequestById,
+  cancelMaintenanceRequest,
+} from "../../services/maintenanceService";
+
+import {
+  getRatingByRequest,
+  submitRating,
+} from "../../services/ratingService";
 
 function Review() {
-  const { id } = useParams();
-  const location = useLocation();
+  const { requestId } = useParams();
   const navigate = useNavigate();
 
-  const [request, setRequest] = useState(location.state?.createdRequest || null);
-  const [message, setMessage] = useState(null);
+  const [request, setRequest] = useState(null);
+  const [ratingData, setRatingData] = useState(null);
   const [rating, setRating] = useState(5);
   const [comment, setComment] = useState("");
-  const [submittingReview, setSubmittingReview] = useState(false);
-  const [cancelling, setCancelling] = useState(false);
+  const [message, setMessage] = useState(null);
+
+  const loadRequest = async () => {
+    try {
+      const data = await getRequestById(requestId);
+      setRequest(data);
+    } catch (err) {
+      console.error("load review request error:", err);
+      setMessage({
+        type: "error",
+        title: "Error",
+        body: "Failed to load request.",
+      });
+    }
+  };
+
+  useEffect(() => {
+    loadRequest();
+
+    getRatingByRequest(requestId)
+      .then((data) => {
+        if (data) {
+          setRatingData(data);
+          setRating(data.rating || 5);
+          setComment(data.comment || "");
+        }
+      })
+      .catch(() => setRatingData(null));
+  }, [requestId]);
+
+  const status = String(request?.status || "").toLowerCase();
+
+  const canCancel = useMemo(() => {
+    return status === "pending";
+  }, [status]);
+
+  const canReview = useMemo(() => {
+    return status === "completed";
+  }, [status]);
 
   const formatDate = (value) => {
     if (!value) return "-";
     return String(value).split("T")[0];
   };
 
-  const formatDateTime = (value) => {
-    if (!value) return "-";
-    const d = new Date(value);
-    if (Number.isNaN(d.getTime())) return value;
-    return d.toLocaleString();
-  };
-
-  const normalizedStatus = String(request?.status || "pending").toLowerCase();
-
-  const canCancel = normalizedStatus === "pending";
-  const canReview = normalizedStatus === "completed";
-
-  const loadRequest = async () => {
+  const handleCancel = async () => {
     try {
-      const res = await API.get(`/maintenance/${id}`);
-      setRequest(res.data);
-    } catch (err) {
-      console.error("review load error:", err);
-      setMessage({
-        type: "error",
-        title: "Error",
-        body: "Failed to load request details.",
-      });
-    }
-  };
+      setMessage(null);
 
-  useEffect(() => {
-    if (id) loadRequest();
-  }, [id]);
+      if (!canCancel) {
+        setMessage({
+          type: "warning",
+          title: "Request Not Available",
+          body: "You can cancel only pending requests.",
+        });
+        return;
+      }
 
-  const cancelRequest = async () => {
-    if (!canCancel) {
-      setMessage({
-        type: "warning",
-        title: "Cannot Cancel",
-        body: "This request is already accepted or started, so it cannot be cancelled.",
-      });
-      return;
-    }
-
-    try {
-      setCancelling(true);
-
-      await API.put(`/maintenance/${id}/status`, {
-        status: "cancelled",
-      });
-
-      setRequest((prev) => ({
-        ...prev,
-        status: "cancelled",
-      }));
+      await cancelMaintenanceRequest(requestId);
 
       setMessage({
         type: "success",
-        title: "Request Cancelled",
-        body:
-          String(request?.payment_method).toLowerCase() === "online"
-            ? "Request cancelled. The refund notification was sent."
-            : "Request cancelled successfully.",
+        title: "Cancelled Successfully",
+        body: "Your request has been cancelled.",
       });
-    } catch (err) {
-      console.error("cancel request error:", err);
 
+      loadRequest();
+    } catch (err) {
+      console.error("cancel error:", err);
       setMessage({
         type: "error",
         title: "Error",
-        body: err.response?.data?.message || "Failed to cancel request.",
+        body:
+          err.response?.data?.message ||
+          "Failed to cancel request.",
       });
-    } finally {
-      setCancelling(false);
     }
   };
 
-  const submitReview = async () => {
-    if (!canReview) {
-      setMessage({
-        type: "warning",
-        title: "Review Not Available",
-        body: "Review is available only after the request is completed.",
-      });
-      return;
-    }
-
+  const handleSubmitReview = async () => {
     try {
-      setSubmittingReview(true);
+      setMessage(null);
 
-      await API.post("/ratings", {
-        request_id: Number(id),
+      await submitRating({
         technician_id: request.technician_id,
+        request_id: request.id,
         rating,
         comment,
       });
 
+      setRatingData({ rating, comment });
+
       setMessage({
         type: "success",
-        title: "Review Sent",
-        body: "Thank you for your review.",
+        title: "Review Submitted",
+        body: "Thank you for your feedback.",
       });
     } catch (err) {
-      console.error("submit review error:", err);
-
+      console.error("rating error:", err);
       setMessage({
         type: "error",
         title: "Error",
-        body: err.response?.data?.message || "Failed to submit review.",
+        body: "Failed to submit review.",
       });
-    } finally {
-      setSubmittingReview(false);
     }
   };
 
@@ -147,7 +143,7 @@ function Review() {
     <>
       <Header />
 
-      <div className="container request-container">
+      <div className="container">
         <h2>Request Review</h2>
 
         {message && (
@@ -159,8 +155,8 @@ function Review() {
 
         <div className="history-card">
           <div className="history-card-header">
-            <h3>{request.service || "Maintenance"}</h3>
-            <span className="status-pill">{request.status || "pending"}</span>
+            <h3>{request.service || request.service_type || "Maintenance"}</h3>
+            <span className="status-pill">{request.status}</span>
           </div>
 
           <p className="history-description">
@@ -168,60 +164,64 @@ function Review() {
           </p>
 
           <div className="history-info-grid">
-            <span>
-              <b>Request Created:</b>{" "}
-              {formatDateTime(request.created_at || request.createdAt)}
-            </span>
+            <p>
+              <b>Date:</b> {formatDate(request.scheduled_date)}
+            </p>
 
-            <span>
-              <b>Scheduled Date:</b> {formatDate(request.scheduled_date)}
-            </span>
+            <p>
+              <b>Time:</b> {request.scheduled_time || "-"}
+            </p>
 
-            <span>
-              <b>Scheduled Time:</b> {request.scheduled_time || "-"}
-            </span>
+            <p>
+              <b>Created At:</b>{" "}
+              {request.created_at
+                ? new Date(request.created_at).toLocaleString()
+                : "-"}
+            </p>
 
-            <span>
+            <p>
               <b>Technician:</b>{" "}
               {request.technician_name || request.technician_id || "-"}
-            </span>
+            </p>
 
-            <span>
+            <p>
               <b>Location:</b>{" "}
               {request.location_note || request.location || request.city || "-"}
-            </span>
+            </p>
 
-            <span>
+            <p>
               <b>Payment:</b> {request.payment_method || "-"}
-            </span>
+            </p>
 
-            <span>
+            <p>
               <b>Total:</b>{" "}
-              {request.total_price
-                ? `${Number(request.total_price).toFixed(2)} JOD`
-                : "-"}
-            </span>
+              {Number(request.total_price || request.total || 0).toFixed(2)} JOD
+            </p>
           </div>
 
           {canCancel && (
-            <button className="secondary" type="button" onClick={cancelRequest}>
-              {cancelling ? "Cancelling..." : "Cancel Request"}
+            <button className="secondary" onClick={handleCancel}>
+              Cancel Request
             </button>
           )}
         </div>
 
         {canReview ? (
           <div className="card">
-            <h3>Write Review</h3>
+            <h3>Rate Technician</h3>
 
             <div className="input-group">
               <label>Rating</label>
-              <select value={rating} onChange={(e) => setRating(e.target.value)}>
-                <option value="5">5 Stars</option>
-                <option value="4">4 Stars</option>
-                <option value="3">3 Stars</option>
-                <option value="2">2 Stars</option>
-                <option value="1">1 Star</option>
+              <select
+                value={rating}
+                disabled={!!ratingData}
+                onChange={(e) => setRating(Number(e.target.value))}
+              >
+                <option value={5}>5 Stars</option>
+                <option value={4}>4 Stars</option>
+                <option value={3}>3 Stars</option>
+                <option value={2}>2 Stars</option>
+                <option value={1}>1 Star</option>
               </select>
             </div>
 
@@ -229,21 +229,26 @@ function Review() {
               <label>Comment</label>
               <textarea
                 value={comment}
+                disabled={!!ratingData}
                 onChange={(e) => setComment(e.target.value)}
-                placeholder="Write your feedback..."
+                placeholder="Write your review..."
               />
             </div>
 
-            <button className="primary" type="button" onClick={submitReview}>
-              {submittingReview ? "Sending..." : "Submit Review"}
+            <button
+              className="primary"
+              disabled={!!ratingData}
+              onClick={handleSubmitReview}
+            >
+              Submit Review
             </button>
           </div>
         ) : (
           <p>Review is available only after the request is completed.</p>
         )}
 
-        <button className="secondary" type="button" onClick={() => navigate("/history")}>
-          Back To History
+        <button className="secondary" onClick={() => navigate("/history")}>
+          Back to History
         </button>
       </div>
     </>

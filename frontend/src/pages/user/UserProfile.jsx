@@ -7,7 +7,6 @@ function UserProfile() {
   const currentUser = JSON.parse(localStorage.getItem("user") || "{}");
 
   const [profile, setProfile] = useState(null);
-
   const [menuOpen, setMenuOpen] = useState(false);
   const [submenu, setSubmenu] = useState(null);
 
@@ -31,6 +30,8 @@ function UserProfile() {
 
   const loadProfile = async () => {
     try {
+      setProfileMessage(null);
+
       const res = await API.get(`/users/${currentUser.id}`);
 
       setProfile(res.data);
@@ -68,25 +69,20 @@ function UserProfile() {
 
   const handleSaveProfile = async () => {
     try {
-      const payload = {
-        email,
-        phone,
-        city,
-        dob,
-      };
+      const payload = { email, phone, city, dob };
 
       await API.patch(`/users/${currentUser.id}`, payload);
 
-      await API.post("/users/send-profile-update-email", {
-        userId: currentUser.id,
-        ...payload,
-      });
+      try {
+        await API.post("/users/send-profile-update-email", {
+          userId: currentUser.id,
+          ...payload,
+        });
+      } catch (emailErr) {
+        console.error("send profile email error:", emailErr);
+      }
 
-      const updatedProfile = {
-        ...profile,
-        ...payload,
-      };
-
+      const updatedProfile = { ...profile, ...payload };
       setProfile(updatedProfile);
 
       localStorage.setItem(
@@ -127,7 +123,6 @@ function UserProfile() {
     reader.onloadend = () => {
       localStorage.setItem(`profile_photo_${currentUser.id}`, reader.result);
       setPhotoPreview(reader.result);
-
       setShowPhotoModal(false);
 
       setProfileMessage({
@@ -140,7 +135,41 @@ function UserProfile() {
     reader.readAsDataURL(file);
   };
 
-  if (!profile) return null;
+  if (!currentUser?.id) {
+    return (
+      <>
+        <Header />
+        <div className="profile-container">
+          <div className="profile-card">
+            <div className="message-box-card error">
+              <div className="message-box-title">Error</div>
+              <div className="message-box-body">User id is missing.</div>
+            </div>
+          </div>
+        </div>
+      </>
+    );
+  }
+
+  if (!profile) {
+    return (
+      <>
+        <Header />
+        <div className="profile-container">
+          <div className="profile-card">
+            {profileMessage ? (
+              <div className={`message-box-card ${profileMessage.type}`}>
+                <div className="message-box-title">{profileMessage.title}</div>
+                <div className="message-box-body">{profileMessage.body}</div>
+              </div>
+            ) : (
+              <p>Loading...</p>
+            )}
+          </div>
+        </div>
+      </>
+    );
+  }
 
   return (
     <>
@@ -202,14 +231,18 @@ function UserProfile() {
 
                   <button
                     type="button"
-                    onClick={() => setSubmenu(submenu === "language" ? null : "language")}
+                    onClick={() =>
+                      setSubmenu(submenu === "language" ? null : "language")
+                    }
                   >
                     Language ▸
                   </button>
 
                   <button
                     type="button"
-                    onClick={() => setSubmenu(submenu === "theme" ? null : "theme")}
+                    onClick={() =>
+                      setSubmenu(submenu === "theme" ? null : "theme")
+                    }
                   >
                     Theme ▸
                   </button>
@@ -276,21 +309,10 @@ function UserProfile() {
           )}
 
           <div className="profile-info">
-            <p>
-              <b>Email:</b> {profile.email || "-"}
-            </p>
-
-            <p>
-              <b>Phone:</b> {profile.phone || "-"}
-            </p>
-
-            <p>
-              <b>City:</b> {profile.city || "-"}
-            </p>
-
-            <p>
-              <b>Birth Date:</b> {formatDate(profile.dob) || "-"}
-            </p>
+            <p><b>Email:</b> {profile.email || "-"}</p>
+            <p><b>Phone:</b> {profile.phone || "-"}</p>
+            <p><b>City:</b> {profile.city || "-"}</p>
+            <p><b>Birth Date:</b> {formatDate(profile.dob) || "-"}</p>
           </div>
 
           {profile.role === "technician" && profile.technician_id && (

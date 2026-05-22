@@ -1,282 +1,366 @@
-import React, { useEffect, useState, useMemo } from "react";
+import React, { useEffect, useState } from "react";
 import {
   View,
   Text,
-  StyleSheet,
   ScrollView,
   TouchableOpacity,
   TextInput,
-  SafeAreaView,
+  StyleSheet,
   ActivityIndicator,
+  Alert,
 } from "react-native";
-import { useNavigation, useRoute } from "@react-navigation/native";
 import { Picker } from "@react-native-picker/picker";
-
-import { getRequestById } from "../../services/maintenanceService";
-import { getRatingByRequest, submitRating } from "../../services/ratingService";
 import Header from "../../components/Common/Header";
 import API from "../../services/api";
+import { getRequestById } from "../../services/maintenanceService";
+import { getRatingByRequest, submitRating } from "../../services/ratingService";
 
-function ReviewRequest() {
-  const route = useRoute();
-  const navigation = useNavigation();
-  const { requestId } = route.params;
+export default function Review({ navigation, route }) {
+  const requestId = route?.params?.requestId;
+  const passedRequest = route?.params?.request || null;
 
-  const [req, setReq] = useState(null);
-  const [technicianName, setTechnicianName] = useState("");
-  const [technicianUserId, setTechnicianUserId] = useState(null);
+  const [req, setReq] = useState(passedRequest);
+  const [loading, setLoading] = useState(!passedRequest);
+  const [message, setMessage] = useState(null);
+
   const [rating, setRating] = useState(5);
   const [comment, setComment] = useState("");
-  const [submitMessage, setSubmitMessage] = useState("");
   const [existingRating, setExistingRating] = useState(null);
 
-  useEffect(() => {
-    getRequestById(requestId)
-      .then((data) => setReq(data))
-      .catch(() => setReq(null));
-  }, [requestId]);
+  const formatDate = (value) => {
+    if (!value) return "-";
+    return String(value).split("T")[0];
+  };
 
-  useEffect(() => {
-    getRatingByRequest(requestId)
-      .then((data) => {
-        if (data) {
-          setExistingRating(data);
-          setRating(data.rating);
-          setComment(data.comment || "");
-        }
-      })
-      .catch(() => setExistingRating(null));
-  }, [requestId]);
+  const formatTime = (value) => {
+    if (!value) return "-";
+    return String(value).slice(0, 8);
+  };
 
-  useEffect(() => {
-    if (!req?.technician_id) return;
-
-    API.get(`/technicians/${req.technician_id}`)
-      .then((res) => {
-        setTechnicianName(res.data?.name || "");
-        setTechnicianUserId(res.data?.user_id || null);
-      })
-      .catch(() => {
-        setTechnicianName("");
-        setTechnicianUserId(null);
+  const loadRequest = async () => {
+    try {
+      setLoading(true);
+      const data = await getRequestById(requestId);
+      setReq(data);
+    } catch (err) {
+      setMessage({
+        type: "error",
+        title: "Error",
+        body: err?.response?.data?.message || "Failed to load request.",
       });
-  }, [req?.technician_id]);
+    } finally {
+      setLoading(false);
+    }
+  };
 
-  const timelineSteps = useMemo(
-    () => ["Request Accepted", "On The Way", "Service in Progress", "Completed"],
-    []
+  const loadRating = async () => {
+    try {
+      const data = await getRatingByRequest(requestId);
+      if (data) {
+        setExistingRating(data);
+        setRating(data.rating || 5);
+        setComment(data.comment || "");
+      }
+    } catch {
+      setExistingRating(null);
+    }
+  };
+
+  useEffect(() => {
+    if (requestId && !passedRequest) loadRequest();
+    if (requestId) loadRating();
+  }, [requestId]);
+
+  const canCancel = ["pending"].includes(
+    String(req?.status || "").toLowerCase()
   );
 
-  const activeIndex = useMemo(() => {
-    const statusMap = {
-      pending: -1,
-      confirmed: 0,
-      on_the_way: 1,
-      in_progress: 2,
-      completed: 3,
-    };
-    const normalizedStatus = String(req?.status || "").trim().toLowerCase();
-    return statusMap[normalizedStatus] ?? -1;
-  }, [req?.status]);
+  const isCompleted =
+    String(req?.status || "").toLowerCase() === "completed";
 
-  const isCompleted = String(req?.status || "").trim().toLowerCase() === "completed";
+  const cancelRequest = async () => {
+    try {
+      if (!canCancel) {
+        Alert.alert(
+          "Not Available",
+          "You can cancel only before the technician accepts the request."
+        );
+        return;
+      }
 
-  const handleSubmitRating = () => {
-    if (!req?.technician_id) return;
-
-    submitRating({
-      technician_id: req.technician_id,
-      request_id: req.id,
-      rating,
-      comment,
-    })
-      .then(() => {
-        setSubmitMessage("Review submitted.");
-        setExistingRating({ rating, comment });
-      })
-      .catch(() => {
-        setSubmitMessage("Failed to submit review.");
+      await API.put(`/maintenance/${req.id}/status`, {
+        status: "cancelled",
       });
+
+      setMessage({
+        type: "success",
+        title: "Cancelled Successfully",
+        body:
+          String(req.payment_method).toLowerCase() === "online"
+            ? "Request cancelled. Refund notification has been sent."
+            : "Request cancelled successfully.",
+      });
+
+      setReq((prev) => ({
+        ...prev,
+        status: "cancelled",
+      }));
+    } catch (err) {
+      setMessage({
+        type: "error",
+        title: "Error",
+        body: err?.response?.data?.message || "Failed to cancel request.",
+      });
+    }
   };
+
+  const sendReview = async () => {
+    try {
+      if (!req?.technician_id) return;
+
+      await submitRating({
+        technician_id: req.technician_id,
+        request_id: req.id,
+        rating,
+        comment,
+      });
+
+      setExistingRating({ rating, comment });
+      setMessage({
+        type: "success",
+        title: "Review Submitted",
+        body: "Thank you for your feedback.",
+      });
+    } catch (err) {
+      setMessage({
+        type: "error",
+        title: "Error",
+        body: err?.response?.data?.message || "Failed to submit review.",
+      });
+    }
+  };
+
+  if (loading) {
+    return (
+      <View style={styles.screen}>
+        <Header />
+        <View style={styles.center}>
+          <ActivityIndicator size="large" color="#111" />
+        </View>
+      </View>
+    );
+  }
 
   if (!req) {
     return (
-      <SafeAreaView style={styles.container}>
+      <View style={styles.screen}>
         <Header />
-        <View style={styles.centered}>
-          <ActivityIndicator size="large" color="#007AFF" />
+        <View style={styles.center}>
+          <Text style={styles.emptyText}>Request not found.</Text>
         </View>
-      </SafeAreaView>
+      </View>
     );
   }
 
   return (
-    <SafeAreaView style={styles.container}>
+    <View style={styles.screen}>
       <Header />
-      <ScrollView contentContainerStyle={styles.scrollContent}>
-        <View style={styles.glassCard}>
-          <Text style={styles.cardTitle}>Request ID: #{req.id}</Text>
-          <Text style={styles.infoText}>
-            <Text style={styles.bold}>Service Type:</Text> {req.service || "Not specified"}
-          </Text>
-          <Text style={styles.infoText}>
-            <Text style={styles.bold}>Date:</Text> {req.scheduled_date || "Not specified"}
-          </Text>
-          <Text style={styles.infoText}>
-            <Text style={styles.bold}>Time:</Text> {req.scheduled_time || "Not specified"}
-          </Text>
-          <Text style={styles.infoText}>
-            <Text style={styles.bold}>Location:</Text> {req.location_note || "Not specified"}
-          </Text>
-          <Text style={styles.infoText}>
-            <Text style={styles.bold}>Description:</Text> {req.description || "Not specified"}
-          </Text>
 
-          <View style={styles.technicianBar}>
-            <Text style={styles.technicianText}>
-              👤 Technician: {technicianName || "Assigned technician"}
-            </Text>
-            <TouchableOpacity
-              style={styles.chatButton}
-              onPress={() => {
-                if (technicianUserId) {
-                  navigation.navigate("Chat", { userId: technicianUserId });
-                } else {
-                  setSubmitMessage("Chat will be available once a technician is assigned.");
-                }
-              }}
+      <ScrollView contentContainerStyle={styles.container}>
+        <View style={styles.panel}>
+          <Text style={styles.title}>Request Review</Text>
+
+          {message ? (
+            <View
+              style={[
+                styles.messageBox,
+                message.type === "success" && styles.successBox,
+                message.type === "error" && styles.errorBox,
+              ]}
             >
-              <Text style={styles.chatButtonText}>Chat</Text>
-            </TouchableOpacity>
-          </View>
+              <Text style={styles.messageTitle}>{message.title}</Text>
+              <Text style={styles.messageBody}>{message.body}</Text>
+            </View>
+          ) : null}
 
-          <View style={styles.timeline}>
-            {timelineSteps.map((step, index) => (
-              <View key={step} style={styles.timelineItem}>
-                <View style={[styles.dot, activeIndex >= index && styles.activeDot]} />
-                <Text style={[styles.stepText, activeIndex >= index && styles.activeStepText]}>
-                  {step}
-                </Text>
-              </View>
-            ))}
+          <View style={styles.card}>
+            <View style={styles.cardTop}>
+              <Text style={styles.service}>
+                {req.service || req.service_type || "Maintenance"}
+              </Text>
+              <Text style={styles.badge}>{req.status || "-"}</Text>
+            </View>
+
+            <Text style={styles.desc}>{req.description || "No description"}</Text>
+
+            <View style={styles.infoGrid}>
+              <Text style={styles.line}>
+                Date: {formatDate(req.scheduled_date)}
+              </Text>
+              <Text style={styles.line}>
+                Time: {formatTime(req.scheduled_time)}
+              </Text>
+              <Text style={styles.line}>
+                Technician: {req.technician_name || req.technician_id || "-"}
+              </Text>
+              <Text style={styles.line}>
+                Location: {req.location_note || req.location || req.city || "-"}
+              </Text>
+              <Text style={styles.line}>
+                Payment: {req.payment_method || "-"}
+              </Text>
+              <Text style={styles.line}>
+                Total: {Number(req.total_price || req.total || 0).toFixed(2)} JOD
+              </Text>
+              <Text style={styles.line}>
+                Created Date: {formatDate(req.created_at)}
+              </Text>
+              <Text style={styles.line}>
+                Created Time: {formatTime(req.created_at?.split("T")?.[1])}
+              </Text>
+            </View>
+
+            {canCancel ? (
+              <TouchableOpacity style={styles.outlineBtn} onPress={cancelRequest}>
+                <Text style={styles.outlineBtnText}>Cancel Request</Text>
+              </TouchableOpacity>
+            ) : (
+              <Text style={styles.note}>
+                Cancellation is available only before the technician accepts the request.
+              </Text>
+            )}
           </View>
 
           {isCompleted ? (
-            <View style={styles.ratingSection}>
-              <Text style={styles.ratingTitle}>Rate your experience:</Text>
+            <View style={styles.reviewBox}>
+              <Text style={styles.sectionTitle}>Rate your experience</Text>
 
-              <View style={styles.pickerContainer}>
+              <View style={styles.pickerBox}>
                 <Picker
                   selectedValue={rating}
                   enabled={!existingRating}
-                  onValueChange={(val) => setRating(val)}
+                  onValueChange={setRating}
                 >
-                  {[5, 4, 3, 2, 1].map((v) => (
-                    <Picker.Item key={v} label={`${v} Stars`} value={v} />
-                  ))}
+                  <Picker.Item label="5 Stars" value={5} />
+                  <Picker.Item label="4 Stars" value={4} />
+                  <Picker.Item label="3 Stars" value={3} />
+                  <Picker.Item label="2 Stars" value={2} />
+                  <Picker.Item label="1 Star" value={1} />
                 </Picker>
               </View>
 
               <TextInput
                 style={styles.textArea}
-                placeholder="Leave a comment..."
-                multiline
-                numberOfLines={4}
                 value={comment}
-                editable={!existingRating}
                 onChangeText={setComment}
+                editable={!existingRating}
+                multiline
+                placeholder="Leave a comment..."
               />
 
-              {submitMessage ? <Text style={styles.messageText}>{submitMessage}</Text> : null}
-
               <TouchableOpacity
-                style={[styles.submitButton, existingRating && styles.disabledButton]}
+                style={[styles.primaryBtn, existingRating && { opacity: 0.5 }]}
                 disabled={!!existingRating}
-                onPress={handleSubmitRating}
+                onPress={sendReview}
               >
-                <Text style={styles.submitButtonText}>Submit Review</Text>
+                <Text style={styles.primaryBtnText}>
+                  {existingRating ? "Review Submitted" : "Submit Review"}
+                </Text>
               </TouchableOpacity>
             </View>
           ) : (
-            <Text style={styles.footerNote}>
-              You can rate the service after it is marked as Completed.
+            <Text style={styles.note}>
+              Review is available only after the request is completed.
             </Text>
           )}
         </View>
       </ScrollView>
-    </SafeAreaView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#E8DCCF" },
-  centered: { flex: 1, justifyContent: "center", alignItems: "center" },
-  scrollContent: { padding: 15 },
-  glassCard: {
-    backgroundColor: "#FFF9F3",
-    padding: 20,
-    borderRadius: 15,
-    elevation: 5,
-    shadowColor: "#000",
-    shadowOpacity: 0.1,
-    shadowRadius: 10,
+  screen: { flex: 1, backgroundColor: "#e7dccc" },
+  center: { flex: 1, justifyContent: "center", alignItems: "center" },
+  container: { padding: 24, paddingBottom: 70 },
+  panel: {
+    backgroundColor: "#fffaf4",
+    borderRadius: 28,
+    padding: 26,
     borderWidth: 1,
-    borderColor: "#D8C8B8",
+    borderColor: "#d8c8b8",
   },
-  cardTitle: { fontSize: 18, fontWeight: "bold", marginBottom: 10 },
-  infoText: { fontSize: 14, marginBottom: 5 },
-  bold: { fontWeight: "bold" },
-  technicianBar: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: "#e7ddd1",
-    padding: 12,
-    borderRadius: 10,
-    marginVertical: 15,
+  title: { fontSize: 36, fontWeight: "900", marginBottom: 20 },
+  messageBox: {
+    padding: 14,
+    borderRadius: 16,
+    marginBottom: 16,
+    borderWidth: 1,
   },
-  technicianText: { flex: 1, fontSize: 14 },
-  chatButton: {
+  successBox: { backgroundColor: "#eef9f1", borderColor: "#bfe7ca" },
+  errorBox: { backgroundColor: "#fdebed", borderColor: "#efb6bd" },
+  messageTitle: { fontWeight: "900", fontSize: 16 },
+  messageBody: { marginTop: 6, fontSize: 15, color: "#6b5e52" },
+  card: {
+    backgroundColor: "#f7efe7",
+    borderRadius: 24,
+    padding: 22,
+    borderWidth: 1,
+    borderColor: "#d8c8b8",
+  },
+  cardTop: { flexDirection: "row", justifyContent: "space-between", gap: 12 },
+  service: { fontSize: 26, fontWeight: "900", flex: 1 },
+  badge: {
     backgroundColor: "#111",
-    paddingVertical: 6,
-    paddingHorizontal: 15,
-    borderRadius: 5,
+    color: "#fff",
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 20,
+    overflow: "hidden",
+    fontWeight: "900",
   },
-  chatButtonText: { color: "#fff", fontWeight: "600" },
-  timeline: { marginVertical: 15 },
-  timelineItem: { flexDirection: "row", alignItems: "center", marginBottom: 10 },
-  dot: { width: 12, height: 12, borderRadius: 6, backgroundColor: "#ddd", marginRight: 10 },
-  activeDot: { backgroundColor: "#111" },
-  stepText: { color: "#888", fontSize: 13 },
-  activeStepText: { color: "#000", fontWeight: "bold" },
-  ratingSection: { marginTop: 20 },
-  ratingTitle: { textAlign: "center", marginBottom: 10, fontSize: 16 },
-  pickerContainer: {
+  desc: { fontSize: 17, marginVertical: 18, color: "#3d342d" },
+  infoGrid: { gap: 8 },
+  line: { fontSize: 16, color: "#3d342d", fontWeight: "600" },
+  outlineBtn: {
+    alignSelf: "flex-start",
+    marginTop: 18,
+    paddingHorizontal: 22,
+    paddingVertical: 12,
+    borderRadius: 14,
     borderWidth: 1,
-    borderColor: "#ccc",
-    borderRadius: 8,
-    marginBottom: 10,
-    backgroundColor: "#fff",
+    borderColor: "#111",
+  },
+  outlineBtnText: { color: "#111", fontWeight: "900" },
+  note: { marginTop: 18, color: "#6b5e52", fontSize: 15, lineHeight: 22 },
+  reviewBox: { marginTop: 22 },
+  sectionTitle: { fontSize: 22, fontWeight: "900", marginBottom: 12 },
+  pickerBox: {
+    backgroundColor: "#f7efe7",
+    borderWidth: 1,
+    borderColor: "#d8c8b8",
+    borderRadius: 16,
+    overflow: "hidden",
+    marginBottom: 12,
   },
   textArea: {
+    backgroundColor: "#f7efe7",
     borderWidth: 1,
-    borderColor: "#ccc",
-    borderRadius: 10,
-    padding: 10,
-    height: 80,
+    borderColor: "#d8c8b8",
+    borderRadius: 16,
+    padding: 14,
+    height: 100,
     textAlignVertical: "top",
-    backgroundColor: "#fff",
+    fontSize: 16,
   },
-  messageText: { color: "#111", textAlign: "center", marginVertical: 10 },
-  submitButton: {
+  primaryBtn: {
     backgroundColor: "#111",
-    padding: 15,
-    borderRadius: 10,
-    marginTop: 10,
-    alignItems: "center",
+    alignSelf: "flex-start",
+    marginTop: 14,
+    paddingHorizontal: 24,
+    paddingVertical: 14,
+    borderRadius: 16,
   },
-  disabledButton: { backgroundColor: "#ccc" },
-  submitButtonText: { color: "#fff", fontWeight: "bold" },
-  footerNote: { textAlign: "center", marginTop: 20, color: "#666" },
+  primaryBtnText: { color: "#fff", fontWeight: "900", fontSize: 16 },
+  emptyText: { fontSize: 18, color: "#6b5e52" },
 });
-
-export default ReviewRequest;

@@ -3,18 +3,15 @@ import {
   getUserProfile,
   updateUserPassword,
   updateUserProfile,
-  sendProfileUpdateEmail,
+  updateUserPhoto,
 } from "../controllers/userController.js";
 import auth from "../utils/authMiddleware.js";
 
 const router = express.Router();
 
 router.get("/:id", auth, getUserProfile);
-
 router.patch("/:id", auth, updateUserProfile);
-
+router.patch("/:id/photo", auth, updateUserPhoto);
 router.patch("/:id/password", auth, updateUserPassword);
-
-router.post("/send-profile-update-email", auth, sendProfileUpdateEmail);
 
 export default router;

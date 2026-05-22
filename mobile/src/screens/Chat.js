@@ -8,14 +8,20 @@ import {
   StyleSheet,
   Image,
   Linking,
+  Alert,
 } from "react-native";
+import * as ImagePicker from "expo-image-picker";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import * as Location from "expo-location";
 import API from "../services/api";
+import Header from "../components/Common/Header";
 
 const API_HOST = "http://localhost:5000";
 
 const fullUrl = (url) => {
   if (!url) return "";
   if (String(url).startsWith("http")) return url;
+  if (String(url).startsWith("data:image")) return url;
   return `${API_HOST}${url}`;
 };
 
@@ -25,10 +31,16 @@ export default function Chat({ navigation, route }) {
     params.receiverId || params.userId || params.user?.id || params.otherUserId;
   const receiverName = params.name || params.user?.name || "Conversation";
 
+  const [currentUser, setCurrentUser] = useState(null);
   const [messages, setMessages] = useState([]);
   const [text, setText] = useState("");
   const [notice, setNotice] = useState("");
   const scrollRef = useRef(null);
+
+  const loadCurrentUser = async () => {
+    const saved = await AsyncStorage.getItem("user");
+    setCurrentUser(saved ? JSON.parse(saved) : null);
+  };
 
   const loadMessages = async () => {
     try {
@@ -46,10 +58,22 @@ export default function Chat({ navigation, route }) {
   };
 
   useEffect(() => {
+    loadCurrentUser();
+  }, []);
+
+  useEffect(() => {
     loadMessages();
     const timer = setInterval(loadMessages, 4000);
     return () => clearInterval(timer);
   }, [receiverId]);
+
+  const isMine = (msg) => {
+    const myId = currentUser?.id || currentUser?.user_id;
+
+    if (msg.isMine || msg.is_mine || msg.mine) return true;
+
+    return Number(msg.sender_id) === Number(myId);
+  };
 
   const sendText = async () => {
     try {
@@ -64,7 +88,6 @@ export default function Chat({ navigation, route }) {
       setText("");
       loadMessages();
     } catch (err) {
-      console.log("send error:", err.response?.data || err.message);
       setNotice(err.response?.data?.message || "Failed to send message.");
     }
   };
@@ -73,50 +96,103 @@ export default function Chat({ navigation, route }) {
     try {
       if (!receiverId) return;
 
-      const fakeLocation = "https://www.google.com/maps?q=32.5317,35.8676";
+      const permission = await Location.requestForegroundPermissionsAsync();
+
+      if (permission.status !== "granted") {
+        Alert.alert("Notice", "Location permission is required.");
+        return;
+      }
+
+      const loc = await Location.getCurrentPositionAsync({});
+      const url = `https://www.google.com/maps?q=${loc.coords.latitude},${loc.coords.longitude}`;
 
       await API.post("/chat", {
         receiver_id: receiverId,
-        message: fakeLocation,
+        message: url,
         type: "location",
       });
 
       loadMessages();
     } catch (err) {
-      console.log("location error:", err.response?.data || err.message);
       setNotice("Failed to send location.");
     }
   };
 
-  const isMine = (msg) => {
-    return msg.isMine || msg.is_mine || msg.mine;
+  const sendImage = async () => {
+    try {
+      if (!receiverId) return;
+
+      const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+
+      if (!permission.granted) {
+        Alert.alert("Notice", "Image permission is required.");
+        return;
+      }
+
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        base64: true,
+        quality: 0.45,
+      });
+
+      if (result.canceled) return;
+
+      const asset = result.assets?.[0];
+      if (!asset?.base64) return;
+
+      const mimeType = asset.mimeType || "image/jpeg";
+      const image = `data:${mimeType};base64,${asset.base64}`;
+
+      await API.post("/chat", {
+        receiver_id: receiverId,
+        message: image,
+        type: "image",
+      });
+
+      loadMessages();
+    } catch (err) {
+      setNotice("Failed to send image.");
+    }
   };
 
-  const renderMessage = (msg) => {
+  const renderMessage = (msg, mine) => {
     const type = msg.type || "text";
     const content = msg.message || "";
 
-    if (type === "image" || String(content).startsWith("/images/chat/")) {
+    if (
+      type === "image" ||
+      String(content).startsWith("/images/chat/") ||
+      String(content).startsWith("data:image")
+    ) {
       return <Image source={{ uri: fullUrl(content) }} style={styles.msgImage} />;
     }
 
     if (type === "location" || String(content).includes("google.com/maps")) {
       return (
         <TouchableOpacity onPress={() => Linking.openURL(content)}>
-          <Text style={styles.locationText}>📍 Open Location</Text>
+          <Text style={[styles.locationText, mine && { color: "#fff" }]}>
+            📍 Open Location
+          </Text>
         </TouchableOpacity>
       );
     }
 
-    return <Text style={styles.messageText}>{content}</Text>;
+    return (
+      <Text style={[styles.messageText, mine && styles.myMessageText]}>
+        {content}
+      </Text>
+    );
   };
 
   return (
     <View style={styles.screen}>
-      <Header navigation={navigation} />
+      <Header />
 
       <View style={styles.wrapper}>
-        <TouchableOpacity style={styles.backBtn} onPress={() => navigation.navigate("ChatList")}>
+        <TouchableOpacity
+          style={styles.backBtn}
+          onPress={() => navigation.navigate("ChatList")}
+        >
           <Text style={styles.backText}>← Back to Chats</Text>
         </TouchableOpacity>
 
@@ -125,6 +201,7 @@ export default function Chat({ navigation, route }) {
             <View style={styles.chatIcon}>
               <Text style={styles.chatIconText}>💬</Text>
             </View>
+
             <View>
               <Text style={styles.chatTitle}>{receiverName}</Text>
               <Text style={styles.chatSub}>Messages update automatically</Text>
@@ -141,21 +218,25 @@ export default function Chat({ navigation, route }) {
               scrollRef.current?.scrollToEnd({ animated: true })
             }
           >
-            {messages.map((msg, index) => (
-              <View
-                key={msg.id || index}
-                style={[
-                  styles.bubble,
-                  isMine(msg) ? styles.myBubble : styles.otherBubble,
-                ]}
-              >
-                {renderMessage(msg)}
-              </View>
-            ))}
+            {messages.map((msg, index) => {
+              const mine = isMine(msg);
+
+              return (
+                <View
+                  key={msg.id || index}
+                  style={[
+                    styles.bubble,
+                    mine ? styles.myBubble : styles.otherBubble,
+                  ]}
+                >
+                  {renderMessage(msg, mine)}
+                </View>
+              );
+            })}
           </ScrollView>
 
           <View style={styles.inputArea}>
-            <TouchableOpacity style={styles.smallBtn}>
+            <TouchableOpacity style={styles.smallBtn} onPress={sendImage}>
               <Text style={styles.smallBtnText}>📷</Text>
             </TouchableOpacity>
 
@@ -180,49 +261,8 @@ export default function Chat({ navigation, route }) {
   );
 }
 
-function Header({ navigation }) {
-  return (
-    <View style={styles.header}>
-      <Text style={styles.headerTitle}>Maintenance System</Text>
-      <TouchableOpacity style={styles.bell}>
-        <Text style={styles.bellText}>🔔</Text>
-      </TouchableOpacity>
-      <TouchableOpacity style={styles.logout}>
-        <Text style={styles.logoutText}>Log Out</Text>
-      </TouchableOpacity>
-    </View>
-  );
-}
-
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: "#e7dccc" },
-  header: {
-    minHeight: 96,
-    backgroundColor: "#faf5ef",
-    flexDirection: "row",
-    alignItems: "center",
-    paddingHorizontal: 18,
-    borderBottomWidth: 1,
-    borderBottomColor: "#d8c8b8",
-  },
-  headerTitle: { flex: 1, fontSize: 26, fontWeight: "900" },
-  bell: {
-    width: 54,
-    height: 54,
-    borderRadius: 27,
-    backgroundColor: "#fff",
-    alignItems: "center",
-    justifyContent: "center",
-    marginRight: 12,
-  },
-  bellText: { fontSize: 26 },
-  logout: {
-    backgroundColor: "#111",
-    paddingHorizontal: 22,
-    paddingVertical: 16,
-    borderRadius: 28,
-  },
-  logoutText: { color: "#fff", fontWeight: "900", fontSize: 16 },
   wrapper: { flex: 1, padding: 18 },
   backBtn: {
     alignSelf: "flex-start",
@@ -288,6 +328,7 @@ const styles = StyleSheet.create({
     borderBottomLeftRadius: 4,
   },
   messageText: { fontSize: 16, color: "#111" },
+  myMessageText: { color: "#fff" },
   locationText: { fontSize: 16, fontWeight: "900", color: "#0b57d0" },
   msgImage: {
     width: 230,

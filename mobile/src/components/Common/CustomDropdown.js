@@ -6,17 +6,17 @@ import {
   TouchableOpacity,
   StyleSheet,
   Pressable,
+  ScrollView,
 } from "react-native";
 
-function CustomDropdown({ value, options, onChange, placeholder }) {
+export default function CustomDropdown({ value, options, onChange, placeholder }) {
   const [open, setOpen] = useState(false);
-
   const selected = options.find((item) => item.value === value);
 
   return (
     <>
       <TouchableOpacity style={styles.select} onPress={() => setOpen(true)}>
-        <Text style={styles.selectText}>
+        <Text style={styles.selectText} numberOfLines={1}>
           {selected?.label || placeholder || "Select"}
         </Text>
         <Text style={styles.arrow}>⌄</Text>
@@ -24,30 +24,29 @@ function CustomDropdown({ value, options, onChange, placeholder }) {
 
       <Modal transparent visible={open} animationType="fade">
         <Pressable style={styles.backdrop} onPress={() => setOpen(false)}>
-          <View style={styles.menu}>
-            {options.map((item) => (
-              <TouchableOpacity
-                key={item.value}
-                style={[
-                  styles.option,
-                  value === item.value && styles.activeOption,
-                ]}
-                onPress={() => {
-                  onChange(item.value);
-                  setOpen(false);
-                }}
-              >
-                <Text
-                  style={[
-                    styles.optionText,
-                    value === item.value && styles.activeOptionText,
-                  ]}
+          <Pressable style={styles.menu}>
+            <ScrollView>
+              {options.map((item) => (
+                <TouchableOpacity
+                  key={item.value}
+                  style={[styles.option, value === item.value && styles.activeOption]}
+                  onPress={() => {
+                    onChange(item.value);
+                    setOpen(false);
+                  }}
                 >
-                  {item.label}
-                </Text>
-              </TouchableOpacity>
-            ))}
-          </View>
+                  <Text
+                    style={[
+                      styles.optionText,
+                      value === item.value && styles.activeOptionText,
+                    ]}
+                  >
+                    {item.label}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          </Pressable>
         </Pressable>
       </Modal>
     </>
@@ -56,7 +55,7 @@ function CustomDropdown({ value, options, onChange, placeholder }) {
 
 const styles = StyleSheet.create({
   select: {
-    height: 52,
+    height: 58,
     borderRadius: 999,
     backgroundColor: "#F6EDE2",
     borderWidth: 1,
@@ -70,11 +69,13 @@ const styles = StyleSheet.create({
     color: "#111",
     fontSize: 16,
     fontWeight: "800",
+    flex: 1,
   },
   arrow: {
     color: "#111",
     fontSize: 22,
     fontWeight: "900",
+    marginLeft: 8,
   },
   backdrop: {
     flex: 1,
@@ -83,6 +84,7 @@ const styles = StyleSheet.create({
     padding: 24,
   },
   menu: {
+    maxHeight: "70%",
     backgroundColor: "#FFF9F3",
     borderRadius: 24,
     borderWidth: 1,
@@ -106,5 +108,3 @@ const styles = StyleSheet.create({
     color: "#FFF",
   },
 });
-
-export default CustomDropdown;

@@ -7,72 +7,77 @@ import {
   StyleSheet,
   ActivityIndicator,
 } from "react-native";
-import { Picker } from "@react-native-picker/picker";
+import Header from "../../components/Common/Header";
 import API from "../../services/api";
+import CustomDropdown from "../../components/Common/CustomDropdown";
 
-export default function TechnicianRequests({ navigation, route }) {
-  const user = route?.params?.user || {};
-  const userId = user?.id || user?.user_id;
-
+export default function TechnicianRequests({ navigation }) {
   const [requests, setRequests] = useState([]);
   const [statusFilter, setStatusFilter] = useState("all");
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(true);
+  const [message, setMessage] = useState(null);
 
   const loadRequests = async () => {
     try {
       setLoading(true);
-      setError("");
+      setMessage(null);
 
-      const techRes = await API.get(`/technicians/user/${userId}`);
-      const tech = techRes.data;
-
-      if (!tech?.technicianId && !tech?.id) {
-        setError("Technician not found.");
-        setRequests([]);
-        return;
-      }
-
-      const technicianId = tech.technicianId || tech.id;
-
-      const res = await API.get(`/technicians/requests/my`);
+      const res = await API.get("/technicians/requests/my");
       setRequests(Array.isArray(res.data) ? res.data : []);
     } catch (err) {
-      console.log("technician requests error:", err.response?.data || err.message);
-      setError(err.response?.data?.message || "Failed to load technician requests.");
+      console.log("technician requests error:", err?.response?.data || err.message);
       setRequests([]);
+      setMessage({
+        type: "error",
+        title: "Error",
+        body: err?.response?.data?.message || "Failed to load technician requests.",
+      });
     } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => {
-    if (userId) loadRequests();
-  }, [userId]);
+    const unsubscribe = navigation.addListener("focus", loadRequests);
+    return unsubscribe;
+  }, [navigation]);
 
   const filtered = useMemo(() => {
     if (statusFilter === "all") return requests;
     return requests.filter(
-      (r) =>
-        String(r.status || "").toLowerCase() ===
-        String(statusFilter).toLowerCase()
+      (r) => String(r.status || "").toLowerCase() === statusFilter
     );
   }, [requests, statusFilter]);
-
-  const changeStatus = async (requestId, status) => {
-    try {
-      setError("");
-      await API.put(`/technicians/requests/${requestId}/status`, { status });
-      loadRequests();
-    } catch (err) {
-      console.log("status error:", err.response?.data || err.message);
-      setError(err.response?.data?.message || "Failed to update status.");
-    }
-  };
 
   const formatDate = (value) => {
     if (!value) return "-";
     return String(value).split("T")[0];
+  };
+
+  const formatTime = (value) => {
+    if (!value) return "-";
+    return String(value).slice(0, 8);
+  };
+
+  const changeStatus = async (requestId, status) => {
+    try {
+      setMessage(null);
+      await API.put(`/technicians/requests/${requestId}/status`, { status });
+
+      setMessage({
+        type: "success",
+        title: "Updated",
+        body: `Request status changed to ${status}.`,
+      });
+
+      loadRequests();
+    } catch (err) {
+      setMessage({
+        type: "error",
+        title: "Error",
+        body: err?.response?.data?.message || "Failed to update status.",
+      });
+    }
   };
 
   const actionsForStatus = (req) => {
@@ -100,45 +105,50 @@ export default function TechnicianRequests({ navigation, route }) {
 
     if (status === "accepted") {
       return (
-        <View style={styles.actions}>
-          <TouchableOpacity
-            style={styles.btn}
-            onPress={() => changeStatus(req.id, "on_the_way")}
-          >
-            <Text style={styles.btnText}>On The Way</Text>
-          </TouchableOpacity>
-        </View>
+        <TouchableOpacity
+          style={styles.fullBtn}
+          onPress={() => changeStatus(req.id, "on_the_way")}
+        >
+          <Text style={styles.btnText}>On The Way</Text>
+        </TouchableOpacity>
       );
     }
 
     if (status === "on_the_way") {
       return (
-        <View style={styles.actions}>
-          <TouchableOpacity
-            style={styles.btn}
-            onPress={() => changeStatus(req.id, "in_progress")}
-          >
-            <Text style={styles.btnText}>Start Work</Text>
-          </TouchableOpacity>
-        </View>
+        <TouchableOpacity
+          style={styles.fullBtn}
+          onPress={() => changeStatus(req.id, "in_progress")}
+        >
+          <Text style={styles.btnText}>Start Work</Text>
+        </TouchableOpacity>
       );
     }
 
     if (status === "in_progress") {
       return (
-        <View style={styles.actions}>
-          <TouchableOpacity
-            style={styles.btn}
-            onPress={() => changeStatus(req.id, "completed")}
-          >
-            <Text style={styles.btnText}>Complete</Text>
-          </TouchableOpacity>
-        </View>
+        <TouchableOpacity
+          style={styles.fullBtn}
+          onPress={() => changeStatus(req.id, "completed")}
+        >
+          <Text style={styles.btnText}>Complete</Text>
+        </TouchableOpacity>
       );
     }
 
     return null;
   };
+
+  const options = [
+    { label: "All requests", value: "all" },
+    { label: "Pending", value: "pending" },
+    { label: "Accepted", value: "accepted" },
+    { label: "On The Way", value: "on_the_way" },
+    { label: "In Progress", value: "in_progress" },
+    { label: "Completed", value: "completed" },
+    { label: "Rejected", value: "rejected" },
+    { label: "Cancelled", value: "cancelled" },
+  ];
 
   return (
     <View style={styles.screen}>
@@ -147,23 +157,28 @@ export default function TechnicianRequests({ navigation, route }) {
       <ScrollView contentContainerStyle={styles.container}>
         <Text style={styles.title}>Technician Requests</Text>
 
-        {error ? <Text style={styles.error}>{error}</Text> : null}
+        <CustomDropdown
+          value={statusFilter}
+          options={options}
+          onChange={setStatusFilter}
+          placeholder="All requests"
+        />
 
-        <View style={styles.pickerBox}>
-          <Picker selectedValue={statusFilter} onValueChange={setStatusFilter}>
-            <Picker.Item label="All requests" value="all" />
-            <Picker.Item label="Pending" value="pending" />
-            <Picker.Item label="Accepted" value="accepted" />
-            <Picker.Item label="On The Way" value="on_the_way" />
-            <Picker.Item label="In Progress" value="in_progress" />
-            <Picker.Item label="Completed" value="completed" />
-            <Picker.Item label="Rejected" value="rejected" />
-            <Picker.Item label="Cancelled" value="cancelled" />
-          </Picker>
-        </View>
+        {message ? (
+          <View
+            style={[
+              styles.messageBox,
+              message.type === "error" && styles.errorBox,
+              message.type === "success" && styles.successBox,
+            ]}
+          >
+            <Text style={styles.messageTitle}>{message.title}</Text>
+            <Text style={styles.messageBody}>{message.body}</Text>
+          </View>
+        ) : null}
 
         {loading ? (
-          <ActivityIndicator size="large" color="#111" />
+          <ActivityIndicator size="large" color="#111" style={{ marginTop: 40 }} />
         ) : filtered.length === 0 ? (
           <View style={styles.emptyCard}>
             <Text style={styles.empty}>No requests found.</Text>
@@ -181,11 +196,12 @@ export default function TechnicianRequests({ navigation, route }) {
               <Text style={styles.desc}>{req.description || "No description"}</Text>
 
               <Text style={styles.line}>Date: {formatDate(req.scheduled_date)}</Text>
-              <Text style={styles.line}>Time: {req.scheduled_time || "-"}</Text>
+              <Text style={styles.line}>Time: {formatTime(req.scheduled_time)}</Text>
+              <Text style={styles.line}>Created Date: {formatDate(req.created_at)}</Text>
               <Text style={styles.line}>User: {req.user_name || req.user_id || "-"}</Text>
               <Text style={styles.line}>Phone: {req.phone || "-"}</Text>
               <Text style={styles.line}>
-                Location: {req.location || req.location_note || req.city || "-"}
+                Location: {req.location_note || req.location || req.city || "-"}
               </Text>
               <Text style={styles.line}>Payment: {req.payment_method || "-"}</Text>
               <Text style={styles.line}>
@@ -201,132 +217,41 @@ export default function TechnicianRequests({ navigation, route }) {
   );
 }
 
-function Header({ navigation }) {
-  const [open, setOpen] = useState(false);
-
-  return (
-    <View style={styles.header}>
-      <TouchableOpacity style={styles.menuBtn} onPress={() => setOpen(!open)}>
-        <Text style={styles.menuText}>☰</Text>
-      </TouchableOpacity>
-
-      <Text style={styles.headerTitle}>Maintenance System</Text>
-
-      <TouchableOpacity style={styles.bell}>
-        <Text style={styles.bellText}>🔔</Text>
-      </TouchableOpacity>
-
-      <TouchableOpacity style={styles.logout}>
-        <Text style={styles.logoutText}>Log Out</Text>
-      </TouchableOpacity>
-
-      {open && (
-        <View style={styles.menu}>
-          <TouchableOpacity onPress={() => navigation.navigate("TechnicianDashboard")}>
-            <Text style={styles.menuItem}>Dashboard</Text>
-          </TouchableOpacity>
-          <TouchableOpacity onPress={() => navigation.navigate("TechnicianProfile")}>
-            <Text style={styles.menuItem}>Profile</Text>
-          </TouchableOpacity>
-          <TouchableOpacity onPress={() => navigation.navigate("AIChat")}>
-            <Text style={styles.menuItem}>AI Assistant</Text>
-          </TouchableOpacity>
-          <TouchableOpacity onPress={() => navigation.navigate("ChatList")}>
-            <Text style={styles.menuItem}>Chat</Text>
-          </TouchableOpacity>
-        </View>
-      )}
-    </View>
-  );
-}
-
 const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: "#e7dccc" },
-  header: {
-    minHeight: 96,
-    backgroundColor: "#faf5ef",
-    flexDirection: "row",
-    alignItems: "center",
-    paddingHorizontal: 18,
-    borderBottomWidth: 1,
-    borderBottomColor: "#d8c8b8",
-    zIndex: 100,
-  },
-  menuBtn: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    backgroundColor: "#fff",
-    alignItems: "center",
-    justifyContent: "center",
-    borderWidth: 1,
-    borderColor: "#d8c8b8",
-  },
-  menuText: { fontSize: 34, fontWeight: "900" },
-  headerTitle: { flex: 1, fontSize: 26, fontWeight: "900", marginLeft: 12 },
-  bell: {
-    width: 54,
-    height: 54,
-    borderRadius: 27,
-    backgroundColor: "#fff",
-    alignItems: "center",
-    justifyContent: "center",
-    marginRight: 12,
-  },
-  bellText: { fontSize: 26 },
-  logout: {
-    backgroundColor: "#111",
-    paddingHorizontal: 22,
-    paddingVertical: 16,
-    borderRadius: 28,
-  },
-  logoutText: { color: "#fff", fontWeight: "900", fontSize: 16 },
-  menu: {
-    position: "absolute",
-    top: 88,
-    left: 18,
-    width: 230,
-    backgroundColor: "#fffaf4",
-    borderRadius: 18,
-    padding: 12,
-    borderWidth: 1,
-    borderColor: "#d8c8b8",
-    elevation: 10,
-  },
-  menuItem: { fontSize: 18, fontWeight: "800", paddingVertical: 12 },
-  container: { padding: 24, paddingBottom: 60 },
-  title: { fontSize: 40, fontWeight: "900", marginBottom: 20 },
-  error: {
-    backgroundColor: "#fdebed",
-    color: "#b4232b",
-    padding: 14,
-    borderRadius: 14,
-    fontSize: 17,
-    marginBottom: 16,
-  },
-  pickerBox: {
-    backgroundColor: "#f7efe7",
-    borderWidth: 1,
-    borderColor: "#d8c8b8",
-    borderRadius: 28,
-    overflow: "hidden",
+  screen: { flex: 1, backgroundColor: "#E7DCCC" },
+  container: { padding: 24, paddingBottom: 80 },
+  title: {
+    fontSize: 42,
+    fontWeight: "900",
+    color: "#111",
     marginBottom: 24,
   },
-  emptyCard: {
-    backgroundColor: "#fffaf4",
-    padding: 32,
-    borderRadius: 24,
+  messageBox: {
+    padding: 14,
+    borderRadius: 18,
+    marginTop: 18,
     borderWidth: 1,
-    borderColor: "#d8c8b8",
+  },
+  errorBox: { backgroundColor: "#FDEBED", borderColor: "#EFB6BD" },
+  successBox: { backgroundColor: "#EEF9F1", borderColor: "#BFE7CA" },
+  messageTitle: { fontWeight: "900", fontSize: 16 },
+  messageBody: { marginTop: 6, fontSize: 15, color: "#6B5E52" },
+  emptyCard: {
+    marginTop: 26,
+    backgroundColor: "#FFFAF4",
+    padding: 32,
+    borderRadius: 26,
+    borderWidth: 1,
+    borderColor: "#D8C8B8",
   },
   empty: { fontSize: 22, textAlign: "center" },
   card: {
-    backgroundColor: "#fffaf4",
-    borderRadius: 24,
+    backgroundColor: "#FFFAF4",
+    borderRadius: 26,
     padding: 22,
     borderWidth: 1,
-    borderColor: "#d8c8b8",
-    marginBottom: 16,
+    borderColor: "#D8C8B8",
+    marginTop: 18,
   },
   cardTop: { flexDirection: "row", justifyContent: "space-between", gap: 12 },
   service: { fontSize: 24, fontWeight: "900", flex: 1 },
@@ -335,27 +260,36 @@ const styles = StyleSheet.create({
     color: "#fff",
     paddingHorizontal: 14,
     paddingVertical: 8,
-    borderRadius: 20,
+    borderRadius: 999,
     overflow: "hidden",
     fontWeight: "900",
   },
   desc: { fontSize: 18, marginVertical: 14 },
-  line: { fontSize: 17, marginTop: 6, color: "#3d342d" },
-  actions: { flexDirection: "row", gap: 10, marginTop: 18, flexWrap: "wrap" },
+  line: { fontSize: 17, marginTop: 7, color: "#3D342D" },
+  actions: { flexDirection: "row", gap: 12, marginTop: 20 },
   btn: {
+    flex: 1,
     backgroundColor: "#111",
-    paddingHorizontal: 24,
-    paddingVertical: 14,
+    paddingVertical: 16,
     borderRadius: 18,
+    alignItems: "center",
   },
   btnText: { color: "#fff", fontWeight: "900", fontSize: 16 },
   btnOutline: {
-    backgroundColor: "#fffaf4",
-    paddingHorizontal: 24,
-    paddingVertical: 14,
+    flex: 1,
+    backgroundColor: "#FFFAF4",
+    paddingVertical: 16,
     borderRadius: 18,
     borderWidth: 1,
     borderColor: "#111",
+    alignItems: "center",
   },
   btnOutlineText: { color: "#111", fontWeight: "900", fontSize: 16 },
+  fullBtn: {
+    backgroundColor: "#111",
+    paddingVertical: 16,
+    borderRadius: 18,
+    alignItems: "center",
+    marginTop: 20,
+  },
 });

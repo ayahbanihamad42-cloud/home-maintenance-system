@@ -332,115 +332,128 @@ export const deleteRegularAvailability = (req, res) => {
 
 export const getAvailabilityByTechnician = (req, res) => {
   const { id } = req.params;
+  const selectedDate = req.query.date ? String(req.query.date).slice(0, 10) : "";
 
-  db.query(
-    `
-    SELECT scheduled_date, scheduled_time
+  const bookedQuery = `
+    SELECT 
+      DATE_FORMAT(scheduled_date, '%Y-%m-%d') AS scheduled_date,
+      TIME_FORMAT(scheduled_time, '%H:%i:%s') AS scheduled_time
     FROM maintenance_requests
     WHERE technician_id = ?
       AND status NOT IN ('rejected', 'cancelled')
-    `,
-    [id],
-    (bookedErr, bookedRows) => {
-      if (bookedErr) {
-        return res.status(500).json({ message: bookedErr.sqlMessage || bookedErr.message });
+  `;
+
+  db.query(bookedQuery, [id], (bookedErr, bookedRows) => {
+    if (bookedErr) {
+      return res.status(500).json({ message: bookedErr.sqlMessage || bookedErr.message });
+    }
+
+    const bookedSet = new Set(
+      (bookedRows || []).map(
+        (b) => `${b.scheduled_date}_${String(b.scheduled_time).slice(0, 8)}`
+      )
+    );
+
+    const oneTimeQuery = `
+      SELECT 
+        id,
+        technician_id,
+        DATE_FORMAT(available_date, '%Y-%m-%d') AS available_date,
+        TIME_FORMAT(start_time, '%H:%i:%s') AS start_time,
+        TIME_FORMAT(end_time, '%H:%i:%s') AS end_time
+      FROM technician_availability
+      WHERE technician_id = ?
+        AND available_date >= CURDATE()
+        AND COALESCE(is_booked, 0) = 0
+      ORDER BY available_date ASC, start_time ASC
+    `;
+
+    db.query(oneTimeQuery, [id], (oneErr, oneRows) => {
+      if (oneErr) {
+        return res.status(500).json({ message: oneErr.sqlMessage || oneErr.message });
       }
 
-      const bookedSet = new Set(
-        (bookedRows || []).map(
-          (b) =>
-            `${String(b.scheduled_date).slice(0, 10)}_${String(b.scheduled_time).slice(0, 8)}`
-        )
-      );
-
-      db.query(
-        `
+      const regularQuery = `
         SELECT *
-        FROM technician_availability
+        FROM technician_regular_availability
         WHERE technician_id = ?
-          AND available_date >= CURDATE()
-          AND COALESCE(is_booked, 0) = 0
-        `,
-        [id],
-        (oneErr, oneRows) => {
-          if (oneErr) return res.status(500).json({ message: oneErr.sqlMessage || oneErr.message });
+          AND month_end >= CURDATE()
+      `;
 
-          db.query(
-            `
-            SELECT *
-            FROM technician_regular_availability
-            WHERE technician_id = ?
-              AND month_end >= CURDATE()
-            `,
-            [id],
-            (regErr, regRows) => {
-              if (regErr) return res.status(500).json({ message: regErr.sqlMessage || regErr.message });
+      db.query(regularQuery, [id], (regErr, regRows) => {
+        const result = [];
 
-              const result = [];
+        for (const item of oneRows || []) {
+          const date = item.available_date;
+          const start = String(item.start_time).slice(0, 8);
 
-              for (const item of oneRows || []) {
-                const date = String(item.available_date).slice(0, 10);
-                const start = String(item.start_time).slice(0, 8);
-                const end = String(item.end_time).slice(0, 8);
+          if (!selectedDate || date === selectedDate) {
+            if (!bookedSet.has(`${date}_${start}`)) {
+              result.push({
+                id: item.id,
+                technician_id: item.technician_id,
+                available_date: date,
+                start_time: item.start_time,
+                end_time: item.end_time,
+                source_type: "one-time",
+              });
+            }
+          }
+        }
 
-                if (!bookedSet.has(`${date}_${start}`)) {
+        if (!regErr) {
+          for (const rule of regRows || []) {
+            const startDate = new Date(rule.month_start);
+            const endDate = new Date(rule.month_end);
+
+            for (
+              let d = new Date(startDate);
+              d <= endDate;
+              d.setDate(d.getDate() + 1)
+            ) {
+              const dateText = formatDate(d);
+              if (selectedDate && dateText !== selectedDate) continue;
+
+              const dayName = d.toLocaleDateString("en-US", { weekday: "long" });
+
+              if (rule.day_of_week !== "All" && rule.day_of_week !== dayName) {
+                continue;
+              }
+
+              let current = String(rule.start_time).slice(0, 8);
+              const end = String(rule.end_time).slice(0, 8);
+              const slotMinutes = Number(rule.slot_minutes || 60);
+
+              while (timeToMinutes(addMinutes(current, slotMinutes)) <= timeToMinutes(end)) {
+                const slotEnd = addMinutes(current, slotMinutes);
+
+                if (!bookedSet.has(`${dateText}_${current}`)) {
                   result.push({
-                    id: item.id,
-                    available_date: date,
-                    start_time: start,
-                    end_time: end,
-                    slot_minutes: 60,
-                    source_type: "one-time",
+                    id: `${rule.id}-${dateText}-${current}`,
+                    technician_id: Number(id),
+                    available_date: dateText,
+                    start_time: current,
+                    end_time: slotEnd,
+                    source_type: "regular",
                   });
                 }
+
+                current = slotEnd;
               }
-
-              for (const rule of regRows || []) {
-                const startDate = new Date(rule.month_start);
-                const endDate = new Date(rule.month_end);
-
-                for (let d = new Date(startDate); d <= endDate; d.setDate(d.getDate() + 1)) {
-                  const dateText = formatDate(d);
-                  const dayName = d.toLocaleDateString("en-US", { weekday: "long" });
-
-                  if (rule.day_of_week !== "All" && rule.day_of_week !== dayName) continue;
-
-                  let current = String(rule.start_time).slice(0, 8);
-                  const end = String(rule.end_time).slice(0, 8);
-                  const slotMinutes = Number(rule.slot_minutes || 60);
-
-                  while (timeToMinutes(addMinutes(current, slotMinutes)) <= timeToMinutes(end)) {
-                    const slotEnd = addMinutes(current, slotMinutes);
-
-                    if (!bookedSet.has(`${dateText}_${current}`)) {
-                      result.push({
-                        id: `${rule.id}-${dateText}-${current}`,
-                        available_date: dateText,
-                        start_time: current,
-                        end_time: slotEnd,
-                        slot_minutes: slotMinutes,
-                        source_type: "regular",
-                      });
-                    }
-
-                    current = slotEnd;
-                  }
-                }
-              }
-
-              result.sort((a, b) =>
-                `${a.available_date} ${a.start_time}`.localeCompare(
-                  `${b.available_date} ${b.start_time}`
-                )
-              );
-
-              res.json(result);
             }
-          );
+          }
         }
-      );
-    }
-  );
+
+        result.sort((a, b) =>
+          `${a.available_date} ${a.start_time}`.localeCompare(
+            `${b.available_date} ${b.start_time}`
+          )
+        );
+
+        return res.json(result);
+      });
+    });
+  });
 };
 
 export const getMyRequests = (req, res) => {

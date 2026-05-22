@@ -1,150 +1,101 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams, useLocation } from "react-router-dom";
 import Header from "../../components/common/Header";
-import API from "../../services/api";
+
+import { createMaintenanceRequest } from "../../services/maintenanceService";
+import { getTechnicianById, getAvailability } from "../../services/technicianService";
 
 function MaintenanceRequest() {
+  const navigate = useNavigate();
   const { technicianId } = useParams();
   const location = useLocation();
-  const navigate = useNavigate();
 
+  const stateTech = location.state?.technician || location.state?.tech || {};
   const user = JSON.parse(localStorage.getItem("user") || "{}");
 
-  const passedTech = location.state?.technician || null;
-
-  const [tech, setTech] = useState(passedTech);
-  const [availableSlots, setAvailableSlots] = useState([]);
+  const [availableDates, setAvailableDates] = useState([]);
+  const [availableTimes, setAvailableTimes] = useState([]);
   const [message, setMessage] = useState(null);
-  const [submitting, setSubmitting] = useState(false);
 
   const [form, setForm] = useState({
-    service: passedTech?.service || "",
-    technician_name: passedTech?.name || "",
+    service: location.state?.service || stateTech.service || "",
+    technician_name:
+      location.state?.technicianName || stateTech.name || "",
     scheduled_date: "",
     scheduled_time: "",
     estimated_hours: "1",
     payment_method: "cash",
     location_note: "",
     description: "",
+    price_per_hour:
+      location.state?.price_per_hour || stateTech.price_per_hour || 0,
   });
 
-  const toSqlDate = (value) => {
+  const totalPrice = useMemo(() => {
+    return (
+      Number(form.price_per_hour || 0) * Number(form.estimated_hours || 1)
+    ).toFixed(2);
+  }, [form.price_per_hour, form.estimated_hours]);
+
+  const normalizeDate = (value) => {
     if (!value) return "";
-
-    if (/^\d{4}-\d{2}-\d{2}$/.test(value)) return value;
-
-    const d = new Date(value);
-    if (Number.isNaN(d.getTime())) return value;
-
-    const yyyy = d.getFullYear();
-    const mm = String(d.getMonth() + 1).padStart(2, "0");
-    const dd = String(d.getDate()).padStart(2, "0");
-
-    return `${yyyy}-${mm}-${dd}`;
+    return String(value).split("T")[0];
   };
 
   const normalizeTime = (value) => {
     if (!value) return "";
-    return String(value).split(".")[0];
+    return String(value).slice(0, 8);
   };
-
-  const slotStartTime = (slot) => {
-    if (!slot) return "";
-    return normalizeTime(String(slot).split(" - ")[0]);
-  };
-
-  const selectedSlotObj = useMemo(() => {
-    return availableSlots.find(
-      (slot) =>
-        toSqlDate(slot.date) === toSqlDate(form.scheduled_date) &&
-        slot.label === form.scheduled_time
-    );
-  }, [availableSlots, form.scheduled_date, form.scheduled_time]);
-
-  const dates = useMemo(() => {
-    const unique = new Set();
-
-    availableSlots.forEach((slot) => {
-      if (slot?.date) unique.add(toSqlDate(slot.date));
-    });
-
-    return Array.from(unique).sort();
-  }, [availableSlots]);
-
-  const timesForSelectedDate = useMemo(() => {
-    return availableSlots.filter(
-      (slot) => toSqlDate(slot.date) === toSqlDate(form.scheduled_date)
-    );
-  }, [availableSlots, form.scheduled_date]);
-
-  const pricePerHour = Number(tech?.price_per_hour || 0);
-  const estimatedHours = Number(form.estimated_hours || 1);
-  const totalPrice = pricePerHour * estimatedHours;
 
   useEffect(() => {
     const loadTechnician = async () => {
       try {
-        if (passedTech) {
-          setTech(passedTech);
-          return;
-        }
+        if (!technicianId) return;
 
-        const res = await API.get(`/technicians/${technicianId}`);
-        setTech(res.data);
+        const tech = await getTechnicianById(technicianId);
+
+        setForm((prev) => ({
+          ...prev,
+          service: prev.service || tech.service || "",
+          technician_name: prev.technician_name || tech.name || "",
+          price_per_hour: prev.price_per_hour || tech.price_per_hour || 0,
+        }));
       } catch (err) {
         console.error("load technician error:", err);
-        setMessage({
-          type: "error",
-          title: "Error",
-          body: "Failed to load technician details.",
-        });
       }
     };
 
-    if (technicianId) loadTechnician();
-  }, [technicianId, passedTech]);
+    loadTechnician();
+  }, [technicianId]);
 
   useEffect(() => {
-    if (!tech) return;
-
-    setForm((prev) => ({
-      ...prev,
-      service: tech.service || prev.service || "",
-      technician_name: tech.name || prev.technician_name || "",
-    }));
-  }, [tech]);
-
-  useEffect(() => {
-    const loadSlots = async () => {
+    const loadDates = async () => {
       try {
-        const res = await API.get(`/technicians/${technicianId}/available-slots`);
+        setMessage(null);
 
-        const slots = Array.isArray(res.data) ? res.data : [];
+        const data = await getAvailability(technicianId);
+        const list = Array.isArray(data) ? data : [];
 
-        const cleanSlots = slots
-          .map((slot) => ({
-            ...slot,
-            date: toSqlDate(slot.date || slot.scheduled_date),
-            label:
-              slot.label ||
-              `${normalizeTime(slot.start_time)} - ${normalizeTime(slot.end_time)}`,
-            start_time: normalizeTime(slot.start_time),
-            end_time: normalizeTime(slot.end_time),
-          }))
-          .filter((slot) => slot.date && slot.label);
+        const dates = [
+          ...new Set(
+            list
+              .filter((x) => Number(x.is_booked) !== 1 && x.is_booked !== true)
+              .map((x) => normalizeDate(x.available_date))
+              .filter(Boolean)
+          ),
+        ];
 
-        setAvailableSlots(cleanSlots);
+        setAvailableDates(dates);
 
-        if (cleanSlots.length > 0) {
-          setForm((prev) => ({
-            ...prev,
-            scheduled_date: prev.scheduled_date || cleanSlots[0].date,
-            scheduled_time: prev.scheduled_time || cleanSlots[0].label,
-          }));
-        }
+        setForm((prev) => ({
+          ...prev,
+          scheduled_date: dates[0] || "",
+          scheduled_time: "",
+        }));
       } catch (err) {
-        console.error("load slots error:", err);
-        setAvailableSlots([]);
+        console.error("load dates error:", err);
+        setAvailableDates([]);
+        setAvailableTimes([]);
         setMessage({
           type: "error",
           title: "Error",
@@ -153,104 +104,124 @@ function MaintenanceRequest() {
       }
     };
 
-    if (technicianId) loadSlots();
+    if (technicianId) loadDates();
   }, [technicianId]);
 
-  const handleDateChange = (value) => {
-    const date = toSqlDate(value);
-    const firstSlot = availableSlots.find((slot) => toSqlDate(slot.date) === date);
+  useEffect(() => {
+    const loadTimes = async () => {
+      try {
+        if (!technicianId || !form.scheduled_date) {
+          setAvailableTimes([]);
+          return;
+        }
 
-    setForm((prev) => ({
-      ...prev,
-      scheduled_date: date,
-      scheduled_time: firstSlot?.label || "",
-    }));
+        const data = await getAvailability(technicianId, form.scheduled_date);
+        const list = Array.isArray(data) ? data : [];
+
+        const times = list
+          .filter((x) => Number(x.is_booked) !== 1 && x.is_booked !== true)
+          .map((x) => ({
+            id: x.id,
+            value: normalizeTime(x.start_time),
+            label: `${normalizeTime(x.start_time)} - ${normalizeTime(x.end_time)}`,
+          }));
+
+        setAvailableTimes(times);
+
+        setForm((prev) => ({
+          ...prev,
+          scheduled_time: times[0]?.value || "",
+        }));
+      } catch (err) {
+        console.error("load times error:", err);
+        setAvailableTimes([]);
+        setForm((prev) => ({ ...prev, scheduled_time: "" }));
+      }
+    };
+
+    loadTimes();
+  }, [technicianId, form.scheduled_date]);
+
+  const checkSlotStillAvailable = async () => {
+    const data = await getAvailability(technicianId, form.scheduled_date);
+    const list = Array.isArray(data) ? data : [];
+
+    return list.some(
+      (x) =>
+        Number(x.is_booked) !== 1 &&
+        x.is_booked !== true &&
+        normalizeDate(x.available_date) === form.scheduled_date &&
+        normalizeTime(x.start_time) === normalizeTime(form.scheduled_time)
+    );
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
 
-    if (!form.scheduled_date || !form.scheduled_time) {
-      setMessage({
-        type: "error",
-        title: "Missing Date Or Time",
-        body: "Please choose an available date and time.",
-      });
-      return;
-    }
-
-    if (!selectedSlotObj) {
-      setMessage({
-        type: "error",
-        title: "Unavailable Time",
-        body: "This date and time are not available. Please choose another slot.",
-      });
-      return;
-    }
-
     try {
-      setSubmitting(true);
       setMessage(null);
 
-      const payload = {
-        technician_id: Number(technicianId),
-        service: form.service,
-        description: form.description,
-        scheduled_date: toSqlDate(form.scheduled_date),
-        scheduled_time: slotStartTime(form.scheduled_time),
-        estimated_hours: estimatedHours,
-        payment_method: form.payment_method,
-        location_note: form.location_note,
-        total_price: totalPrice,
-      };
-
-      const res = await API.post("/maintenance", payload);
-
-      const newRequestId = res.data?.id || res.data?.request_id;
-
-      if (!newRequestId) {
+      if (!form.scheduled_date || !form.scheduled_time) {
         setMessage({
-          type: "success",
-          title: "Request Created",
-          body: "Request created successfully.",
+          type: "error",
+          title: "Unavailable Time",
+          body: "Please choose an available date and time.",
         });
         return;
       }
 
-      navigate(`/review/${newRequestId}`, {
-        state: {
-          createdRequest: {
-            ...payload,
-            id: newRequestId,
-            service: form.service,
-            technician_name: form.technician_name,
-            created_at: new Date().toISOString(),
-          },
-        },
-      });
-    } catch (err) {
-      console.error("create request error:", err);
+      const stillAvailable = await checkSlotStillAvailable();
 
-      const backendMessage =
-        err.response?.data?.message ||
-        err.response?.data?.error ||
-        "Failed to create request.";
+      if (!stillAvailable) {
+        setMessage({
+          type: "error",
+          title: "Unavailable Time",
+          body: "This date and time are already booked. Please choose another slot.",
+        });
+        return;
+      }
+
+      const payload = {
+        user_id: user.id,
+        technician_id: technicianId,
+        service: form.service,
+        service_type: form.service,
+        description: form.description,
+        city: user.city || "",
+        location: form.location_note,
+        location_note: form.location_note,
+        scheduled_date: form.scheduled_date,
+        scheduled_time: form.scheduled_time,
+        estimated_hours: Number(form.estimated_hours || 1),
+        payment_method: form.payment_method,
+        price_per_hour: Number(form.price_per_hour || 0),
+        total_price: Number(totalPrice),
+      };
+
+      const res = await createMaintenanceRequest(payload);
+      const requestId = res.requestId || res.id;
+
+      if (form.payment_method === "online") {
+        navigate("/payment", {
+          state: {
+            requestId,
+            amount: Number(totalPrice),
+            technicianId,
+          },
+        });
+      } else {
+        navigate(`/review/${requestId}`);
+      }
+    } catch (err) {
+      console.error("submit request error:", err);
 
       setMessage({
         type: "error",
-        title:
-          backendMessage.toLowerCase().includes("duplicate") ||
-          backendMessage.toLowerCase().includes("available") ||
-          backendMessage.toLowerCase().includes("booked")
-            ? "Unavailable Time"
-            : "Error",
+        title: "Error",
         body:
-          backendMessage.toLowerCase().includes("duplicate")
-            ? "This date and time are already booked. Please choose another slot."
-            : backendMessage,
+          err.response?.data?.message ||
+          "This time slot is no longer available. Please choose another time.",
       });
-    } finally {
-      setSubmitting(false);
     }
   };
 
@@ -262,133 +233,132 @@ function MaintenanceRequest() {
         <h2>Maintenance Request</h2>
 
         {message && (
-          <div className={`message-box-card ${message.type} request-message-card`}>
+          <div className={`message-box-card ${message.type}`}>
             <div className="message-box-title">{message.title}</div>
             <div className="message-box-body">{message.body}</div>
           </div>
         )}
 
-        <form onSubmit={handleSubmit} className="request-grid">
-          <div className="input-group">
-            <label>Service</label>
-            <input value={form.service} readOnly />
-          </div>
+        <form onSubmit={handleSubmit}>
+          <div className="request-grid">
+            <div className="input-group">
+              <label>Service</label>
+              <input value={form.service} readOnly />
+            </div>
 
-          <div className="input-group">
-            <label>Technician</label>
-            <input value={form.technician_name} readOnly />
-          </div>
+            <div className="input-group">
+              <label>Technician</label>
+              <input value={form.technician_name} readOnly />
+            </div>
 
-          <div className="input-group">
-            <label>Date</label>
-            <select
-              value={form.scheduled_date}
-              onChange={(e) => handleDateChange(e.target.value)}
-            >
-              {dates.length === 0 ? (
-                <option value="">No available dates</option>
-              ) : (
-                dates.map((date) => (
-                  <option key={date} value={date}>
-                    {date}
-                  </option>
-                ))
-              )}
-            </select>
-          </div>
+            <div className="input-group">
+              <label>Date</label>
+              <select
+                value={form.scheduled_date}
+                onChange={(e) =>
+                  setForm({
+                    ...form,
+                    scheduled_date: e.target.value,
+                    scheduled_time: "",
+                  })
+                }
+              >
+                {availableDates.length === 0 ? (
+                  <option value="">No available dates</option>
+                ) : (
+                  availableDates.map((date) => (
+                    <option key={date} value={date}>
+                      {date}
+                    </option>
+                  ))
+                )}
+              </select>
+            </div>
 
-          <div className="input-group">
-            <label>Time Slot</label>
-            <select
-              value={form.scheduled_time}
-              onChange={(e) =>
-                setForm((prev) => ({
-                  ...prev,
-                  scheduled_time: e.target.value,
-                }))
-              }
-            >
-              {timesForSelectedDate.length === 0 ? (
-                <option value="">No available times</option>
-              ) : (
-                timesForSelectedDate.map((slot) => (
-                  <option key={`${slot.date}-${slot.label}`} value={slot.label}>
-                    {slot.label}
-                  </option>
-                ))
-              )}
-            </select>
-          </div>
+            <div className="input-group">
+              <label>Time Slot</label>
+              <select
+                value={form.scheduled_time}
+                onChange={(e) =>
+                  setForm({ ...form, scheduled_time: e.target.value })
+                }
+              >
+                {availableTimes.length === 0 ? (
+                  <option value="">No available times</option>
+                ) : (
+                  availableTimes.map((time) => (
+                    <option key={time.id || time.value} value={time.value}>
+                      {time.label}
+                    </option>
+                  ))
+                )}
+              </select>
+            </div>
 
-          <div className="input-group">
-            <label>Estimated Hours</label>
-            <input
-              type="number"
-              min="1"
-              value={form.estimated_hours}
-              onChange={(e) =>
-                setForm((prev) => ({
-                  ...prev,
-                  estimated_hours: e.target.value,
-                }))
-              }
-            />
-          </div>
+            <div className="input-group">
+              <label>Estimated Hours</label>
+              <input
+                type="number"
+                min="1"
+                value={form.estimated_hours}
+                onChange={(e) =>
+                  setForm({ ...form, estimated_hours: e.target.value })
+                }
+              />
+            </div>
 
-          <div className="input-group">
-            <label>Payment Method</label>
-            <select
-              value={form.payment_method}
-              onChange={(e) =>
-                setForm((prev) => ({
-                  ...prev,
-                  payment_method: e.target.value,
-                }))
-              }
-            >
-              <option value="cash">Cash</option>
-              <option value="online">Online</option>
-            </select>
-          </div>
+            <div className="input-group">
+              <label>Payment Method</label>
+              <select
+                value={form.payment_method}
+                onChange={(e) =>
+                  setForm({ ...form, payment_method: e.target.value })
+                }
+              >
+                <option value="cash">Cash</option>
+                <option value="online">Online</option>
+              </select>
+            </div>
 
-          <div className="input-group full-width">
-            <label>Price Summary</label>
-            <div className="readonly-field">
-              Price / hour: {pricePerHour.toFixed(2)} JOD | Estimated Hours:{" "}
-              {estimatedHours || 1} | Total: {totalPrice.toFixed(2)} JOD
+            <div className="input-group full-width">
+              <label>Price Summary</label>
+              <input
+                readOnly
+                value={`Price / hour: ${Number(form.price_per_hour || 0).toFixed(
+                  2
+                )} JOD | Estimated Hours: ${
+                  form.estimated_hours
+                } | Total: ${totalPrice} JOD`}
+              />
+            </div>
+
+            <div className="input-group full-width">
+              <label>Location Note</label>
+              <input
+                value={form.location_note}
+                onChange={(e) =>
+                  setForm({ ...form, location_note: e.target.value })
+                }
+                placeholder="Example: Irbid, near Yarmouk University"
+              />
+            </div>
+
+            <div className="input-group full-width">
+              <label>Description</label>
+              <textarea
+                value={form.description}
+                onChange={(e) =>
+                  setForm({ ...form, description: e.target.value })
+                }
+                placeholder="Describe the problem..."
+              />
             </div>
           </div>
 
-          <div className="input-group full-width">
-            <label>Location Note</label>
-            <input
-              value={form.location_note}
-              onChange={(e) =>
-                setForm((prev) => ({
-                  ...prev,
-                  location_note: e.target.value,
-                }))
-              }
-              placeholder="Example: Irbid, near Yarmouk University"
-            />
-          </div>
-
-          <div className="input-group full-width">
-            <label>Description</label>
-            <textarea
-              value={form.description}
-              onChange={(e) =>
-                setForm((prev) => ({
-                  ...prev,
-                  description: e.target.value,
-                }))
-              }
-              placeholder="Describe the problem..."
-            />
-          </div>
-
-          <button className="primary" type="submit" disabled={submitting}>
-            {submitting ? "Submitting..." : "Submit Request"}
+          <button className="primary" type="submit">
+            {form.payment_method === "online"
+              ? "Continue to Payment"
+              : "Submit Request"}
           </button>
         </form>
       </div>

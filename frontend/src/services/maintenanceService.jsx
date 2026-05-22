@@ -13,6 +13,4 @@ export const updateRequestStatus = (id, data) =>
   API.put(`/maintenance/${id}/status`, data).then((res) => res.data);
 
 export const cancelMaintenanceRequest = (id) =>
-  API.put(`/maintenance/${id}/status`, {
-    status: "cancelled",
-  }).then((res) => res.data);
+  API.delete(`/maintenance/${id}`).then((res) => res.data);

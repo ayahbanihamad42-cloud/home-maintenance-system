@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   getNotificationFeed,
@@ -13,6 +13,8 @@ function Header() {
   const [showNotifications, setShowNotifications] = useState(false);
   const [notifications, setNotifications] = useState([]);
 
+  const unreadCount = useMemo(() => notifications.length, [notifications]);
+
   const loadNotifications = async () => {
     try {
       const data = await getNotificationFeed();
@@ -25,6 +27,10 @@ function Header() {
 
   useEffect(() => {
     loadNotifications();
+
+    const timer = setInterval(loadNotifications, 8000);
+
+    return () => clearInterval(timer);
   }, []);
 
   const logout = () => {
@@ -43,8 +49,7 @@ function Header() {
     if (String(n.id).startsWith("stored-")) {
       const realId = String(n.id).replace("stored-", "");
       await markNotificationAsRead(realId).catch(() => null);
-      // بعد ما يتم تعليمه كمقروء، يفضل إعادة تحميل الإشعارات ليختفي المقروء وتتحدث القائمة
-      loadNotifications();
+      await loadNotifications();
     }
 
     setShowNotifications(false);
@@ -54,20 +59,21 @@ function Header() {
       return;
     }
 
-    if (n.type === "request") {
+    if (n.type === "request" && n.requestId) {
       if (role === "technician") navigate("/technician/requests");
-      else navigate("/history");
+      else navigate(`/review/${n.requestId}`);
       return;
     }
 
-    navigate("/history");
+    if (role === "technician") navigate("/technician/requests");
+    else navigate("/history");
   };
 
   return (
     <div className="navbar">
-      <div className="navbar-brand" onClick={goHome}>
+      <button className="navbar-brand link-button" onClick={goHome}>
         Maintenance System
-      </div>
+      </button>
 
       <div className="navbar-links">
         {role === "technician" ? (
@@ -114,42 +120,41 @@ function Header() {
         <div className="notification-wrapper">
           <button
             className="icon-button"
-            onClick={() => setShowNotifications(!showNotifications)}
+            type="button"
+            onClick={() => setShowNotifications((prev) => !prev)}
           >
             🔔
           </button>
 
-          {notifications.length > 0 && (
-            <span className="badge">
-              {notifications.length}
-            </span>
-          )}
+          {unreadCount > 0 && <span className="badge">{unreadCount}</span>}
 
           {showNotifications && (
             <div className="notification-dropdown">
-              <div className="notification-title">
-                Notifications
-              </div>
+              <div className="notification-title">Notifications</div>
 
-              <ul>
-                {notifications.map((n) => (
-                  <li key={n.id}>
-                    <button
-                      className="notification-item"
-                      onClick={() => handleNotificationClick(n)}
-                    >
-                      <div className="notification-item-title">
-                        {n.title}
-                      </div>
+              {notifications.length === 0 ? (
+                <div className="notification-empty">No notifications.</div>
+              ) : (
+                <ul>
+                  {notifications.map((n) => (
+                    <li key={n.id}>
+                      <button
+                        type="button"
+                        className="notification-item"
+                        onClick={() => handleNotificationClick(n)}
+                      >
+                        <div className="notification-item-title">
+                          {n.title || "Notification"}
+                        </div>
 
-                      
-                      <div className="notification-item-body">
-                        {n.body} 
-                      </div>
-                    </button>
-                  </li>
-                ))}
-              </ul>
+                        <div className="notification-item-body">
+                          {n.body || n.message || ""}
+                        </div>
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )}
             </div>
           )}
         </div>

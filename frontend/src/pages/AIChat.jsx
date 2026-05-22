@@ -1,65 +1,95 @@
-import React, { useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import Header from "../components/common/Header";
-import API from "../services/api";
+import { chatWithAI, getAIResponses } from "../services/aiService";
 
 function AIChat() {
-  const [message, setMessage] = useState("");
-  const [image, setImage] = useState(null);
+  const user = JSON.parse(localStorage.getItem("user") || "{}");
 
   const [messages, setMessages] = useState([
     {
-      sender: "ai",
-      text: "Hello! I'm your ServiceHub AI assistant.",
+      role: "ai",
+      text: "Hello! I'm your ServiceHub AI assistant. Send text or image.",
     },
   ]);
 
-  const sendMessage = async () => {
-    if (!message && !image) return;
+  const [text, setText] = useState("");
+  const [selectedImage, setSelectedImage] = useState(null);
+  const [loading, setLoading] = useState(false);
 
-    const formData = new FormData();
+  const fileRef = useRef(null);
+  const bottomRef = useRef(null);
 
-    formData.append("message", message);
+  useEffect(() => {
+    getAIResponses(user.id)
+      .then((data) => {
+        if (Array.isArray(data) && data.length > 0) {
+          setMessages(data);
+        }
+      })
+      .catch(() => {});
+  }, [user.id]);
 
-    if (image) {
-      formData.append("image", image);
-    }
+  useEffect(() => {
+    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages, loading]);
+
+  const handleImageChange = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+
+    reader.onloadend = () => {
+      setSelectedImage(reader.result);
+    };
+
+    reader.readAsDataURL(file);
+  };
+
+  const handleSend = async () => {
+    const cleanText = text.trim();
+
+    if (!cleanText && !selectedImage) return;
+
+    const userMessage = {
+      role: "user",
+      text: cleanText || "Sent an image",
+      image: selectedImage,
+    };
+
+    setMessages((prev) => [...prev, userMessage]);
+
+    const imageToSend = selectedImage;
+
+    setText("");
+    setSelectedImage(null);
+    if (fileRef.current) fileRef.current.value = "";
 
     try {
-      const res = await API.post(
-        "/ai/chat",
-        formData,
-        {
-          headers: {
-            "Content-Type":
-              "multipart/form-data",
-          },
-        }
-      );
+      setLoading(true);
+
+      const res = await chatWithAI(cleanText, imageToSend);
 
       setMessages((prev) => [
         ...prev,
         {
-          sender: "user",
-          text: message,
-          image: image
-            ? URL.createObjectURL(image)
-            : null,
-        },
-        {
-          sender: "ai",
-          text: res.data.reply,
+          role: "ai",
+          text: res.reply || "AI assistant is not available right now.",
+          image: res.image || res.url || null,
         },
       ]);
-
-      setMessage("");
-
-      setImage(null);
-
-      document.getElementById(
-        "ai-image-input"
-      ).value = "";
     } catch (err) {
-      console.error(err);
+      setMessages((prev) => [
+        ...prev,
+        {
+          role: "ai",
+          text:
+            err.response?.data?.reply ||
+            "صار خطأ بالمساعد. جرّبي مرة ثانية.",
+        },
+      ]);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -74,10 +104,7 @@ function AIChat() {
 
             <div className="chat-title-block">
               <h3>AI Assistant</h3>
-
-              <span>
-                Send text or image
-              </span>
+              <span>Send text or image</span>
             </div>
           </div>
 
@@ -86,50 +113,84 @@ function AIChat() {
               <div
                 key={index}
                 className={`message-bubble ${
-                  msg.sender === "user"
-                    ? "my-message"
-                    : "other-message"
+                  msg.role === "user" ? "my-message" : "other-message"
                 }`}
               >
                 {msg.image && (
-                  <img
-                    src={msg.image}
-                    alt=""
-                    style={{
-                      width: "100%",
-                      borderRadius: 12,
-                      marginBottom: 10,
-                    }}
-                  />
+                  <img src={msg.image} alt="uploaded" />
                 )}
 
-                {msg.text}
+                <div>{msg.text}</div>
               </div>
             ))}
+
+            {loading && (
+              <div className="message-bubble other-message">
+                Thinking...
+              </div>
+            )}
+
+            <div ref={bottomRef} />
           </div>
 
+          {selectedImage && (
+            <div className="message-box-card compact-message-card">
+              <div className="message-box-title">Selected Image</div>
+              <img
+                src={selectedImage}
+                alt="preview"
+                style={{
+                  width: "120px",
+                  borderRadius: "12px",
+                  display: "block",
+                  marginBottom: "10px",
+                }}
+              />
+
+              <button
+                className="secondary"
+                type="button"
+                onClick={() => {
+                  setSelectedImage(null);
+                  if (fileRef.current) fileRef.current.value = "";
+                }}
+              >
+                Remove
+              </button>
+            </div>
+          )}
+
           <div className="chat-input-area">
+            <button
+              type="button"
+              className="btn-outline"
+              onClick={() => fileRef.current?.click()}
+            >
+              📷
+            </button>
+
             <input
+              ref={fileRef}
               type="file"
-              id="ai-image-input"
               accept="image/*"
-              onChange={(e) =>
-                setImage(e.target.files[0])
-              }
+              hidden
+              onChange={handleImageChange}
             />
 
             <input
-              type="text"
+              value={text}
+              onChange={(e) => setText(e.target.value)}
               placeholder="Ask anything..."
-              value={message}
-              onChange={(e) =>
-                setMessage(e.target.value)
-              }
+              onKeyDown={(e) => {
+                if (e.key === "Enter") handleSend();
+              }}
             />
 
             <button
+              type="button"
               className="send-btn"
-              onClick={sendMessage}
+              onClick={handleSend}
+              disabled={loading}
             >
               Send
             </button>

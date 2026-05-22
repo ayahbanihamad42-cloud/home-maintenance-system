@@ -5,23 +5,31 @@ import {
   ScrollView,
   TextInput,
   TouchableOpacity,
-  StyleSheet,
   ActivityIndicator,
 } from "react-native";
 import { Picker } from "@react-native-picker/picker";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+
+import Header from "../../components/Common/Header";
 import API from "../../services/api";
+import styles from "../../styles/mobileStyles";
 
 export default function MaintenanceRequest({ navigation, route }) {
   const params = route?.params || {};
-  const technician = params.technician || {};
+  const technician = params.tech || params.technician || {};
 
   const technicianId =
-    params.technicianId || technician.technicianId || technician.id;
+    params.technicianId ||
+    params.technician_id ||
+    technician.technicianId ||
+    technician.technician_id ||
+    technician.id;
 
-  const [user, setUser] = useState(params.user || {});
-  const [dates, setDates] = useState([]);
-  const [times, setTimes] = useState([]);
+  const [user, setUser] = useState(null);
+  const [availableDates, setAvailableDates] = useState([]);
+  const [availableTimes, setAvailableTimes] = useState([]);
   const [loadingAvailability, setLoadingAvailability] = useState(false);
+  const [message, setMessage] = useState(null);
 
   const [form, setForm] = useState({
     service: params.service || technician.service || "",
@@ -32,82 +40,144 @@ export default function MaintenanceRequest({ navigation, route }) {
     payment_method: "cash",
     location_note: "",
     description: "",
-    price_per_hour: String(params.price_per_hour || technician.price_per_hour || 0),
+    price_per_hour: String(
+      params.price_per_hour || technician.price_per_hour || 0
+    ),
   });
 
-  const [error, setError] = useState("");
-
-  const total = useMemo(() => {
+  const totalPrice = useMemo(() => {
     return (
       Number(form.price_per_hour || 0) * Number(form.estimated_hours || 1)
     ).toFixed(2);
   }, [form.price_per_hour, form.estimated_hours]);
 
-  const loadDates = async () => {
-    if (!technicianId) {
-      setError("Technician id is missing.");
-      return;
-    }
+  const normalizeDate = (value) => {
+    if (!value) return "";
+    return String(value).split("T")[0];
+  };
 
+  const normalizeTime = (value) => {
+    if (!value) return "";
+    return String(value).slice(0, 8);
+  };
+
+  const loadUser = async () => {
+    const rawUser = await AsyncStorage.getItem("user");
+    setUser(rawUser ? JSON.parse(rawUser) : null);
+  };
+
+  const loadTechnician = async () => {
     try {
+      if (!technicianId) return;
+
+      const res = await API.get(`/technicians/${technicianId}`);
+      const tech = res.data || {};
+
+      setForm((prev) => ({
+        ...prev,
+        service: prev.service || tech.service || "",
+        technicianName: prev.technicianName || tech.name || "",
+        price_per_hour: String(
+          prev.price_per_hour || tech.price_per_hour || 0
+        ),
+      }));
+    } catch (err) {
+      console.log("load technician error:", err?.response?.data || err.message);
+    }
+  };
+
+  const loadDates = async () => {
+    try {
+      if (!technicianId) {
+        setMessage({
+          type: "error",
+          title: "Error",
+          body: "Technician id is missing.",
+        });
+        return;
+      }
+
       setLoadingAvailability(true);
+      setMessage(null);
+
       const res = await API.get(`/technicians/${technicianId}/availability`);
       const list = Array.isArray(res.data) ? res.data : [];
 
-      const uniqueDates = [
+      const dates = [
         ...new Set(
           list
-            .filter((x) => !x.is_booked)
-            .map((x) => String(x.available_date || "").split("T")[0])
+            .filter((item) => !item.is_booked)
+            .map((item) => normalizeDate(item.available_date))
             .filter(Boolean)
         ),
       ];
 
-      setDates(uniqueDates);
+      setAvailableDates(dates);
 
-      if (uniqueDates.length > 0) {
-        setForm((prev) => ({ ...prev, scheduled_date: uniqueDates[0] }));
+      if (dates.length > 0) {
+        setForm((prev) => ({
+          ...prev,
+          scheduled_date: prev.scheduled_date || dates[0],
+        }));
+      } else {
+        setForm((prev) => ({
+          ...prev,
+          scheduled_date: "",
+          scheduled_time: "",
+        }));
       }
     } catch (err) {
-      console.log("load dates error:", err.response?.data || err.message);
-      setDates([]);
+      console.log("load dates error:", err?.response?.data || err.message);
+      setAvailableDates([]);
+      setAvailableTimes([]);
+      setMessage({
+        type: "error",
+        title: "Error",
+        body: "Failed to load available dates and times.",
+      });
     } finally {
       setLoadingAvailability(false);
     }
   };
 
   const loadTimes = async () => {
-    if (!technicianId || !form.scheduled_date) return;
-
     try {
+      if (!technicianId || !form.scheduled_date) {
+        setAvailableTimes([]);
+        return;
+      }
+
       const res = await API.get(`/technicians/${technicianId}/availability`, {
         params: { date: form.scheduled_date },
       });
 
       const list = Array.isArray(res.data) ? res.data : [];
 
-      const slots = list
-        .filter((x) => !x.is_booked)
-        .map((x) => ({
-          id: x.id,
-          label: `${x.start_time} - ${x.end_time}`,
-          value: x.start_time,
+      const times = list
+        .filter((item) => !item.is_booked)
+        .map((item) => ({
+          id: item.id,
+          value: normalizeTime(item.start_time),
+          label: `${normalizeTime(item.start_time)} - ${normalizeTime(
+            item.end_time
+          )}`,
         }));
 
-      setTimes(slots);
+      setAvailableTimes(times);
 
-      if (slots.length > 0) {
-        setForm((prev) => ({ ...prev, scheduled_time: slots[0].value }));
-      } else {
-        setForm((prev) => ({ ...prev, scheduled_time: "" }));
-      }
+      setForm((prev) => ({
+        ...prev,
+        scheduled_time: times.length > 0 ? times[0].value : "",
+      }));
     } catch (err) {
-      console.log("load times error:", err.response?.data || err.message);
-      setTimes([]);
+      console.log("load times error:", err?.response?.data || err.message);
+      setAvailableTimes([]);
     }
   };
 
   useEffect(() => {
+    loadUser();
+    loadTechnician();
     loadDates();
   }, [technicianId]);
 
@@ -115,58 +185,122 @@ export default function MaintenanceRequest({ navigation, route }) {
     loadTimes();
   }, [form.scheduled_date]);
 
+  const checkSlotStillAvailable = async () => {
+    const res = await API.get(`/technicians/${technicianId}/availability`, {
+      params: { date: form.scheduled_date },
+    });
+
+    const list = Array.isArray(res.data) ? res.data : [];
+
+    return list.some(
+      (item) =>
+        !item.is_booked &&
+        normalizeDate(item.available_date) === form.scheduled_date &&
+        normalizeTime(item.start_time) === normalizeTime(form.scheduled_time)
+    );
+  };
+
   const submit = async () => {
     try {
-      setError("");
+      setMessage(null);
+
+      if (!user?.id) {
+        setMessage({
+          type: "error",
+          title: "Error",
+          body: "User id is missing. Please login again.",
+        });
+        return;
+      }
 
       if (!technicianId) {
-        setError("Technician id is missing.");
+        setMessage({
+          type: "error",
+          title: "Error",
+          body: "Technician id is missing.",
+        });
         return;
       }
 
       if (!form.scheduled_date || !form.scheduled_time) {
-        setError("Please choose available date and time.");
+        setMessage({
+          type: "error",
+          title: "Unavailable Time",
+          body: "Please choose an available date and time.",
+        });
+        return;
+      }
+
+      const stillAvailable = await checkSlotStillAvailable();
+
+      if (!stillAvailable) {
+        setMessage({
+          type: "error",
+          title: "Unavailable Time",
+          body: "This date and time are already booked. Please choose another slot.",
+        });
+
+        await loadDates();
         return;
       }
 
       if (!form.description.trim()) {
-        setError("Please enter description.");
+        setMessage({
+          type: "error",
+          title: "Error",
+          body: "Please enter description.",
+        });
         return;
       }
 
       const payload = {
-        user_id: user?.id,
+        user_id: user.id,
         technician_id: technicianId,
         service: form.service,
         service_type: form.service,
         description: form.description,
-        city: user?.city || "",
+        city: user.city || "",
         location: form.location_note,
         location_note: form.location_note,
         scheduled_date: form.scheduled_date,
         scheduled_time: form.scheduled_time,
         estimated_hours: Number(form.estimated_hours || 1),
-        payment_method: String(form.payment_method).toLowerCase(),
+        payment_method: form.payment_method,
         price_per_hour: Number(form.price_per_hour || 0),
-        total_price: Number(total),
+        total_price: Number(totalPrice),
+        created_at: new Date().toISOString(),
       };
 
       const res = await API.post("/maintenance", payload);
       const requestId = res.data?.requestId || res.data?.id;
 
-      if (form.payment_method === "online") {
+      if (String(form.payment_method).toLowerCase() === "online") {
         navigation.navigate("PaymentForm", {
           requestId,
-          amount: Number(total),
+          amount: Number(totalPrice),
           technicianId,
           estimated_hours: Number(form.estimated_hours || 1),
         });
       } else {
-        navigation.navigate("MaintenanceHistory");
+        navigation.navigate("Review", {
+          requestId,
+          request: {
+            ...payload,
+            id: requestId,
+            status: "pending",
+          },
+        });
       }
     } catch (err) {
-      console.log("submit request error:", err.response?.data || err.message);
-      setError(err.response?.data?.message || "Failed to submit request.");
+      console.log("submit request error:", err?.response?.data || err.message);
+
+      setMessage({
+        type: "error",
+        title: "Error",
+        body:
+          err?.response?.data?.message ||
+          "This time slot is no longer available. Please choose another time.",
+      });
     }
   };
 
@@ -174,34 +308,49 @@ export default function MaintenanceRequest({ navigation, route }) {
     <View style={styles.screen}>
       <Header navigation={navigation} />
 
-      <ScrollView contentContainerStyle={styles.container}>
-        <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()}>
-          <Text style={styles.backText}>← Back</Text>
-        </TouchableOpacity>
+      <ScrollView contentContainerStyle={styles.pageContent}>
+        <View style={styles.card}>
+          <Text style={styles.pageTitle}>Maintenance Request</Text>
 
-        <View style={styles.panel}>
-          <Text style={styles.title}>Maintenance Request</Text>
-
-          {error ? <Text style={styles.error}>{error}</Text> : null}
-
-          <View style={styles.grid}>
-            <View style={styles.field}>
-              <Text style={styles.label}>Service</Text>
-              <TextInput style={styles.input} value={form.service} editable={false} />
+          {message ? (
+            <View
+              style={
+                message.type === "error" ? styles.errorBox : styles.successBox
+              }
+            >
+              <Text
+                style={
+                  message.type === "error"
+                    ? styles.errorTitle
+                    : styles.successTitle
+                }
+              >
+                {message.title}
+              </Text>
+              <Text
+                style={
+                  message.type === "error"
+                    ? styles.errorText
+                    : styles.successText
+                }
+              >
+                {message.body}
+              </Text>
             </View>
+          ) : null}
 
-            <View style={styles.field}>
-              <Text style={styles.label}>Technician</Text>
-              <TextInput
-                style={styles.input}
-                value={form.technicianName}
-                editable={false}
-              />
-            </View>
-          </View>
+          <Text style={styles.label}>Service</Text>
+          <TextInput style={styles.input} value={form.service} editable={false} />
 
-          <View style={styles.grid}>
-            <View style={styles.field}>
+          <Text style={styles.label}>Technician</Text>
+          <TextInput
+            style={styles.input}
+            value={form.technicianName}
+            editable={false}
+          />
+
+          <View style={styles.twoColumns}>
+            <View style={styles.column}>
               <Text style={styles.label}>Date</Text>
               <View style={styles.pickerBox}>
                 <Picker
@@ -210,15 +359,18 @@ export default function MaintenanceRequest({ navigation, route }) {
                     setForm({ ...form, scheduled_date: value })
                   }
                 >
-                  <Picker.Item label="Select date" value="" />
-                  {dates.map((date) => (
-                    <Picker.Item key={date} label={date} value={date} />
-                  ))}
+                  {availableDates.length === 0 ? (
+                    <Picker.Item label="No available dates" value="" />
+                  ) : (
+                    availableDates.map((date) => (
+                      <Picker.Item key={date} label={date} value={date} />
+                    ))
+                  )}
                 </Picker>
               </View>
             </View>
 
-            <View style={styles.field}>
+            <View style={styles.column}>
               <Text style={styles.label}>Time Slot</Text>
               <View style={styles.pickerBox}>
                 <Picker
@@ -227,31 +379,36 @@ export default function MaintenanceRequest({ navigation, route }) {
                     setForm({ ...form, scheduled_time: value })
                   }
                 >
-                  <Picker.Item label="Select time" value="" />
-                  {times.map((time) => (
-                    <Picker.Item
-                      key={time.id || time.label}
-                      label={time.label}
-                      value={time.value}
-                    />
-                  ))}
+                  {availableTimes.length === 0 ? (
+                    <Picker.Item label="No available times" value="" />
+                  ) : (
+                    availableTimes.map((time) => (
+                      <Picker.Item
+                        key={time.id || time.value}
+                        label={time.label}
+                        value={time.value}
+                      />
+                    ))
+                  )}
                 </Picker>
               </View>
             </View>
           </View>
 
-          <View style={styles.grid}>
-            <View style={styles.field}>
+          <View style={styles.twoColumns}>
+            <View style={styles.column}>
               <Text style={styles.label}>Estimated Hours</Text>
               <TextInput
                 style={styles.input}
                 keyboardType="numeric"
                 value={form.estimated_hours}
-                onChangeText={(v) => setForm({ ...form, estimated_hours: v })}
+                onChangeText={(value) =>
+                  setForm({ ...form, estimated_hours: value })
+                }
               />
             </View>
 
-            <View style={styles.field}>
+            <View style={styles.column}>
               <Text style={styles.label}>Payment Method</Text>
               <View style={styles.pickerBox}>
                 <Picker
@@ -275,14 +432,16 @@ export default function MaintenanceRequest({ navigation, route }) {
               2
             )} JOD | Estimated Hours: ${
               form.estimated_hours
-            } | Total: ${total} JOD`}
+            } | Total: ${totalPrice} JOD`}
           />
 
           <Text style={styles.label}>Location Note</Text>
           <TextInput
             style={styles.input}
             value={form.location_note}
-            onChangeText={(v) => setForm({ ...form, location_note: v })}
+            onChangeText={(value) =>
+              setForm({ ...form, location_note: value })
+            }
             placeholder="Example: Irbid, near Yarmouk University"
           />
 
@@ -291,12 +450,14 @@ export default function MaintenanceRequest({ navigation, route }) {
             style={[styles.input, styles.textArea]}
             multiline
             value={form.description}
-            onChangeText={(v) => setForm({ ...form, description: v })}
+            onChangeText={(value) =>
+              setForm({ ...form, description: value })
+            }
             placeholder="Describe the problem..."
           />
 
-          <TouchableOpacity style={styles.btn} onPress={submit}>
-            <Text style={styles.btnText}>
+          <TouchableOpacity style={styles.primaryBtn} onPress={submit}>
+            <Text style={styles.primaryBtnText}>
               {form.payment_method === "online"
                 ? "Continue to Payment"
                 : "Submit Request"}
@@ -304,110 +465,10 @@ export default function MaintenanceRequest({ navigation, route }) {
           </TouchableOpacity>
 
           {loadingAvailability ? (
-            <ActivityIndicator color="#111" style={{ marginTop: 20 }} />
+            <ActivityIndicator color="#111" style={{ marginTop: 18 }} />
           ) : null}
         </View>
       </ScrollView>
     </View>
   );
 }
-
-function Header({ navigation }) {
-  return (
-    <View style={styles.header}>
-      <Text style={styles.headerTitle}>Maintenance System</Text>
-      <TouchableOpacity style={styles.bell}>
-        <Text style={styles.bellText}>🔔</Text>
-      </TouchableOpacity>
-      <TouchableOpacity style={styles.logout}>
-        <Text style={styles.logoutText}>Log Out</Text>
-      </TouchableOpacity>
-    </View>
-  );
-}
-
-const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: "#e7dccc" },
-  header: {
-    minHeight: 96,
-    backgroundColor: "#faf5ef",
-    flexDirection: "row",
-    alignItems: "center",
-    paddingHorizontal: 18,
-    borderBottomWidth: 1,
-    borderBottomColor: "#d8c8b8",
-  },
-  headerTitle: { flex: 1, fontSize: 26, fontWeight: "900" },
-  bell: {
-    width: 54,
-    height: 54,
-    borderRadius: 27,
-    backgroundColor: "#fff",
-    alignItems: "center",
-    justifyContent: "center",
-    marginRight: 12,
-  },
-  bellText: { fontSize: 26 },
-  logout: {
-    backgroundColor: "#111",
-    paddingHorizontal: 22,
-    paddingVertical: 16,
-    borderRadius: 28,
-  },
-  logoutText: { color: "#fff", fontWeight: "900", fontSize: 16 },
-  container: { padding: 24, paddingBottom: 70 },
-  backBtn: {
-    backgroundColor: "#111",
-    alignSelf: "flex-start",
-    paddingHorizontal: 28,
-    paddingVertical: 18,
-    borderRadius: 28,
-    marginBottom: 24,
-  },
-  backText: { color: "#fff", fontSize: 20, fontWeight: "900" },
-  panel: {
-    backgroundColor: "#fffaf4",
-    borderRadius: 28,
-    padding: 26,
-    borderWidth: 1,
-    borderColor: "#d8c8b8",
-  },
-  title: { fontSize: 38, fontWeight: "900", marginBottom: 20 },
-  error: {
-    backgroundColor: "#fdebed",
-    color: "#b4232b",
-    padding: 14,
-    borderRadius: 14,
-    fontSize: 17,
-    marginBottom: 16,
-  },
-  grid: { flexDirection: "row", gap: 12 },
-  field: { flex: 1 },
-  label: { fontSize: 17, fontWeight: "900", marginBottom: 8, marginTop: 14 },
-  input: {
-    backgroundColor: "#f7efe7",
-    borderWidth: 1,
-    borderColor: "#d8c8b8",
-    borderRadius: 16,
-    paddingHorizontal: 16,
-    minHeight: 56,
-    fontSize: 17,
-  },
-  pickerBox: {
-    backgroundColor: "#f7efe7",
-    borderWidth: 1,
-    borderColor: "#d8c8b8",
-    borderRadius: 16,
-    overflow: "hidden",
-  },
-  textArea: { height: 120, textAlignVertical: "top", paddingTop: 14 },
-  btn: {
-    backgroundColor: "#111",
-    alignSelf: "flex-start",
-    marginTop: 18,
-    paddingHorizontal: 28,
-    paddingVertical: 18,
-    borderRadius: 20,
-  },
-  btnText: { color: "#fff", fontSize: 17, fontWeight: "900" },
-});
