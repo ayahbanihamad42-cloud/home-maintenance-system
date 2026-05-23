@@ -6,6 +6,16 @@ export const getTechnicians = async (service) => {
   return res.data;
 };
 
+export const smartSearchTechnicians = async ({ searchText, service, userCity }) => {
+  const res = await API.post("/technicians/smart-search", {
+    searchText,
+    service,
+    userCity,
+  });
+
+  return res.data;
+};
+
 export const getAvailability = async (techId, date) => {
   const res = await API.get(`/technicians/${techId}/availability`, {
     params: { date },

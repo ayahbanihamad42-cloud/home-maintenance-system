@@ -23,6 +23,16 @@ export const getRequestById = async (id) => {
 };
 
 export const updateRequestStatus = async (id, data) => {
-  const res = await api.patch(`/maintenance/${id}/status`, data);
+  const res = await api.put(`/maintenance/${id}/status`, data);
+  return res.data;
+};
+
+export const cancelMaintenanceRequest = async (id) => {
+  const res = await api.delete(`/maintenance/${id}`);
+  return res.data;
+};
+
+export const confirmOnlinePayment = async (id, data) => {
+  const res = await api.post(`/maintenance/${id}/online-payment`, data);
   return res.data;
 };

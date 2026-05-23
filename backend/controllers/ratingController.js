@@ -26,7 +26,21 @@ export const getTechnicianRatings = (req, res) => {
   const { technicianId } = req.params;
 
   db.query(
-    "SELECT rating, comment FROM ratings WHERE technician_id = ?",
+    `
+    SELECT
+      r.id,
+      r.rating,
+      r.comment,
+      r.created_at,
+      r.user_id,
+      u.name AS user_name
+    FROM ratings r
+    LEFT JOIN users u ON u.id = r.user_id
+    WHERE r.technician_id = ?
+      AND r.comment IS NOT NULL
+      AND TRIM(r.comment) <> ''
+    ORDER BY r.created_at DESC, r.id DESC
+    `,
     [technicianId],
     (err, rows) => {
       if (err) {

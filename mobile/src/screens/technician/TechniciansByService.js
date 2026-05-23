@@ -7,16 +7,93 @@ import {
   TextInput,
   ActivityIndicator,
   StyleSheet,
+  Modal,
 } from "react-native";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+
 import Header from "../../components/Common/Header";
 import API from "../../services/api";
 import CustomDropdown from "../../components/Common/CustomDropdown";
+import {
+  getTechnicians,
+  smartSearchTechnicians,
+} from "../../services/technicianService";
+
+const getTechnicianId = (tech) =>
+  tech.technicianId || tech.technician_id || tech.tech_id || tech.id;
+
+const normalizeText = (value) => String(value || "").trim().toLowerCase();
+const getRating = (tech) => Number(tech.rating || tech.average_rating || 0);
+const getPrice = (tech) => Number(tech.price_per_hour || 0);
+
+function CommentsModal({ visible, onClose, technicianId }) {
+  const [comments, setComments] = useState([]);
+  const [loading, setLoading] = useState(false);
+
+  const loadComments = async () => {
+    if (!visible || !technicianId) return;
+
+    setLoading(true);
+
+    try {
+      const res = await API.get(`/ratings/technician/${technicianId}`);
+      setComments(Array.isArray(res.data) ? res.data : []);
+    } catch (err) {
+      console.log("comments error:", err?.response?.data || err.message);
+      setComments([]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadComments();
+  }, [visible, technicianId]);
+
+  return (
+    <Modal transparent visible={visible} animationType="fade">
+      <View style={styles.modalOverlay}>
+        <View style={styles.commentsModal}>
+          <Text style={styles.commentsTitle}>Comments</Text>
+
+          {loading ? (
+            <ActivityIndicator color="#111" style={{ marginTop: 20 }} />
+          ) : comments.length === 0 ? (
+            <Text style={styles.noComments}>No comments yet.</Text>
+          ) : (
+            <ScrollView style={{ maxHeight: 360 }}>
+              {comments.map((item) => (
+                <View key={item.id} style={styles.commentRow}>
+                  <View style={styles.commentTop}>
+                    <Text style={styles.commentUser}>
+                      {item.user_name || "User"}
+                    </Text>
+                    <Text style={styles.commentRating}>⭐ {item.rating}</Text>
+                  </View>
+
+                  <Text style={styles.commentText}>{item.comment}</Text>
+                </View>
+              ))}
+            </ScrollView>
+          )}
+
+          <TouchableOpacity style={styles.closeBtn} onPress={onClose}>
+            <Text style={styles.closeBtnText}>Close</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    </Modal>
+  );
+}
 
 export default function TechniciansByService({ route, navigation }) {
   const service = route?.params?.service || route?.params?.serviceName || "";
 
   const [technicians, setTechnicians] = useState([]);
+  const [smartResults, setSmartResults] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [smartLoading, setSmartLoading] = useState(false);
+  const [userCity, setUserCity] = useState("");
 
   const [search, setSearch] = useState("");
   const [resultType, setResultType] = useState("technicians");
@@ -24,12 +101,19 @@ export default function TechniciansByService({ route, navigation }) {
   const [locationFilter, setLocationFilter] = useState("all");
   const [ratingFilter, setRatingFilter] = useState("all");
 
+  const [commentsOpen, setCommentsOpen] = useState(false);
+  const [selectedTechnicianId, setSelectedTechnicianId] = useState(null);
+
   const loadTechnicians = async () => {
     try {
       setLoading(true);
-      const safeService = encodeURIComponent(String(service).trim());
-      const res = await API.get(`/technicians/service/${safeService}`);
-      setTechnicians(Array.isArray(res.data) ? res.data : []);
+
+      const rawUser = await AsyncStorage.getItem("user");
+      const user = rawUser ? JSON.parse(rawUser) : {};
+      setUserCity(user?.city || "");
+
+      const data = await getTechnicians(service);
+      setTechnicians(Array.isArray(data) ? data : []);
     } catch (err) {
       console.log("technicians error:", err?.response?.data || err.message);
       setTechnicians([]);
@@ -42,60 +126,88 @@ export default function TechniciansByService({ route, navigation }) {
     loadTechnicians();
   }, [service]);
 
+  useEffect(() => {
+    const value = search.trim();
+
+    if (!value) {
+      setSmartResults(null);
+      setSmartLoading(false);
+      return;
+    }
+
+    const timer = setTimeout(async () => {
+      try {
+        setSmartLoading(true);
+
+        const data = await smartSearchTechnicians({
+          searchText: value,
+          service,
+          userCity,
+        });
+
+        setSmartResults(Array.isArray(data?.technicians) ? data.technicians : []);
+      } catch (err) {
+        console.log("smart search error:", err?.response?.data || err.message);
+        setSmartResults(null);
+      } finally {
+        setSmartLoading(false);
+      }
+    }, 800);
+
+    return () => clearTimeout(timer);
+  }, [search, service, userCity]);
+
   const cities = useMemo(() => {
     const result = [];
-    technicians.forEach((t) => {
-      const city = String(t.city || "").trim();
+
+    technicians.forEach((tech) => {
+      const city = String(tech.city || "").trim();
       if (city && !result.includes(city)) result.push(city);
     });
+
     return result;
   }, [technicians]);
 
   const filteredTechnicians = useMemo(() => {
     if (resultType === "stores") return [];
 
-    let result = [...technicians];
-
-    const q = search.trim().toLowerCase();
-
-    if (q) {
-      result = result.filter((t) => {
-        const combined = `${t.name || ""} ${t.service || ""} ${t.city || ""}`.toLowerCase();
-        return combined.includes(q);
-      });
-    }
+    let result =
+      search.trim() && Array.isArray(smartResults) ? smartResults : [...technicians];
 
     if (priceFilter === "low") {
-      result = result.filter((t) => Number(t.price_per_hour || 0) <= 10);
+      result = result.filter((tech) => getPrice(tech) <= 10);
     }
 
     if (priceFilter === "mid") {
       result = result.filter(
-        (t) =>
-          Number(t.price_per_hour || 0) > 10 &&
-          Number(t.price_per_hour || 0) <= 25
+        (tech) => getPrice(tech) > 10 && getPrice(tech) <= 25
       );
     }
 
     if (priceFilter === "high") {
-      result = result.filter((t) => Number(t.price_per_hour || 0) > 25);
+      result = result.filter((tech) => getPrice(tech) > 25);
     }
 
     if (locationFilter !== "all") {
       result = result.filter(
-        (t) => String(t.city || "").toLowerCase() === locationFilter.toLowerCase()
+        (tech) => normalizeText(tech.city) === normalizeText(locationFilter)
       );
     }
 
     if (ratingFilter !== "all") {
-      result = result.filter((t) => Number(t.rating || 0) >= Number(ratingFilter));
+      result = result.filter((tech) => getRating(tech) >= Number(ratingFilter));
     }
 
     return result;
-  }, [technicians, search, resultType, priceFilter, locationFilter, ratingFilter]);
-
-  const getTechnicianId = (tech) =>
-    tech.technicianId || tech.technician_id || tech.id;
+  }, [
+    technicians,
+    smartResults,
+    search,
+    resultType,
+    priceFilter,
+    locationFilter,
+    ratingFilter,
+  ]);
 
   return (
     <View style={styles.screen}>
@@ -109,9 +221,18 @@ export default function TechniciansByService({ route, navigation }) {
             style={styles.search}
             value={search}
             onChangeText={setSearch}
-            placeholder="Search by name, service or location..."
+            placeholder="Ask or search: name, city, cheapest, best..."
             placeholderTextColor="#8B7D70"
           />
+
+          {search.trim() ? (
+            <View style={styles.smartHint}>
+              <Text style={styles.smartHintText}>
+                Assistant search: {search}
+                {smartLoading ? " ..." : ""}
+              </Text>
+            </View>
+          ) : null}
 
           <View style={styles.filterGrid}>
             <View style={styles.filterItem}>
@@ -167,7 +288,13 @@ export default function TechniciansByService({ route, navigation }) {
             <ActivityIndicator size="large" color="#111" style={{ marginTop: 30 }} />
           ) : resultType === "stores" ? (
             <View style={styles.emptyCard}>
-              <Text style={styles.emptyText}>Store results will be connected later.</Text>
+              <Text style={styles.emptyText}>
+                Store results will be connected later.
+              </Text>
+            </View>
+          ) : smartLoading ? (
+            <View style={styles.emptyCard}>
+              <Text style={styles.emptyText}>Searching...</Text>
             </View>
           ) : filteredTechnicians.length === 0 ? (
             <View style={styles.emptyCard}>
@@ -188,11 +315,22 @@ export default function TechniciansByService({ route, navigation }) {
                     Experience: {tech.experience || 0} years
                   </Text>
                   <Text style={styles.info}>
-                    Price: {Number(tech.price_per_hour || 0).toFixed(2)} JOD/hour
+                    Price: {getPrice(tech).toFixed(2)} JOD/hour
                   </Text>
                   <Text style={styles.info}>
-                    Rating: ⭐ {Number(tech.rating || 0).toFixed(1)}
+                    Rating: ⭐ {getRating(tech).toFixed(1)}
+                    {tech.review_count ? ` (${tech.review_count})` : ""}
                   </Text>
+
+                  <TouchableOpacity
+                    onPress={() => {
+                      setSelectedTechnicianId(technicianId);
+                      setCommentsOpen(true);
+                    }}
+                  >
+                    <Text style={styles.commentsLink}>View comments</Text>
+                  </TouchableOpacity>
+
                   <Text style={styles.bio}>
                     {tech.bio || "Experienced technician ready to help."}
                   </Text>
@@ -231,6 +369,15 @@ export default function TechniciansByService({ route, navigation }) {
           )}
         </View>
       </ScrollView>
+
+      <CommentsModal
+        visible={commentsOpen}
+        technicianId={selectedTechnicianId}
+        onClose={() => {
+          setCommentsOpen(false);
+          setSelectedTechnicianId(null);
+        }}
+      />
     </View>
   );
 }
@@ -259,7 +406,20 @@ const styles = StyleSheet.create({
     height: 58,
     paddingHorizontal: 20,
     fontSize: 17,
-    marginBottom: 18,
+    marginBottom: 12,
+  },
+  smartHint: {
+    backgroundColor: "#FFF9F3",
+    borderWidth: 1,
+    borderColor: "#D8C8B8",
+    borderRadius: 16,
+    padding: 12,
+    marginBottom: 14,
+  },
+  smartHintText: {
+    color: "#3A3028",
+    fontSize: 15,
+    fontWeight: "800",
   },
   filterGrid: {
     flexDirection: "row",
@@ -292,6 +452,13 @@ const styles = StyleSheet.create({
   techName: { fontSize: 34, fontWeight: "900", color: "#111" },
   techService: { fontSize: 25, color: "#111", marginTop: 8, marginBottom: 16 },
   info: { fontSize: 20, color: "#111", marginTop: 7 },
+  commentsLink: {
+    color: "#111",
+    fontSize: 16,
+    fontWeight: "900",
+    textDecorationLine: "underline",
+    marginTop: 10,
+  },
   bio: { fontSize: 19, color: "#111", marginTop: 16, lineHeight: 28 },
   actions: { marginTop: 22, gap: 14 },
   primaryBtn: {
@@ -302,4 +469,69 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   primaryText: { color: "#fff", fontSize: 18, fontWeight: "900" },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.35)",
+    alignItems: "center",
+    justifyContent: "center",
+    padding: 20,
+  },
+  commentsModal: {
+    width: "100%",
+    backgroundColor: "#FFFAF4",
+    borderRadius: 26,
+    padding: 22,
+    borderWidth: 1,
+    borderColor: "#D8C8B8",
+  },
+  commentsTitle: {
+    fontSize: 28,
+    fontWeight: "900",
+    color: "#111",
+    marginBottom: 18,
+  },
+  noComments: {
+    fontSize: 18,
+    color: "#4D433B",
+    textAlign: "center",
+    marginVertical: 30,
+  },
+  commentRow: {
+    borderBottomWidth: 1,
+    borderBottomColor: "#EADFCE",
+    paddingVertical: 14,
+  },
+  commentTop: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    gap: 12,
+    marginBottom: 8,
+  },
+  commentUser: {
+    color: "#111",
+    fontWeight: "900",
+    fontSize: 17,
+  },
+  commentRating: {
+    color: "#111",
+    fontWeight: "900",
+    fontSize: 16,
+  },
+  commentText: {
+    color: "#3A3028",
+    fontSize: 16,
+    lineHeight: 23,
+  },
+  closeBtn: {
+    backgroundColor: "#111",
+    borderRadius: 999,
+    paddingVertical: 15,
+    marginTop: 18,
+    alignItems: "center",
+  },
+  closeBtnText: {
+    color: "#fff",
+    fontWeight: "900",
+    fontSize: 17,
+  },
 });

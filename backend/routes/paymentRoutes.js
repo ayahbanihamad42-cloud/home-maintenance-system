@@ -1,9 +1,15 @@
 import express from "express";
-import { createMockPayment } from "../controllers/paymentController.js";
 import auth from "../utils/authMiddleware.js";
+import {
+  getMyPaymentInfo,
+  saveMyPaymentInfo,
+  getMyBalance,
+} from "../controllers/paymentController.js";
 
 const router = express.Router();
 
-router.post("/create-intent", auth, createMockPayment);
+router.get("/my-info", auth, getMyPaymentInfo);
+router.post("/my-info", auth, saveMyPaymentInfo);
+router.get("/my-balance", auth, getMyBalance);
 
 export default router;

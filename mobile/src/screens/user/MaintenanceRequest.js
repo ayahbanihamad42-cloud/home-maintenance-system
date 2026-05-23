@@ -9,7 +9,6 @@ import {
 } from "react-native";
 import { Picker } from "@react-native-picker/picker";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-
 import Header from "../../components/Common/Header";
 import API from "../../services/api";
 import styles from "../../styles/mobileStyles";
@@ -23,6 +22,7 @@ export default function MaintenanceRequest({ navigation, route }) {
     params.technician_id ||
     technician.technicianId ||
     technician.technician_id ||
+    technician.tech_id ||
     technician.id;
 
   const [user, setUser] = useState(null);
@@ -40,9 +40,7 @@ export default function MaintenanceRequest({ navigation, route }) {
     payment_method: "cash",
     location_note: "",
     description: "",
-    price_per_hour: String(
-      params.price_per_hour || technician.price_per_hour || 0
-    ),
+    price_per_hour: String(params.price_per_hour || technician.price_per_hour || 0),
   });
 
   const totalPrice = useMemo(() => {
@@ -53,7 +51,21 @@ export default function MaintenanceRequest({ navigation, route }) {
 
   const normalizeDate = (value) => {
     if (!value) return "";
-    return String(value).split("T")[0];
+
+    const raw = String(value);
+
+    if (/^\d{4}-\d{2}-\d{2}$/.test(raw)) return raw;
+
+    const d = new Date(value);
+
+    if (!Number.isNaN(d.getTime())) {
+      const yyyy = d.getFullYear();
+      const mm = String(d.getMonth() + 1).padStart(2, "0");
+      const dd = String(d.getDate()).padStart(2, "0");
+      return `${yyyy}-${mm}-${dd}`;
+    }
+
+    return raw.slice(0, 10);
   };
 
   const normalizeTime = (value) => {
@@ -77,9 +89,7 @@ export default function MaintenanceRequest({ navigation, route }) {
         ...prev,
         service: prev.service || tech.service || "",
         technicianName: prev.technicianName || tech.name || "",
-        price_per_hour: String(
-          prev.price_per_hour || tech.price_per_hour || 0
-        ),
+        price_per_hour: String(prev.price_per_hour || tech.price_per_hour || 0),
       }));
     } catch (err) {
       console.log("load technician error:", err?.response?.data || err.message);
@@ -106,7 +116,7 @@ export default function MaintenanceRequest({ navigation, route }) {
       const dates = [
         ...new Set(
           list
-            .filter((item) => !item.is_booked)
+            .filter((item) => Number(item.is_booked) !== 1 && item.is_booked !== true)
             .map((item) => normalizeDate(item.available_date))
             .filter(Boolean)
         ),
@@ -114,18 +124,11 @@ export default function MaintenanceRequest({ navigation, route }) {
 
       setAvailableDates(dates);
 
-      if (dates.length > 0) {
-        setForm((prev) => ({
-          ...prev,
-          scheduled_date: prev.scheduled_date || dates[0],
-        }));
-      } else {
-        setForm((prev) => ({
-          ...prev,
-          scheduled_date: "",
-          scheduled_time: "",
-        }));
-      }
+      setForm((prev) => ({
+        ...prev,
+        scheduled_date: dates.length > 0 ? prev.scheduled_date || dates[0] : "",
+        scheduled_time: dates.length > 0 ? prev.scheduled_time : "",
+      }));
     } catch (err) {
       console.log("load dates error:", err?.response?.data || err.message);
       setAvailableDates([]);
@@ -154,7 +157,7 @@ export default function MaintenanceRequest({ navigation, route }) {
       const list = Array.isArray(res.data) ? res.data : [];
 
       const times = list
-        .filter((item) => !item.is_booked)
+        .filter((item) => Number(item.is_booked) !== 1 && item.is_booked !== true)
         .map((item) => ({
           id: item.id,
           value: normalizeTime(item.start_time),
@@ -194,7 +197,8 @@ export default function MaintenanceRequest({ navigation, route }) {
 
     return list.some(
       (item) =>
-        !item.is_booked &&
+        Number(item.is_booked) !== 1 &&
+        item.is_booked !== true &&
         normalizeDate(item.available_date) === form.scheduled_date &&
         normalizeTime(item.start_time) === normalizeTime(form.scheduled_time)
     );
@@ -268,7 +272,6 @@ export default function MaintenanceRequest({ navigation, route }) {
         payment_method: form.payment_method,
         price_per_hour: Number(form.price_per_hour || 0),
         total_price: Number(totalPrice),
-        created_at: new Date().toISOString(),
       };
 
       const res = await API.post("/maintenance", payload);
@@ -313,27 +316,11 @@ export default function MaintenanceRequest({ navigation, route }) {
           <Text style={styles.pageTitle}>Maintenance Request</Text>
 
           {message ? (
-            <View
-              style={
-                message.type === "error" ? styles.errorBox : styles.successBox
-              }
-            >
-              <Text
-                style={
-                  message.type === "error"
-                    ? styles.errorTitle
-                    : styles.successTitle
-                }
-              >
+            <View style={message.type === "error" ? styles.errorBox : styles.successBox}>
+              <Text style={message.type === "error" ? styles.errorTitle : styles.successTitle}>
                 {message.title}
               </Text>
-              <Text
-                style={
-                  message.type === "error"
-                    ? styles.errorText
-                    : styles.successText
-                }
-              >
+              <Text style={message.type === "error" ? styles.errorText : styles.successText}>
                 {message.body}
               </Text>
             </View>
@@ -343,11 +330,7 @@ export default function MaintenanceRequest({ navigation, route }) {
           <TextInput style={styles.input} value={form.service} editable={false} />
 
           <Text style={styles.label}>Technician</Text>
-          <TextInput
-            style={styles.input}
-            value={form.technicianName}
-            editable={false}
-          />
+          <TextInput style={styles.input} value={form.technicianName} editable={false} />
 
           <View style={styles.twoColumns}>
             <View style={styles.column}>
@@ -356,7 +339,7 @@ export default function MaintenanceRequest({ navigation, route }) {
                 <Picker
                   selectedValue={form.scheduled_date}
                   onValueChange={(value) =>
-                    setForm({ ...form, scheduled_date: value })
+                    setForm({ ...form, scheduled_date: value, scheduled_time: "" })
                   }
                 >
                   {availableDates.length === 0 ? (
@@ -428,20 +411,16 @@ export default function MaintenanceRequest({ navigation, route }) {
           <TextInput
             style={styles.input}
             editable={false}
-            value={`Price / hour: ${Number(form.price_per_hour || 0).toFixed(
+            value={`${Number(form.price_per_hour || 0).toFixed(
               2
-            )} JOD | Estimated Hours: ${
-              form.estimated_hours
-            } | Total: ${totalPrice} JOD`}
+            )} JOD/hour | Hours: ${form.estimated_hours} | Total: ${totalPrice} JOD`}
           />
 
           <Text style={styles.label}>Location Note</Text>
           <TextInput
             style={styles.input}
             value={form.location_note}
-            onChangeText={(value) =>
-              setForm({ ...form, location_note: value })
-            }
+            onChangeText={(value) => setForm({ ...form, location_note: value })}
             placeholder="Example: Irbid, near Yarmouk University"
           />
 
@@ -450,9 +429,7 @@ export default function MaintenanceRequest({ navigation, route }) {
             style={[styles.input, styles.textArea]}
             multiline
             value={form.description}
-            onChangeText={(value) =>
-              setForm({ ...form, description: value })
-            }
+            onChangeText={(value) => setForm({ ...form, description: value })}
             placeholder="Describe the problem..."
           />
 

@@ -5,43 +5,56 @@ import {
   ScrollView,
   TouchableOpacity,
   TextInput,
-  StyleSheet,
   ActivityIndicator,
-  Alert,
+  StyleSheet,
 } from "react-native";
-import { Picker } from "@react-native-picker/picker";
 import Header from "../../components/Common/Header";
-import API from "../../services/api";
-import { getRequestById } from "../../services/maintenanceService";
-import { getRatingByRequest, submitRating } from "../../services/ratingService";
+import {
+  getRequestById,
+  cancelMaintenanceRequest,
+} from "../../services/maintenanceService";
+import { addRating, getRatingByRequest } from "../../services/ratingService";
 
 export default function Review({ navigation, route }) {
-  const requestId = route?.params?.requestId;
-  const passedRequest = route?.params?.request || null;
+  const requestId = route?.params?.requestId || route?.params?.id;
 
-  const [req, setReq] = useState(passedRequest);
-  const [loading, setLoading] = useState(!passedRequest);
-  const [message, setMessage] = useState(null);
-
+  const [request, setRequest] = useState(route?.params?.request || null);
+  const [oldRating, setOldRating] = useState(null);
   const [rating, setRating] = useState(5);
   const [comment, setComment] = useState("");
-  const [existingRating, setExistingRating] = useState(null);
+  const [message, setMessage] = useState(null);
+  const [loading, setLoading] = useState(true);
 
-  const formatDate = (value) => {
+  const formatDateOnly = (value) => {
     if (!value) return "-";
-    return String(value).split("T")[0];
+    const raw = String(value);
+    const match = raw.match(/^(\d{4}-\d{2}-\d{2})/);
+    if (match) return match[1];
+    return raw.slice(0, 10);
   };
 
-  const formatTime = (value) => {
+  const formatDateTime = (value) => {
     if (!value) return "-";
-    return String(value).slice(0, 8);
+    const d = new Date(value);
+    if (Number.isNaN(d.getTime())) return String(value);
+    return d.toLocaleString();
   };
 
   const loadRequest = async () => {
     try {
       setLoading(true);
+      setMessage(null);
+
       const data = await getRequestById(requestId);
-      setReq(data);
+      setRequest(data);
+
+      const ratingData = await getRatingByRequest(requestId).catch(() => null);
+      setOldRating(ratingData || null);
+
+      if (ratingData) {
+        setRating(ratingData.rating || 5);
+        setComment(ratingData.comment || "");
+      }
     } catch (err) {
       setMessage({
         type: "error",
@@ -53,84 +66,66 @@ export default function Review({ navigation, route }) {
     }
   };
 
-  const loadRating = async () => {
-    try {
-      const data = await getRatingByRequest(requestId);
-      if (data) {
-        setExistingRating(data);
-        setRating(data.rating || 5);
-        setComment(data.comment || "");
-      }
-    } catch {
-      setExistingRating(null);
-    }
-  };
-
   useEffect(() => {
-    if (requestId && !passedRequest) loadRequest();
-    if (requestId) loadRating();
+    if (requestId) {
+      loadRequest();
+    } else {
+      setLoading(false);
+      setMessage({
+        type: "error",
+        title: "Error",
+        body: "Request id is missing.",
+      });
+    }
   }, [requestId]);
 
-  const canCancel = ["pending"].includes(
-    String(req?.status || "").toLowerCase()
-  );
-
-  const isCompleted =
-    String(req?.status || "").toLowerCase() === "completed";
-
-  const cancelRequest = async () => {
+  const handleCancel = async () => {
     try {
-      if (!canCancel) {
-        Alert.alert(
-          "Not Available",
-          "You can cancel only before the technician accepts the request."
-        );
-        return;
-      }
-
-      await API.put(`/maintenance/${req.id}/status`, {
-        status: "cancelled",
-      });
+      await cancelMaintenanceRequest(requestId);
 
       setMessage({
         type: "success",
-        title: "Cancelled Successfully",
-        body:
-          String(req.payment_method).toLowerCase() === "online"
-            ? "Request cancelled. Refund notification has been sent."
-            : "Request cancelled successfully.",
+        title: "Cancelled",
+        body: "Request cancelled successfully.",
       });
 
-      setReq((prev) => ({
-        ...prev,
-        status: "cancelled",
-      }));
+      await loadRequest();
     } catch (err) {
       setMessage({
         type: "error",
         title: "Error",
-        body: err?.response?.data?.message || "Failed to cancel request.",
+        body:
+          err?.response?.data?.message ||
+          "This request cannot be cancelled now.",
       });
     }
   };
 
-  const sendReview = async () => {
+  const submitRating = async () => {
     try {
-      if (!req?.technician_id) return;
+      if (!request?.technician_id) {
+        setMessage({
+          type: "error",
+          title: "Error",
+          body: "Technician id is missing.",
+        });
+        return;
+      }
 
-      await submitRating({
-        technician_id: req.technician_id,
-        request_id: req.id,
+      await addRating({
+        technician_id: request.technician_id,
+        request_id: request.id,
         rating,
         comment,
       });
 
-      setExistingRating({ rating, comment });
       setMessage({
         type: "success",
-        title: "Review Submitted",
-        body: "Thank you for your feedback.",
+        title: "Saved",
+        body: "Review submitted successfully.",
       });
+
+      await loadRequest();
     } catch (err) {
       setMessage({
         type: "error",
@@ -143,224 +138,326 @@ export default function Review({ navigation, route }) {
   if (loading) {
     return (
       <View style={styles.screen}>
-        <Header />
-        <View style={styles.center}>
+        <Header navigation={navigation} />
+        <View style={styles.loadingBox}>
           <ActivityIndicator size="large" color="#111" />
         </View>
       </View>
     );
   }
 
-  if (!req) {
-    return (
-      <View style={styles.screen}>
-        <Header />
-        <View style={styles.center}>
-          <Text style={styles.emptyText}>Request not found.</Text>
-        </View>
-      </View>
-    );
-  }
+  const status = String(request?.status || "").toLowerCase();
+  const canCancel = status === "pending";
+  const canReview = status === "completed";
 
   return (
     <View style={styles.screen}>
-      <Header />
+      <Header navigation={navigation} />
 
       <ScrollView contentContainerStyle={styles.container}>
-        <View style={styles.panel}>
-          <Text style={styles.title}>Request Review</Text>
+        <Text style={styles.title}>Request Review</Text>
 
-          {message ? (
-            <View
-              style={[
-                styles.messageBox,
-                message.type === "success" && styles.successBox,
-                message.type === "error" && styles.errorBox,
-              ]}
-            >
-              <Text style={styles.messageTitle}>{message.title}</Text>
-              <Text style={styles.messageBody}>{message.body}</Text>
-            </View>
-          ) : null}
-
-          <View style={styles.card}>
-            <View style={styles.cardTop}>
-              <Text style={styles.service}>
-                {req.service || req.service_type || "Maintenance"}
-              </Text>
-              <Text style={styles.badge}>{req.status || "-"}</Text>
-            </View>
-
-            <Text style={styles.desc}>{req.description || "No description"}</Text>
-
-            <View style={styles.infoGrid}>
-              <Text style={styles.line}>
-                Date: {formatDate(req.scheduled_date)}
-              </Text>
-              <Text style={styles.line}>
-                Time: {formatTime(req.scheduled_time)}
-              </Text>
-              <Text style={styles.line}>
-                Technician: {req.technician_name || req.technician_id || "-"}
-              </Text>
-              <Text style={styles.line}>
-                Location: {req.location_note || req.location || req.city || "-"}
-              </Text>
-              <Text style={styles.line}>
-                Payment: {req.payment_method || "-"}
-              </Text>
-              <Text style={styles.line}>
-                Total: {Number(req.total_price || req.total || 0).toFixed(2)} JOD
-              </Text>
-              <Text style={styles.line}>
-                Created Date: {formatDate(req.created_at)}
-              </Text>
-              <Text style={styles.line}>
-                Created Time: {formatTime(req.created_at?.split("T")?.[1])}
-              </Text>
-            </View>
-
-            {canCancel ? (
-              <TouchableOpacity style={styles.outlineBtn} onPress={cancelRequest}>
-                <Text style={styles.outlineBtnText}>Cancel Request</Text>
-              </TouchableOpacity>
-            ) : (
-              <Text style={styles.note}>
-                Cancellation is available only before the technician accepts the request.
-              </Text>
-            )}
+        {message ? (
+          <View
+            style={[
+              styles.messageBox,
+              message.type === "error" ? styles.errorBox : styles.successBox,
+            ]}
+          >
+            <Text style={styles.messageTitle}>{message.title}</Text>
+            <Text style={styles.messageText}>{message.body}</Text>
           </View>
+        ) : null}
 
-          {isCompleted ? (
-            <View style={styles.reviewBox}>
-              <Text style={styles.sectionTitle}>Rate your experience</Text>
-
-              <View style={styles.pickerBox}>
-                <Picker
-                  selectedValue={rating}
-                  enabled={!existingRating}
-                  onValueChange={setRating}
-                >
-                  <Picker.Item label="5 Stars" value={5} />
-                  <Picker.Item label="4 Stars" value={4} />
-                  <Picker.Item label="3 Stars" value={3} />
-                  <Picker.Item label="2 Stars" value={2} />
-                  <Picker.Item label="1 Star" value={1} />
-                </Picker>
+        {!request ? (
+          <View style={styles.card}>
+            <Text style={styles.emptyTitle}>Request not found</Text>
+            <Text style={styles.emptyText}>Please go back and try again.</Text>
+          </View>
+        ) : (
+          <>
+            <View style={styles.card}>
+              <View style={styles.cardHeader}>
+                <Text style={styles.cardTitle}>{request.service || "-"}</Text>
+                <View style={styles.statusPill}>
+                  <Text style={styles.statusText}>{request.status || "-"}</Text>
+                </View>
               </View>
 
-              <TextInput
-                style={styles.textArea}
-                value={comment}
-                onChangeText={setComment}
-                editable={!existingRating}
-                multiline
-                placeholder="Leave a comment..."
-              />
+              <Text style={styles.description}>
+                {request.description || "-"}
+              </Text>
 
-              <TouchableOpacity
-                style={[styles.primaryBtn, existingRating && { opacity: 0.5 }]}
-                disabled={!!existingRating}
-                onPress={sendReview}
-              >
-                <Text style={styles.primaryBtnText}>
-                  {existingRating ? "Review Submitted" : "Submit Review"}
-                </Text>
-              </TouchableOpacity>
+              <Text style={styles.info}>
+                <Text style={styles.bold}>Date:</Text>{" "}
+                {formatDateOnly(request.scheduled_date)}
+              </Text>
+
+              <Text style={styles.info}>
+                <Text style={styles.bold}>Time:</Text>{" "}
+                {request.scheduled_time || "-"}
+              </Text>
+
+              <Text style={styles.info}>
+                <Text style={styles.bold}>Created At:</Text>{" "}
+                {formatDateTime(request.created_at)}
+              </Text>
+
+              <Text style={styles.info}>
+                <Text style={styles.bold}>Technician:</Text>{" "}
+                {request.technician_name || "-"}
+              </Text>
+
+              <Text style={styles.info}>
+                <Text style={styles.bold}>Location:</Text>{" "}
+                {request.location_note || request.city || "-"}
+              </Text>
+
+              <Text style={styles.info}>
+                <Text style={styles.bold}>Payment:</Text>{" "}
+                {request.payment_method || "-"}
+              </Text>
+
+              <Text style={styles.info}>
+                <Text style={styles.bold}>Total:</Text>{" "}
+                {Number(request.total_price || 0).toFixed(2)} JOD
+              </Text>
+
+              {canCancel ? (
+                <TouchableOpacity
+                  style={styles.secondaryBtn}
+                  onPress={handleCancel}
+                >
+                  <Text style={styles.secondaryText}>Cancel Request</Text>
+                </TouchableOpacity>
+              ) : null}
             </View>
-          ) : (
-            <Text style={styles.note}>
-              Review is available only after the request is completed.
-            </Text>
-          )}
-        </View>
+
+            {!canReview ? (
+              <View style={styles.card}>
+                <Text style={styles.emptyText}>
+                  Review is available only after the request is completed.
+                </Text>
+
+                <TouchableOpacity
+                  style={styles.secondaryBtn}
+                  onPress={() => navigation.navigate("MaintenanceHistory")}
+                >
+                  <Text style={styles.secondaryText}>Back to History</Text>
+                </TouchableOpacity>
+              </View>
+            ) : oldRating ? (
+              <View style={[styles.card, styles.successBox]}>
+                <Text style={styles.emptyTitle}>Already Reviewed</Text>
+                <Text style={styles.emptyText}>
+                  Your rating: {oldRating.rating} ⭐
+                </Text>
+                <Text style={styles.emptyText}>
+                  {oldRating.comment || "No comment."}
+                </Text>
+              </View>
+            ) : (
+              <View style={styles.card}>
+                <Text style={styles.emptyTitle}>Rate Technician</Text>
+
+                <View style={styles.starsRow}>
+                  {[1, 2, 3, 4, 5].map((star) => (
+                    <TouchableOpacity
+                      key={star}
+                      onPress={() => setRating(star)}
+                    >
+                      <Text
+                        style={[
+                          styles.star,
+                          star <= rating && styles.activeStar,
+                        ]}
+                      >
+                        ★
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+
+                <Text style={styles.label}>Comment</Text>
+                <TextInput
+                  style={[styles.input, styles.textArea]}
+                  value={comment}
+                  onChangeText={setComment}
+                  multiline
+                  placeholder="Write your review..."
+                />
+
+                <TouchableOpacity
+                  style={styles.primaryBtn}
+                  onPress={submitRating}
+                >
+                  <Text style={styles.primaryText}>Submit Review</Text>
+                </TouchableOpacity>
+              </View>
+            )}
+          </>
+        )}
       </ScrollView>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: "#e7dccc" },
-  center: { flex: 1, justifyContent: "center", alignItems: "center" },
-  container: { padding: 24, paddingBottom: 70 },
-  panel: {
-    backgroundColor: "#fffaf4",
-    borderRadius: 28,
-    padding: 26,
-    borderWidth: 1,
-    borderColor: "#d8c8b8",
+  screen: {
+    flex: 1,
+    backgroundColor: "#E8DCCF",
   },
-  title: { fontSize: 36, fontWeight: "900", marginBottom: 20 },
-  messageBox: {
-    padding: 14,
-    borderRadius: 16,
-    marginBottom: 16,
-    borderWidth: 1,
+  loadingBox: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
   },
-  successBox: { backgroundColor: "#eef9f1", borderColor: "#bfe7ca" },
-  errorBox: { backgroundColor: "#fdebed", borderColor: "#efb6bd" },
-  messageTitle: { fontWeight: "900", fontSize: 16 },
-  messageBody: { marginTop: 6, fontSize: 15, color: "#6b5e52" },
-  card: {
-    backgroundColor: "#f7efe7",
-    borderRadius: 24,
-    padding: 22,
-    borderWidth: 1,
-    borderColor: "#d8c8b8",
+  container: {
+    padding: 18,
+    paddingBottom: 60,
   },
-  cardTop: { flexDirection: "row", justifyContent: "space-between", gap: 12 },
-  service: { fontSize: 26, fontWeight: "900", flex: 1 },
-  badge: {
-    backgroundColor: "#111",
-    color: "#fff",
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    borderRadius: 20,
-    overflow: "hidden",
+  title: {
+    fontSize: 38,
     fontWeight: "900",
+    color: "#111",
+    marginBottom: 22,
   },
-  desc: { fontSize: 17, marginVertical: 18, color: "#3d342d" },
-  infoGrid: { gap: 8 },
-  line: { fontSize: 16, color: "#3d342d", fontWeight: "600" },
-  outlineBtn: {
-    alignSelf: "flex-start",
-    marginTop: 18,
-    paddingHorizontal: 22,
-    paddingVertical: 12,
-    borderRadius: 14,
+  card: {
+    backgroundColor: "#FFF9F3",
     borderWidth: 1,
-    borderColor: "#111",
+    borderColor: "#D8C8B8",
+    borderRadius: 26,
+    padding: 22,
+    marginBottom: 20,
   },
-  outlineBtnText: { color: "#111", fontWeight: "900" },
-  note: { marginTop: 18, color: "#6b5e52", fontSize: 15, lineHeight: 22 },
-  reviewBox: { marginTop: 22 },
-  sectionTitle: { fontSize: 22, fontWeight: "900", marginBottom: 12 },
-  pickerBox: {
-    backgroundColor: "#f7efe7",
-    borderWidth: 1,
-    borderColor: "#d8c8b8",
-    borderRadius: 16,
-    overflow: "hidden",
-    marginBottom: 12,
+  cardHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    gap: 12,
+    alignItems: "flex-start",
+    marginBottom: 16,
   },
-  textArea: {
-    backgroundColor: "#f7efe7",
-    borderWidth: 1,
-    borderColor: "#d8c8b8",
-    borderRadius: 16,
-    padding: 14,
-    height: 100,
-    textAlignVertical: "top",
-    fontSize: 16,
+  cardTitle: {
+    fontSize: 28,
+    fontWeight: "900",
+    color: "#111",
+    flex: 1,
+  },
+  statusPill: {
+    backgroundColor: "#111",
+    paddingHorizontal: 16,
+    paddingVertical: 9,
+    borderRadius: 999,
+  },
+  statusText: {
+    color: "#FFF",
+    fontWeight: "900",
+    fontSize: 12,
+    textTransform: "lowercase",
+  },
+  description: {
+    color: "#3A3028",
+    fontSize: 17,
+    lineHeight: 26,
+    marginBottom: 18,
+  },
+  info: {
+    fontSize: 17,
+    color: "#3A3028",
+    marginBottom: 11,
+    lineHeight: 24,
+  },
+  bold: {
+    color: "#111",
+    fontWeight: "900",
   },
   primaryBtn: {
     backgroundColor: "#111",
-    alignSelf: "flex-start",
-    marginTop: 14,
-    paddingHorizontal: 24,
     paddingVertical: 14,
-    borderRadius: 16,
+    paddingHorizontal: 22,
+    borderRadius: 999,
+    alignItems: "center",
+    marginTop: 12,
   },
-  primaryBtnText: { color: "#fff", fontWeight: "900", fontSize: 16 },
-  emptyText: { fontSize: 18, color: "#6b5e52" },
+  primaryText: {
+    color: "#FFF",
+    fontWeight: "900",
+  },
+  secondaryBtn: {
+    borderWidth: 1,
+    borderColor: "#111",
+    paddingVertical: 13,
+    paddingHorizontal: 22,
+    borderRadius: 999,
+    alignSelf: "flex-start",
+    marginTop: 12,
+  },
+  secondaryText: {
+    color: "#111",
+    fontWeight: "900",
+  },
+  messageBox: {
+    borderWidth: 1,
+    borderRadius: 18,
+    padding: 14,
+    marginBottom: 18,
+  },
+  successBox: {
+    backgroundColor: "#F5FBF6",
+    borderColor: "#CFE8D4",
+  },
+  errorBox: {
+    backgroundColor: "#FFF3F3",
+    borderColor: "#EFC3C3",
+  },
+  messageTitle: {
+    fontWeight: "900",
+    color: "#111",
+    marginBottom: 6,
+  },
+  messageText: {
+    color: "#3A3028",
+    lineHeight: 22,
+  },
+  emptyTitle: {
+    fontSize: 24,
+    fontWeight: "900",
+    color: "#111",
+    marginBottom: 8,
+  },
+  emptyText: {
+    color: "#6B5E52",
+    fontSize: 16,
+    lineHeight: 24,
+  },
+  starsRow: {
+    flexDirection: "row",
+    gap: 8,
+    marginVertical: 14,
+  },
+  star: {
+    fontSize: 36,
+    color: "#C8B8A8",
+  },
+  activeStar: {
+    color: "#111",
+  },
+  label: {
+    color: "#111",
+    fontWeight: "900",
+    marginBottom: 8,
+    fontSize: 16,
+  },
+  input: {
+    backgroundColor: "#F6EDE2",
+    borderWidth: 1,
+    borderColor: "#D8C8B8",
+    borderRadius: 14,
+    padding: 12,
+    color: "#111",
+  },
+  textArea: {
+    minHeight: 110,
+    textAlignVertical: "top",
+  },
 });

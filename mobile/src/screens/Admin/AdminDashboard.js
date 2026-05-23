@@ -2,17 +2,15 @@ import React, { useCallback, useEffect, useState } from "react";
 import {
   View,
   Text,
-  TouchableOpacity,
-  StyleSheet,
-  FlatList,
-  TextInput,
-  Modal,
-  Alert,
   ScrollView,
+  TouchableOpacity,
+  TextInput,
+  StyleSheet,
+  Alert,
+  Modal,
   Image,
-  ActivityIndicator,
 } from "react-native";
-import * as ImagePicker from "expo-image-picker";
+import { Picker } from "@react-native-picker/picker";
 import Header from "../../components/Common/Header";
 import {
   getAdminUsers,
@@ -30,11 +28,32 @@ import {
   getBackendImageUrl,
 } from "../../services/adminService";
 
-function AdminDashboard() {
+const JORDAN_CITIES = [
+  "Amman",
+  "Irbid",
+  "Zarqa",
+  "Balqa",
+  "Madaba",
+  "Karak",
+  "Tafilah",
+  "Maan",
+  "Aqaba",
+  "Jerash",
+  "Ajloun",
+  "Mafraq",
+];
+
+function formatDate(value) {
+  if (!value) return "";
+  return String(value).split("T")[0];
+}
+
+export default function AdminDashboard() {
   const emptyForm = {
     name: "",
     email: "",
     phone: "",
+    dob: "",
     city: "",
     password: "",
     service_id: "",
@@ -46,7 +65,6 @@ function AdminDashboard() {
     owner_id: "",
     service_name: "",
     image_url: "",
-    image_base64: "",
   };
 
   const [view, setView] = useState("users");
@@ -58,43 +76,25 @@ function AdminDashboard() {
   const [selectedProfile, setSelectedProfile] = useState(null);
   const [loading, setLoading] = useState(false);
 
-  const resetForm = () => {
-    setForm(emptyForm);
-  };
+  const resetForm = () => setForm(emptyForm);
 
-  const fetchServices = useCallback(async () => {
+  const loadServices = useCallback(async () => {
     try {
       const data = await getAdminServices();
       setServices(Array.isArray(data) ? data : []);
-    } catch (err) {
-      console.log("MOBILE fetch services error:", err?.response?.data || err.message);
+    } catch {
       setServices([]);
     }
   }, []);
 
-  const fetchData = useCallback(async () => {
+  const loadData = useCallback(async () => {
     try {
       setLoading(true);
 
-      if (view === "users") {
-        const data = await getAdminUsers();
-        setUsers(Array.isArray(data) ? data : []);
-      }
-
-      if (view === "technicians") {
-        const data = await getAdminTechnicians();
-        setTechnicians(Array.isArray(data) ? data : []);
-      }
-
-      if (view === "stores") {
-        const data = await getAdminStores();
-        setStores(Array.isArray(data) ? data : []);
-      }
-
-      if (view === "services") {
-        const data = await getAdminServices();
-        setServices(Array.isArray(data) ? data : []);
-      }
+      if (view === "users") setUsers(await getAdminUsers());
+      if (view === "technicians") setTechnicians(await getAdminTechnicians());
+      if (view === "stores") setStores(await getAdminStores());
+      if (view === "services") setServices(await getAdminServices());
     } catch (err) {
       Alert.alert("Error", err?.response?.data?.message || err.message);
     } finally {
@@ -103,42 +103,17 @@ function AdminDashboard() {
   }, [view]);
 
   useEffect(() => {
-    fetchData();
-  }, [fetchData]);
+    loadData();
+  }, [loadData]);
 
   useEffect(() => {
-    fetchServices();
-  }, [fetchServices]);
+    loadServices();
+  }, [loadServices]);
 
-  const pickServiceImage = async () => {
-    const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
-
-    if (!permission.granted) {
-      Alert.alert("Notice", "Please allow image access.");
-      return;
-    }
-
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      allowsEditing: true,
-      aspect: [1, 1],
-      quality: 0.35,
-      base64: true,
-    });
-
-    if (result.canceled) return;
-
-    const asset = result.assets?.[0];
-
-    if (!asset?.base64) return;
-
-    const mimeType = asset.mimeType || "image/jpeg";
-
-    setForm((prev) => ({
-      ...prev,
-      image_base64: `data:${mimeType};base64,${asset.base64}`,
-      image_url: "",
-    }));
+  const changeView = (nextView) => {
+    setView(nextView);
+    resetForm();
+    setSelectedProfile(null);
   };
 
   const handleAdd = async () => {
@@ -148,6 +123,7 @@ function AdminDashboard() {
           name: form.name,
           email: form.email,
           phone: form.phone,
+          dob: form.dob,
           city: form.city,
           password: form.password,
           role: "user",
@@ -159,6 +135,7 @@ function AdminDashboard() {
           name: form.name,
           email: form.email,
           phone: form.phone,
+          dob: form.dob,
           city: form.city,
           password: form.password,
           service_id: form.service_id,
@@ -168,9 +145,13 @@ function AdminDashboard() {
       }
 
       if (view === "stores") {
+        const categoryName =
+          services.find((s) => String(s.id) === String(form.category))?.name ||
+          form.category;
+
         await createAdminStore({
           store_name: form.store_name,
-          category: form.category,
+          category: categoryName,
           city: form.city,
           address: form.address,
           owner_id: form.owner_id || null,
@@ -181,237 +162,204 @@ function AdminDashboard() {
         await createAdminService({
           name: form.service_name,
           image_url: form.image_url,
-          image_base64: form.image_base64,
         });
       }
 
       resetForm();
-      await fetchData();
-      await fetchServices();
-
+      await loadData();
+      await loadServices();
       Alert.alert("Success", "Added successfully.");
     } catch (err) {
       Alert.alert("Error", err?.response?.data?.message || err.message);
     }
   };
 
-  const confirmDelete = (label, callback) => {
-    Alert.alert("Confirm", `Delete this ${label}?`, [
+  const handleDelete = async (type, id) => {
+    Alert.alert("Delete", "Are you sure?", [
       { text: "Cancel", style: "cancel" },
-      { text: "Delete", style: "destructive", onPress: callback },
+      {
+        text: "Delete",
+        style: "destructive",
+        onPress: async () => {
+          try {
+            if (type === "user") await deleteAdminUser(id);
+            if (type === "technician") await deleteAdminTechnician(id);
+            if (type === "store") await deleteAdminStore(id);
+            if (type === "service") await deleteAdminService(id);
+
+            await loadData();
+            await loadServices();
+          } catch (err) {
+            Alert.alert("Error", err?.response?.data?.message || err.message);
+          }
+        },
+      },
     ]);
   };
 
-  const deleteItem = async (type, id) => {
-    try {
-      if (type === "user") await deleteAdminUser(id);
-      if (type === "technician") await deleteAdminTechnician(id);
-      if (type === "store") await deleteAdminStore(id);
-      if (type === "service") await deleteAdminService(id);
+  const renderInput = (label, key, placeholder, secure = false, keyboardType = "default") => (
+    <View style={styles.inputGroup}>
+      <Text style={styles.label}>{label}</Text>
+      <TextInput
+        style={styles.input}
+        value={form[key]}
+        placeholder={placeholder}
+        secureTextEntry={secure}
+        keyboardType={keyboardType}
+        onChangeText={(text) => setForm({ ...form, [key]: text })}
+      />
+    </View>
+  );
 
-      setSelectedProfile(null);
-      await fetchData();
-      await fetchServices();
-    } catch (err) {
-      Alert.alert("Error", err?.response?.data?.message || err.message);
+  const renderPicker = (label, value, onChange, options, placeholder) => (
+    <View style={styles.inputGroup}>
+      <Text style={styles.label}>{label}</Text>
+      <View style={styles.pickerBox}>
+        <Picker selectedValue={value} onValueChange={onChange}>
+          <Picker.Item label={placeholder} value="" />
+          {options.map((item) => (
+            <Picker.Item key={item.value} label={item.label} value={item.value} />
+          ))}
+        </Picker>
+      </View>
+    </View>
+  );
+
+  const serviceOptions = services.map((service) => ({
+    label: service.name,
+    value: String(service.id),
+  }));
+
+  const cityOptions = JORDAN_CITIES.map((city) => ({
+    label: city,
+    value: city,
+  }));
+
+  const renderRows = () => {
+    const data =
+      view === "users"
+        ? users
+        : view === "technicians"
+        ? technicians
+        : view === "stores"
+        ? stores
+        : services;
+
+    if (!data.length) {
+      return (
+        <View style={styles.emptyCard}>
+          <Text style={styles.emptyText}>No data found.</Text>
+        </View>
+      );
     }
-  };
 
-  const switchView = (nextView) => {
-    setView(nextView);
-    resetForm();
-    setSelectedProfile(null);
-  };
+    return data.map((item) => {
+      if (view === "users") {
+        return (
+          <View style={styles.itemCard} key={item.id}>
+            <Text style={styles.itemTitle}>{item.name}</Text>
+            <Text style={styles.itemText}>Email: {item.email}</Text>
+            <Text style={styles.itemText}>Phone: {item.phone || "-"}</Text>
+            <Text style={styles.itemText}>Birth Date: {formatDate(item.dob) || "-"}</Text>
+            <Text style={styles.itemText}>City: {item.city || "-"}</Text>
+            <Text style={styles.itemText}>Role: {item.role}</Text>
 
-  const renderUser = ({ item }) => (
-    <View style={styles.card}>
-      <Text style={styles.cardTitle}>{item.name}</Text>
-      <Text style={styles.cardText}>{item.email}</Text>
-      <Text style={styles.cardText}>Phone: {item.phone || "-"}</Text>
-      <Text style={styles.cardText}>City: {item.city || "-"}</Text>
-      <Text style={styles.badge}>{item.role}</Text>
+            <View style={styles.rowActions}>
+              <TouchableOpacity style={styles.blackBtn} onPress={() => setSelectedProfile({ type: "user", data: item })}>
+                <Text style={styles.blackBtnText}>View</Text>
+              </TouchableOpacity>
 
-      <View style={styles.actionRow}>
-        <TouchableOpacity onPress={() => setSelectedProfile({ type: "user", data: item })}>
-          <Text style={styles.link}>View</Text>
-        </TouchableOpacity>
+              <TouchableOpacity style={styles.outlineBtn} onPress={() => handleDelete("user", item.id)}>
+                <Text style={styles.outlineBtnText}>Delete</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        );
+      }
 
-        <TouchableOpacity
-          onPress={() => confirmDelete("user", () => deleteItem("user", item.id))}
-        >
-          <Text style={styles.deleteLink}>Delete</Text>
-        </TouchableOpacity>
-      </View>
-    </View>
-  );
+      if (view === "technicians") {
+        return (
+          <View style={styles.itemCard} key={item.technicianId}>
+            <Text style={styles.itemTitle}>{item.name}</Text>
+            <Text style={styles.itemText}>Email: {item.email}</Text>
+            <Text style={styles.itemText}>Phone: {item.phone || "-"}</Text>
+            <Text style={styles.itemText}>Birth Date: {formatDate(item.dob) || "-"}</Text>
+            <Text style={styles.itemText}>City: {item.city || "-"}</Text>
+            <Text style={styles.itemText}>Service: {item.service || "-"}</Text>
+            <Text style={styles.itemText}>Experience: {item.experience || 0} years</Text>
+            <Text style={styles.itemText}>
+              Price/hr: {Number(item.price_per_hour || 0).toFixed(2)} JOD
+            </Text>
 
-  const renderTechnician = ({ item }) => (
-    <View style={styles.card}>
-      <View style={styles.cardHeader}>
-        {item.service_image ? (
-          <Image
-            source={{ uri: getBackendImageUrl(item.service_image) }}
-            style={styles.smallCircleImage}
-          />
-        ) : null}
+            <View style={styles.rowActions}>
+              <TouchableOpacity style={styles.blackBtn} onPress={() => setSelectedProfile({ type: "technician", data: item })}>
+                <Text style={styles.blackBtnText}>View</Text>
+              </TouchableOpacity>
 
-        <View style={{ flex: 1 }}>
-          <Text style={styles.cardTitle}>{item.name}</Text>
-          <Text style={styles.cardText}>{item.email}</Text>
+              <TouchableOpacity style={styles.outlineBtn} onPress={() => handleDelete("technician", item.technicianId)}>
+                <Text style={styles.outlineBtnText}>Delete</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        );
+      }
+
+      if (view === "stores") {
+        return (
+          <View style={styles.itemCard} key={item.id}>
+            <Text style={styles.itemTitle}>{item.store_name}</Text>
+            <Text style={styles.itemText}>Category: {item.category || "-"}</Text>
+            <Text style={styles.itemText}>City: {item.city || "-"}</Text>
+            <Text style={styles.itemText}>Address: {item.address || "-"}</Text>
+
+            <TouchableOpacity style={styles.outlineBtn} onPress={() => handleDelete("store", item.id)}>
+              <Text style={styles.outlineBtnText}>Delete</Text>
+            </TouchableOpacity>
+          </View>
+        );
+      }
+
+      return (
+        <View style={styles.itemCard} key={item.id}>
+          {item.image_url ? (
+            <Image source={{ uri: getBackendImageUrl(item.image_url) }} style={styles.serviceImage} />
+          ) : null}
+          <Text style={styles.itemTitle}>{item.name}</Text>
+          <Text style={styles.itemText}>{item.image_url || "-"}</Text>
+
+          <TouchableOpacity style={styles.outlineBtn} onPress={() => handleDelete("service", item.id)}>
+            <Text style={styles.outlineBtnText}>Delete</Text>
+          </TouchableOpacity>
         </View>
-      </View>
-
-      <Text style={styles.cardText}>Phone: {item.phone || "-"}</Text>
-      <Text style={styles.cardText}>City: {item.city || "-"}</Text>
-      <Text style={styles.cardText}>Service: {item.service || "-"}</Text>
-      <Text style={styles.cardText}>Experience: {item.experience || 0}</Text>
-      <Text style={styles.cardText}>
-        Price/hr: {Number(item.price_per_hour || 0).toFixed(2)}
-      </Text>
-
-      <View style={styles.actionRow}>
-        <TouchableOpacity
-          onPress={() => setSelectedProfile({ type: "technician", data: item })}
-        >
-          <Text style={styles.link}>View</Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          onPress={() =>
-            confirmDelete("technician", () =>
-              deleteItem("technician", item.technicianId)
-            )
-          }
-        >
-          <Text style={styles.deleteLink}>Delete</Text>
-        </TouchableOpacity>
-      </View>
-    </View>
-  );
-
-  const renderStore = ({ item }) => (
-    <View style={styles.card}>
-      <Text style={styles.cardTitle}>{item.store_name}</Text>
-      <Text style={styles.cardText}>Category: {item.category}</Text>
-      <Text style={styles.cardText}>City: {item.city}</Text>
-      <Text style={styles.cardText}>Address: {item.address || "-"}</Text>
-      <Text style={styles.cardText}>Owner: {item.owner_name || "-"}</Text>
-
-      <View style={styles.actionRow}>
-        <TouchableOpacity
-          onPress={() => confirmDelete("store", () => deleteItem("store", item.id))}
-        >
-          <Text style={styles.deleteLink}>Delete</Text>
-        </TouchableOpacity>
-      </View>
-    </View>
-  );
-
-  const renderService = ({ item }) => (
-    <View style={styles.card}>
-      <View style={styles.cardHeader}>
-        {item.image_url ? (
-          <Image
-            source={{ uri: getBackendImageUrl(item.image_url) }}
-            style={styles.smallCircleImage}
-          />
-        ) : null}
-
-        <View style={{ flex: 1 }}>
-          <Text style={styles.cardTitle}>{item.name}</Text>
-          <Text style={styles.cardText}>{item.image_url || "-"}</Text>
-        </View>
-      </View>
-
-      <View style={styles.actionRow}>
-        <TouchableOpacity
-          onPress={() =>
-            confirmDelete("service", () => deleteItem("service", item.id))
-          }
-        >
-          <Text style={styles.deleteLink}>Delete</Text>
-        </TouchableOpacity>
-      </View>
-    </View>
-  );
+      );
+    });
+  };
 
   return (
-    <>
+    <View style={styles.screen}>
       <Header />
 
-      <ScrollView style={styles.container} contentContainerStyle={styles.content}>
+      <ScrollView contentContainerStyle={styles.container}>
         <Text style={styles.title}>Admin Dashboard</Text>
 
-        <View style={styles.buttonRow}>
-          <TouchableOpacity
-            style={view === "users" ? styles.primaryBtn : styles.secondaryBtn}
-            onPress={() => switchView("users")}
-          >
-            <Text style={styles.btnText}>Users</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={view === "technicians" ? styles.primaryBtn : styles.secondaryBtn}
-            onPress={() => switchView("technicians")}
-          >
-            <Text style={styles.btnText}>Technicians</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={view === "stores" ? styles.primaryBtn : styles.secondaryBtn}
-            onPress={() => switchView("stores")}
-          >
-            <Text style={styles.btnText}>Stores</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={view === "services" ? styles.primaryBtn : styles.secondaryBtn}
-            onPress={() => switchView("services")}
-          >
-            <Text style={styles.btnText}>Services</Text>
-          </TouchableOpacity>
+        <View style={styles.tabs}>
+          {["users", "technicians", "stores", "services"].map((tab) => (
+            <TouchableOpacity
+              key={tab}
+              style={[styles.tabBtn, view === tab && styles.activeTab]}
+              onPress={() => changeView(tab)}
+            >
+              <Text style={[styles.tabText, view === tab && styles.activeTabText]}>{tab}</Text>
+            </TouchableOpacity>
+          ))}
         </View>
 
-        {loading ? <ActivityIndicator size="large" color="#111" /> : null}
+        {loading ? <Text style={styles.loading}>Loading...</Text> : null}
 
-        {view === "users" ? (
-          <FlatList
-            scrollEnabled={false}
-            data={users}
-            keyExtractor={(item) => String(item.id)}
-            renderItem={renderUser}
-          />
-        ) : null}
+        {renderRows()}
 
-        {view === "technicians" ? (
-          <FlatList
-            scrollEnabled={false}
-            data={technicians}
-            keyExtractor={(item) => String(item.technicianId)}
-            renderItem={renderTechnician}
-          />
-        ) : null}
-
-        {view === "stores" ? (
-          <FlatList
-            scrollEnabled={false}
-            data={stores}
-            keyExtractor={(item) => String(item.id)}
-            renderItem={renderStore}
-          />
-        ) : null}
-
-        {view === "services" ? (
-          <FlatList
-            scrollEnabled={false}
-            data={services}
-            keyExtractor={(item) => String(item.id)}
-            renderItem={renderService}
-          />
-        ) : null}
-
-        <View style={styles.form}>
-          <Text style={styles.sectionTitle}>
+        <View style={styles.formCard}>
+          <Text style={styles.formTitle}>
             {view === "users"
               ? "Add User"
               : view === "technicians"
@@ -423,423 +371,211 @@ function AdminDashboard() {
 
           {(view === "users" || view === "technicians") && (
             <>
-              <TextInput
-                style={styles.input}
-                value={form.name}
-                placeholder="Full name"
-                onChangeText={(text) => setForm({ ...form, name: text })}
-              />
-
-              <TextInput
-                style={styles.input}
-                value={form.email}
-                placeholder="Email"
-                autoCapitalize="none"
-                keyboardType="email-address"
-                onChangeText={(text) => setForm({ ...form, email: text })}
-              />
-
-              <TextInput
-                style={styles.input}
-                value={form.phone}
-                placeholder="Phone"
-                onChangeText={(text) => setForm({ ...form, phone: text })}
-              />
-
-              <TextInput
-                style={styles.input}
-                value={form.city}
-                placeholder="City"
-                onChangeText={(text) => setForm({ ...form, city: text })}
-              />
-
-              <TextInput
-                style={styles.input}
-                value={form.password}
-                placeholder="Password"
-                secureTextEntry
-                onChangeText={(text) => setForm({ ...form, password: text })}
-              />
+              {renderInput("Name", "name", "Full name")}
+              {renderInput("Email", "email", "Email")}
+              {renderInput("Phone", "phone", "Phone")}
+              {renderInput("Birth Date", "dob", "YYYY-MM-DD")}
+              {renderPicker("City", form.city, (city) => setForm({ ...form, city }), cityOptions, "Select city")}
+              {renderInput("Password", "password", "Password", true)}
             </>
           )}
 
           {view === "technicians" && (
             <>
-              <Text style={styles.label}>Choose Service</Text>
-
-              <View style={styles.servicePicker}>
-                {services.map((service) => (
-                  <TouchableOpacity
-                    key={service.id}
-                    style={[
-                      styles.serviceOption,
-                      String(form.service_id) === String(service.id) &&
-                        styles.serviceOptionActive,
-                    ]}
-                    onPress={() =>
-                      setForm({ ...form, service_id: String(service.id) })
-                    }
-                  >
-                    {service.image_url ? (
-                      <Image
-                        source={{ uri: getBackendImageUrl(service.image_url) }}
-                        style={styles.optionImage}
-                      />
-                    ) : null}
-
-                    <Text style={styles.optionText}>{service.name}</Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
-
-              <TextInput
-                style={styles.input}
-                value={form.experience}
-                placeholder="Experience"
-                keyboardType="numeric"
-                onChangeText={(text) => setForm({ ...form, experience: text })}
-              />
-
-              <TextInput
-                style={styles.input}
-                value={form.price_per_hour}
-                placeholder="Price per hour"
-                keyboardType="numeric"
-                onChangeText={(text) =>
-                  setForm({ ...form, price_per_hour: text })
-                }
-              />
+              {renderPicker("Service", form.service_id, (service_id) => setForm({ ...form, service_id }), serviceOptions, "Select service")}
+              {renderInput("Experience", "experience", "0", false, "numeric")}
+              {renderInput("Price Per Hour", "price_per_hour", "0", false, "numeric")}
             </>
           )}
 
           {view === "stores" && (
             <>
-              <TextInput
-                style={styles.input}
-                value={form.store_name}
-                placeholder="Store name"
-                onChangeText={(text) => setForm({ ...form, store_name: text })}
-              />
-
-              <TextInput
-                style={styles.input}
-                value={form.category}
-                placeholder="Category"
-                onChangeText={(text) => setForm({ ...form, category: text })}
-              />
-
-              <TextInput
-                style={styles.input}
-                value={form.city}
-                placeholder="City"
-                onChangeText={(text) => setForm({ ...form, city: text })}
-              />
-
-              <TextInput
-                style={styles.input}
-                value={form.address}
-                placeholder="Address"
-                onChangeText={(text) => setForm({ ...form, address: text })}
-              />
-
-              <TextInput
-                style={styles.input}
-                value={form.owner_id}
-                placeholder="Owner user id optional"
-                keyboardType="numeric"
-                onChangeText={(text) => setForm({ ...form, owner_id: text })}
-              />
+              {renderInput("Store Name", "store_name", "Store name")}
+              {renderPicker("Category", form.category, (category) => setForm({ ...form, category }), serviceOptions, "Select category")}
+              {renderPicker("City", form.city, (city) => setForm({ ...form, city }), cityOptions, "Select city")}
+              {renderInput("Address", "address", "Address")}
+              {renderInput("Owner User ID", "owner_id", "Optional", false, "numeric")}
             </>
           )}
 
           {view === "services" && (
             <>
-              <TextInput
-                style={styles.input}
-                value={form.service_name}
-                placeholder="Service name"
-                onChangeText={(text) =>
-                  setForm({ ...form, service_name: text })
-                }
-              />
-
-              <TouchableOpacity style={styles.pickBtn} onPress={pickServiceImage}>
-                <Text style={styles.pickText}>Choose Image From Phone</Text>
-              </TouchableOpacity>
-
-              {form.image_base64 ? (
-                <Image
-                  source={{ uri: form.image_base64 }}
-                  style={styles.previewImage}
-                />
-              ) : null}
-
-              <TextInput
-                style={styles.input}
-                value={form.image_url}
-                placeholder="Or write URL: /images/services/plumbing.png"
-                autoCapitalize="none"
-                onChangeText={(text) =>
-                  setForm({
-                    ...form,
-                    image_url: text,
-                    image_base64: "",
-                  })
-                }
-              />
+              {renderInput("Service Name", "service_name", "Service name")}
+              {renderInput("Image URL", "image_url", "/images/services/name.png")}
             </>
           )}
 
-          <TouchableOpacity style={styles.primaryBtnFull} onPress={handleAdd}>
-            <Text style={styles.btnText}>Add</Text>
+          <TouchableOpacity style={styles.addBtn} onPress={handleAdd}>
+            <Text style={styles.addBtnText}>Add</Text>
           </TouchableOpacity>
         </View>
       </ScrollView>
 
       <Modal visible={!!selectedProfile} transparent animationType="fade">
         <View style={styles.modalOverlay}>
-          <View style={styles.modalBox}>
-            {selectedProfile ? (
-              <>
-                <Text style={styles.modalTitle}>
-                  {selectedProfile.type === "user"
-                    ? "User Profile"
-                    : "Technician Profile"}
+          <View style={styles.profileModal}>
+            <View style={styles.profileHeader}>
+              <View>
+                <Text style={styles.profileTitle}>
+                  {selectedProfile?.type === "user" ? "User Profile" : "Technician Profile"}
                 </Text>
+                <Text style={styles.profileRole}>
+                  {selectedProfile?.data?.role || selectedProfile?.type}
+                </Text>
+              </View>
 
-                <Text>Name: {selectedProfile.data.name}</Text>
-                <Text>Email: {selectedProfile.data.email}</Text>
-                <Text>Phone: {selectedProfile.data.phone || "-"}</Text>
-                <Text>City: {selectedProfile.data.city || "-"}</Text>
+              <TouchableOpacity style={styles.closeBtn} onPress={() => setSelectedProfile(null)}>
+                <Text style={styles.closeBtnText}>Close</Text>
+              </TouchableOpacity>
+            </View>
 
-                {selectedProfile.type === "technician" ? (
-                  <>
-                    <Text>Service: {selectedProfile.data.service || "-"}</Text>
-                    <Text>Experience: {selectedProfile.data.experience || 0}</Text>
-                    <Text>
-                      Price/hr:{" "}
-                      {Number(selectedProfile.data.price_per_hour || 0).toFixed(2)}
-                    </Text>
-                  </>
-                ) : null}
+            <ProfileItem label="Name" value={selectedProfile?.data?.name} />
+            <ProfileItem label="Email" value={selectedProfile?.data?.email} />
+            <ProfileItem label="Phone" value={selectedProfile?.data?.phone} />
+            <ProfileItem label="Birth Date" value={formatDate(selectedProfile?.data?.dob)} />
+            <ProfileItem label="City" value={selectedProfile?.data?.city} />
 
-                <TouchableOpacity
-                  style={styles.closeBtn}
-                  onPress={() => setSelectedProfile(null)}
-                >
-                  <Text style={styles.btnText}>Close</Text>
-                </TouchableOpacity>
+            {selectedProfile?.type === "technician" ? (
+              <>
+                <ProfileItem label="Service" value={selectedProfile?.data?.service} />
+                <ProfileItem label="Experience" value={`${selectedProfile?.data?.experience || 0} years`} />
+                <ProfileItem label="Price/hr" value={`${Number(selectedProfile?.data?.price_per_hour || 0).toFixed(2)} JOD`} />
               </>
             ) : null}
           </View>
         </View>
       </Modal>
-    </>
+    </View>
+  );
+}
+
+function ProfileItem({ label, value }) {
+  return (
+    <View style={styles.profileItem}>
+      <Text style={styles.profileItemLabel}>{label}</Text>
+      <Text style={styles.profileItemValue}>{value || "-"}</Text>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: "#E8DCCF",
-  },
-  content: {
-    padding: 15,
-    paddingBottom: 35,
-  },
-  title: {
-    fontSize: 28,
-    fontWeight: "900",
-    marginBottom: 14,
-    color: "#111",
-  },
-  buttonRow: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 8,
-    marginBottom: 15,
-  },
-  primaryBtn: {
-    backgroundColor: "#111",
+  screen: { flex: 1, backgroundColor: "#E8DCCF" },
+  container: { padding: 18, paddingBottom: 70 },
+  title: { fontSize: 40, fontWeight: "900", color: "#111", marginBottom: 18 },
+  tabs: { flexDirection: "row", flexWrap: "wrap", gap: 10, marginBottom: 18 },
+  tabBtn: {
+    borderWidth: 1,
+    borderColor: "#111",
+    borderRadius: 14,
     paddingVertical: 10,
     paddingHorizontal: 14,
-    borderRadius: 999,
-    marginBottom: 8,
   },
-  secondaryBtn: {
-    backgroundColor: "#6c757d",
-    paddingVertical: 10,
-    paddingHorizontal: 14,
-    borderRadius: 999,
-    marginBottom: 8,
-  },
-  primaryBtnFull: {
-    backgroundColor: "#111",
-    padding: 13,
-    borderRadius: 999,
-    marginTop: 6,
-    marginBottom: 10,
-  },
-  btnText: {
-    color: "#fff",
-    textAlign: "center",
-    fontWeight: "900",
-  },
-  card: {
-    padding: 14,
+  activeTab: { backgroundColor: "#111" },
+  tabText: { color: "#111", fontWeight: "800", textTransform: "capitalize" },
+  activeTabText: { color: "#FFF9F3" },
+  loading: { color: "#3A3028", marginBottom: 14, fontSize: 16 },
+  itemCard: {
     backgroundColor: "#FFF9F3",
-    marginBottom: 10,
-    borderRadius: 16,
     borderWidth: 1,
     borderColor: "#D8C8B8",
+    borderRadius: 22,
+    padding: 18,
+    marginBottom: 16,
   },
-  cardHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 10,
-    marginBottom: 8,
-  },
-  cardTitle: {
-    fontWeight: "900",
-    fontSize: 18,
-    color: "#111",
-  },
-  cardText: {
-    color: "#3A3028",
-    marginTop: 3,
-  },
-  badge: {
-    alignSelf: "flex-start",
-    backgroundColor: "#111",
-    color: "#fff",
-    paddingHorizontal: 10,
-    paddingVertical: 4,
+  itemTitle: { fontSize: 26, fontWeight: "900", color: "#111", marginBottom: 8 },
+  itemText: { fontSize: 16, color: "#3A3028", marginBottom: 6 },
+  rowActions: { flexDirection: "row", gap: 10, marginTop: 12 },
+  blackBtn: { backgroundColor: "#111", borderRadius: 999, paddingVertical: 11, paddingHorizontal: 20 },
+  blackBtnText: { color: "#FFF9F3", fontWeight: "900" },
+  outlineBtn: {
+    borderWidth: 1,
+    borderColor: "#111",
     borderRadius: 999,
-    marginTop: 8,
-    fontWeight: "800",
-  },
-  actionRow: {
-    flexDirection: "row",
-    gap: 16,
+    paddingVertical: 11,
+    paddingHorizontal: 20,
+    alignSelf: "flex-start",
     marginTop: 12,
   },
-  link: {
-    color: "#111",
-    fontWeight: "900",
-  },
-  deleteLink: {
-    color: "#B00020",
-    fontWeight: "900",
-  },
-  smallCircleImage: {
-    width: 52,
-    height: 52,
-    borderRadius: 26,
-    backgroundColor: "#ddd",
-  },
-  form: {
+  outlineBtnText: { color: "#111", fontWeight: "900" },
+  emptyCard: {
     backgroundColor: "#FFF9F3",
-    borderRadius: 18,
     borderWidth: 1,
     borderColor: "#D8C8B8",
-    padding: 14,
-    marginTop: 16,
-  },
-  sectionTitle: {
-    fontSize: 22,
-    fontWeight: "900",
-    color: "#111",
-    marginBottom: 10,
-  },
-  input: {
-    backgroundColor: "#F6EDE2",
-    borderWidth: 1,
-    borderColor: "#D8C8B8",
-    borderRadius: 14,
-    padding: 12,
-    marginBottom: 10,
-    color: "#111",
-  },
-  label: {
-    color: "#111",
-    fontWeight: "900",
-    marginBottom: 8,
-  },
-  servicePicker: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 8,
-    marginBottom: 10,
-  },
-  serviceOption: {
-    width: "48%",
-    backgroundColor: "#F6EDE2",
-    borderWidth: 1,
-    borderColor: "#D8C8B8",
-    borderRadius: 14,
-    padding: 10,
-    alignItems: "center",
-  },
-  serviceOptionActive: {
-    borderColor: "#111",
-    borderWidth: 2,
-  },
-  optionImage: {
-    width: 42,
-    height: 42,
-    borderRadius: 21,
-    marginBottom: 6,
-  },
-  optionText: {
-    color: "#111",
-    fontWeight: "800",
-    textAlign: "center",
-  },
-  pickBtn: {
-    backgroundColor: "#F6EDE2",
-    borderWidth: 1,
-    borderColor: "#111",
-    borderRadius: 999,
-    paddingVertical: 12,
-    alignItems: "center",
-    marginBottom: 10,
-  },
-  pickText: {
-    color: "#111",
-    fontWeight: "900",
-  },
-  previewImage: {
-    width: 90,
-    height: 90,
-    borderRadius: 45,
-    marginBottom: 10,
-    alignSelf: "center",
-  },
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: "rgba(0,0,0,0.45)",
-    alignItems: "center",
-    justifyContent: "center",
-    padding: 20,
-  },
-  modalBox: {
-    width: "100%",
-    backgroundColor: "#FFF9F3",
-    borderRadius: 18,
+    borderRadius: 22,
     padding: 18,
+    marginBottom: 16,
   },
-  modalTitle: {
-    fontSize: 22,
-    fontWeight: "900",
+  emptyText: { fontSize: 18, color: "#3A3028" },
+  formCard: {
+    backgroundColor: "#FFF9F3",
+    borderWidth: 1,
+    borderColor: "#D8C8B8",
+    borderRadius: 24,
+    padding: 20,
+    marginTop: 12,
+  },
+  formTitle: { fontSize: 26, fontWeight: "900", color: "#111", marginBottom: 16 },
+  inputGroup: { marginBottom: 14 },
+  label: { fontSize: 16, fontWeight: "900", color: "#111", marginBottom: 8 },
+  input: {
+    backgroundColor: "#F8F1E8",
+    borderWidth: 1,
+    borderColor: "#D8C8B8",
+    borderRadius: 16,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    fontSize: 16,
     color: "#111",
-    marginBottom: 12,
   },
-  closeBtn: {
+  pickerBox: {
+    backgroundColor: "#F8F1E8",
+    borderWidth: 1,
+    borderColor: "#D8C8B8",
+    borderRadius: 16,
+    overflow: "hidden",
+  },
+  addBtn: {
     backgroundColor: "#111",
     borderRadius: 999,
-    paddingVertical: 12,
-    marginTop: 14,
+    paddingVertical: 15,
+    paddingHorizontal: 30,
+    alignSelf: "flex-start",
+    marginTop: 8,
   },
+  addBtnText: { color: "#FFF9F3", fontSize: 16, fontWeight: "900" },
+  serviceImage: { width: 70, height: 70, borderRadius: 35, marginBottom: 10 },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(17,17,17,0.38)",
+    paddingTop: 90,
+    paddingHorizontal: 18,
+  },
+  profileModal: {
+    backgroundColor: "#FFF9F3",
+    borderWidth: 1,
+    borderColor: "#D8C8B8",
+    borderRadius: 26,
+    padding: 22,
+  },
+  profileHeader: { flexDirection: "row", justifyContent: "space-between", gap: 12, marginBottom: 18 },
+  profileTitle: { fontSize: 26, fontWeight: "900", color: "#111" },
+  profileRole: { fontSize: 16, color: "#3A3028", textTransform: "capitalize", marginTop: 4 },
+  closeBtn: {
+    borderWidth: 1,
+    borderColor: "#111",
+    borderRadius: 999,
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+  },
+  closeBtnText: { fontWeight: "900", color: "#111" },
+  profileItem: {
+    backgroundColor: "#F6EDE2",
+    borderWidth: 1,
+    borderColor: "#D8C8B8",
+    borderRadius: 16,
+    padding: 14,
+    marginBottom: 10,
+  },
+  profileItemLabel: { color: "#111", fontWeight: "900", marginBottom: 6 },
+  profileItemValue: { color: "#3A3028", fontSize: 16 },
 });
-
-export default AdminDashboard;

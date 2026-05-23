@@ -9,7 +9,10 @@ import {
   Alert,
 } from "react-native";
 import Header from "../../components/Common/Header";
-import { createPaymentIntent } from "../../services/paymentservice";
+import {
+  createPaymentIntent,
+  confirmOnlinePayment,
+} from "../../services/paymentservice";
 
 function PaymentForm({ route, navigation }) {
   const paymentData = route?.params || {};
@@ -21,7 +24,7 @@ function PaymentForm({ route, navigation }) {
   const [saving, setSaving] = useState(false);
 
   const requestId = paymentData.requestId;
-  const amount = Number(paymentData.amount || 0);
+  const amount = Number(paymentData.amount || paymentData.total_price || 0);
 
   const submitPayment = async () => {
     if (!cardName.trim() || !cardNumber.trim() || !expiry.trim() || !cvv.trim()) {
@@ -29,20 +32,31 @@ function PaymentForm({ route, navigation }) {
       return;
     }
 
+    if (!requestId) {
+      Alert.alert("Error", "Request id is missing.");
+      return;
+    }
+
     try {
       setSaving(true);
 
-      const payment = await createPaymentIntent({
+      await createPaymentIntent({
         amount,
         requestId,
         technicianId: paymentData.technicianId,
         estimated_hours: paymentData.estimated_hours,
+      }).catch(() => null);
+
+      const confirmed = await confirmOnlinePayment(requestId, {
+        amount,
       });
 
       navigation.navigate("PaymentSuccess", {
         requestId,
-        transactionId: payment.transactionId,
-        amount,
+        transactionId: confirmed.transactionId,
+        totalPrice: confirmed.amount || amount,
+        message:
+          "Payment completed. The technician received a mock deposit notification.",
       });
     } catch (err) {
       Alert.alert("Error", err?.response?.data?.message || "Payment failed.");
@@ -61,7 +75,11 @@ function PaymentForm({ route, navigation }) {
           <Text style={styles.subtitle}>Mock payment form for testing.</Text>
 
           <Text style={styles.label}>Request ID</Text>
-          <TextInput style={styles.input} value={String(requestId || "")} editable={false} />
+          <TextInput
+            style={styles.input}
+            value={String(requestId || "")}
+            editable={false}
+          />
 
           <Text style={styles.label}>Total Amount</Text>
           <TextInput

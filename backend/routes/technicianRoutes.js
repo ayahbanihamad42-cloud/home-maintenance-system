@@ -4,6 +4,7 @@ import auth from "../utils/authMiddleware.js";
 
 const router = express.Router();
 
+router.post("/smart-search", tech.smartTechnicianSearch);
 router.get("/service/:service", tech.getTechniciansByService);
 
 router.get("/availability/my", auth, tech.getMyAvailability);

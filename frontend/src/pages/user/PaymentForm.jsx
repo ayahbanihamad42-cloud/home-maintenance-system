@@ -1,7 +1,10 @@
 import React, { useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import Header from "../../components/common/Header";
-import { createPaymentIntent } from "../../services/paymentService";
+import {
+  createPaymentIntent,
+  confirmOnlinePayment,
+} from "../../services/paymentService";
 
 function PaymentForm() {
   const navigate = useNavigate();
@@ -16,7 +19,7 @@ function PaymentForm() {
   const [saving, setSaving] = useState(false);
 
   const requestId = paymentData.requestId;
-  const amount = Number(paymentData.amount || 0);
+  const amount = Number(paymentData.amount || paymentData.total_price || 0);
 
   const submitPayment = async (e) => {
     e.preventDefault();
@@ -26,22 +29,33 @@ function PaymentForm() {
       return;
     }
 
+    if (!requestId) {
+      alert("Request id is missing.");
+      return;
+    }
+
     try {
       setSaving(true);
 
-      const payment = await createPaymentIntent({
+      await createPaymentIntent({
         amount,
         requestId,
         technicianId: paymentData.technicianId,
         estimated_hours: paymentData.estimated_hours,
+      }).catch(() => null);
+
+      const confirmed = await confirmOnlinePayment(requestId, {
+        amount,
       });
 
       navigate(`/payment-success/${requestId}`, {
-  state: {
-    transactionId: payment.transactionId,
-    amount: paymentData.total_price || paymentData.amount || amount,
-  },
-});
+        state: {
+          transactionId: confirmed.transactionId,
+          amount: confirmed.amount || amount,
+          message:
+            "Payment completed. The technician received a mock deposit notification.",
+        },
+      });
     } catch (err) {
       alert(err?.response?.data?.message || "Payment failed.");
     } finally {

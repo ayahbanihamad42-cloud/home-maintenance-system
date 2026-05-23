@@ -7,6 +7,7 @@ import {
   getMaintenanceRequestById,
   updateMaintenanceRequestStatus,
   cancelMaintenanceRequest,
+  confirmOnlinePayment,
 } from "../controllers/maintenanceController.js";
 
 const router = express.Router();
@@ -23,6 +24,8 @@ router.get("/user/:user_id", auth, getUserMaintenanceRequests);
 router.get("/:id", auth, getMaintenanceRequestById);
 
 router.put("/:id/status", auth, updateMaintenanceRequestStatus);
+
+router.post("/:id/online-payment", auth, confirmOnlinePayment);
 
 router.delete("/:id", auth, cancelMaintenanceRequest);
 

@@ -125,7 +125,7 @@ const appStyles = StyleSheet.create({
   subtitle: {
     fontSize: 15,
     color: "#555",
-    marginBottom: 16,
+    marginBottom: 16, 
   },
 
   card: {

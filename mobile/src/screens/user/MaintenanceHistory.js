@@ -16,50 +16,48 @@ export default function MaintenanceHistory({ navigation }) {
   const [requests, setRequests] = useState([]);
   const [statusFilter, setStatusFilter] = useState("all");
   const [loading, setLoading] = useState(true);
-  const [message, setMessage] = useState(null);
-
-  const loadHistory = async () => {
-    try {
-      setLoading(true);
-      setMessage(null);
-
-      const rawUser = await AsyncStorage.getItem("user");
-      const user = rawUser ? JSON.parse(rawUser) : null;
-
-      if (!user?.id) {
-        setRequests([]);
-        setMessage({
-          type: "error",
-          title: "Notice",
-          body: "User id is missing. Please login again.",
-        });
-        return;
-      }
-
-      const res = await API.get("/maintenance/my");
-      setRequests(Array.isArray(res.data) ? res.data : []);
-    } catch (err) {
-      console.log("history error:", err?.response?.data || err.message);
-      setRequests([]);
-      setMessage({
-        type: "error",
-        title: "Error",
-        body: err?.response?.data?.message || "Failed to load maintenance history.",
-      });
-    } finally {
-      setLoading(false);
-    }
-  };
 
   useEffect(() => {
     const unsubscribe = navigation.addListener("focus", loadHistory);
     return unsubscribe;
   }, [navigation]);
 
+  const loadHistory = async () => {
+    setLoading(true);
+
+    try {
+      const rawUser = await AsyncStorage.getItem("user");
+      const user = rawUser ? JSON.parse(rawUser) : null;
+
+      if (!user?.id) {
+        setRequests([]);
+        return;
+      }
+
+      let res;
+
+      try {
+        res = await API.get("/maintenance/my");
+      } catch {
+        res = await API.get(`/maintenance/user/${user.id}`);
+      }
+
+      setRequests(Array.isArray(res.data) ? res.data : []);
+    } catch (err) {
+      console.log("history error:", err?.response?.data || err.message);
+      setRequests([]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const filtered = useMemo(() => {
     if (statusFilter === "all") return requests;
+
     return requests.filter(
-      (r) => String(r.status || "").toLowerCase() === statusFilter
+      (request) =>
+        String(request.status || "").toLowerCase() ===
+        String(statusFilter).toLowerCase()
     );
   }, [requests, statusFilter]);
 
@@ -73,17 +71,6 @@ export default function MaintenanceHistory({ navigation }) {
     return String(value).slice(0, 8);
   };
 
-  const options = [
-    { label: "All requests", value: "all" },
-    { label: "Pending", value: "pending" },
-    { label: "Accepted", value: "accepted" },
-    { label: "On The Way", value: "on_the_way" },
-    { label: "In Progress", value: "in_progress" },
-    { label: "Completed", value: "completed" },
-    { label: "Rejected", value: "rejected" },
-    { label: "Cancelled", value: "cancelled" },
-  ];
-
   return (
     <View style={styles.screen}>
       <Header navigation={navigation} />
@@ -93,17 +80,19 @@ export default function MaintenanceHistory({ navigation }) {
 
         <CustomDropdown
           value={statusFilter}
-          options={options}
           onChange={setStatusFilter}
           placeholder="All requests"
+          options={[
+            { label: "All requests", value: "all" },
+            { label: "Pending", value: "pending" },
+            { label: "Accepted", value: "accepted" },
+            { label: "On The Way", value: "on_the_way" },
+            { label: "In Progress", value: "in_progress" },
+            { label: "Completed", value: "completed" },
+            { label: "Rejected", value: "rejected" },
+            { label: "Cancelled", value: "cancelled" },
+          ]}
         />
-
-        {message ? (
-          <View style={styles.messageBox}>
-            <Text style={styles.messageTitle}>{message.title}</Text>
-            <Text style={styles.messageBody}>{message.body}</Text>
-          </View>
-        ) : null}
 
         {loading ? (
           <ActivityIndicator size="large" color="#111" style={{ marginTop: 40 }} />
@@ -112,39 +101,45 @@ export default function MaintenanceHistory({ navigation }) {
             <Text style={styles.emptyText}>No requests found.</Text>
           </View>
         ) : (
-          filtered.map((req) => (
-            <TouchableOpacity
-              key={req.id}
-              style={styles.card}
-              onPress={() =>
-                navigation.navigate("Review", {
-                  requestId: req.id,
-                  request: req,
-                })
-              }
-            >
+          filtered.map((request) => (
+            <View key={request.id} style={styles.requestCard}>
               <View style={styles.cardTop}>
-                <Text style={styles.service}>
-                  {req.service || req.service_type || "Maintenance"}
+                <Text style={styles.serviceText}>
+                  {request.service || request.service_type || "Maintenance"}
                 </Text>
-                <Text style={styles.badge}>{req.status || "-"}</Text>
+
+                <Text style={styles.statusBadge}>{request.status || "pending"}</Text>
               </View>
 
-              <Text style={styles.desc}>{req.description || "No description"}</Text>
-              <Text style={styles.line}>Date: {formatDate(req.scheduled_date)}</Text>
-              <Text style={styles.line}>Time: {formatTime(req.scheduled_time)}</Text>
-              <Text style={styles.line}>Created Date: {formatDate(req.created_at)}</Text>
-              <Text style={styles.line}>
-                Technician: {req.technician_name || req.technician_id || "-"}
+              <Text style={styles.description}>
+                {request.description || "No description"}
               </Text>
-              <Text style={styles.line}>
-                Location: {req.location_note || req.location || req.city || "-"}
+
+              <Text style={styles.info}>
+                Technician: {request.technician_name || request.technician_id || "-"}
               </Text>
-              <Text style={styles.line}>Payment: {req.payment_method || "-"}</Text>
-              <Text style={styles.line}>
-                Total: {Number(req.total_price || req.total || 0).toFixed(2)} JOD
+              <Text style={styles.info}>Date: {formatDate(request.scheduled_date)}</Text>
+              <Text style={styles.info}>Time: {formatTime(request.scheduled_time)}</Text>
+              <Text style={styles.info}>
+                Location: {request.location_note || request.location || request.city || "-"}
               </Text>
-            </TouchableOpacity>
+              <Text style={styles.info}>Payment: {request.payment_method || "-"}</Text>
+              <Text style={styles.info}>
+                Total: {Number(request.total_price || request.total || 0).toFixed(2)} JOD
+              </Text>
+
+              <TouchableOpacity
+                style={styles.reviewBtn}
+                onPress={() =>
+                  navigation.navigate("Review", {
+                    requestId: request.id,
+                    request,
+                  })
+                }
+              >
+                <Text style={styles.reviewBtnText}>Review</Text>
+              </TouchableOpacity>
+            </View>
           ))
         )}
       </ScrollView>
@@ -153,30 +148,26 @@ export default function MaintenanceHistory({ navigation }) {
 }
 
 const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: "#E7DCCC" },
-  container: { padding: 24, paddingBottom: 80 },
+  screen: {
+    flex: 1,
+    backgroundColor: "#E8DCCF",
+  },
+  container: {
+    padding: 24,
+    paddingBottom: 80,
+  },
   title: {
     fontSize: 42,
     fontWeight: "900",
     color: "#111",
     marginBottom: 24,
   },
-  messageBox: {
-    backgroundColor: "#FDEBED",
-    borderWidth: 1,
-    borderColor: "#EFB6BD",
-    borderRadius: 18,
-    padding: 16,
-    marginTop: 18,
-  },
-  messageTitle: { fontSize: 17, fontWeight: "900", color: "#111" },
-  messageBody: { marginTop: 6, fontSize: 16, color: "#A32020" },
   emptyCard: {
-    marginTop: 26,
-    backgroundColor: "#FFFAF4",
+    marginTop: 28,
+    backgroundColor: "#FFF9F3",
     borderWidth: 1,
     borderColor: "#D8C8B8",
-    borderRadius: 26,
+    borderRadius: 28,
     padding: 34,
   },
   emptyText: {
@@ -184,11 +175,11 @@ const styles = StyleSheet.create({
     fontSize: 22,
     color: "#4D433B",
   },
-  card: {
-    backgroundColor: "#FFFAF4",
+  requestCard: {
+    backgroundColor: "#FFF9F3",
     borderWidth: 1,
     borderColor: "#D8C8B8",
-    borderRadius: 26,
+    borderRadius: 28,
     padding: 22,
     marginTop: 18,
   },
@@ -196,9 +187,15 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "space-between",
     gap: 12,
+    alignItems: "flex-start",
   },
-  service: { fontSize: 24, fontWeight: "900", flex: 1 },
-  badge: {
+  serviceText: {
+    flex: 1,
+    fontSize: 24,
+    fontWeight: "900",
+    color: "#111",
+  },
+  statusBadge: {
     backgroundColor: "#111",
     color: "#fff",
     paddingHorizontal: 14,
@@ -207,6 +204,27 @@ const styles = StyleSheet.create({
     overflow: "hidden",
     fontWeight: "900",
   },
-  desc: { fontSize: 18, marginVertical: 14 },
-  line: { fontSize: 17, marginTop: 7, color: "#3D342D" },
+  description: {
+    fontSize: 18,
+    marginVertical: 14,
+    color: "#111",
+  },
+  info: {
+    fontSize: 17,
+    marginTop: 7,
+    color: "#3D342D",
+  },
+  reviewBtn: {
+    backgroundColor: "#111",
+    paddingVertical: 14,
+    paddingHorizontal: 24,
+    borderRadius: 999,
+    alignSelf: "flex-start",
+    marginTop: 18,
+  },
+  reviewBtnText: {
+    color: "#fff",
+    fontSize: 16,
+    fontWeight: "900",
+  },
 });

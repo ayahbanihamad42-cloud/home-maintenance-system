@@ -2,16 +2,10 @@ import { db } from "../database/connection.js";
 
 const normalizeDate = (date) => {
   if (!date) return null;
-
-  if (/^\d{4}-\d{2}-\d{2}$/.test(String(date))) {
-    return String(date);
-  }
+  if (/^\d{4}-\d{2}-\d{2}$/.test(String(date))) return String(date);
 
   const d = new Date(date);
-
-  if (Number.isNaN(d.getTime())) {
-    return String(date).slice(0, 10);
-  }
+  if (Number.isNaN(d.getTime())) return String(date).slice(0, 10);
 
   const yyyy = d.getFullYear();
   const mm = String(d.getMonth() + 1).padStart(2, "0");
@@ -22,12 +16,9 @@ const normalizeDate = (date) => {
 
 const normalizeTime = (time) => {
   if (!time) return null;
-
   const value = String(time).trim();
-
   if (/^\d{2}:\d{2}:\d{2}$/.test(value)) return value;
   if (/^\d{2}:\d{2}$/.test(value)) return `${value}:00`;
-
   return value;
 };
 
@@ -72,15 +63,11 @@ export const createMaintenanceRequest = async (req, res) => {
       !cleanDate ||
       !cleanTime
     ) {
-      return res.status(400).json({
-        message: "Missing required request data.",
-      });
+      return res.status(400).json({ message: "Missing required request data." });
     }
 
     if (!["cash", "online"].includes(cleanPaymentMethod)) {
-      return res.status(400).json({
-        message: "Invalid payment method.",
-      });
+      return res.status(400).json({ message: "Invalid payment method." });
     }
 
     const exists = await query(
@@ -98,8 +85,7 @@ export const createMaintenanceRequest = async (req, res) => {
 
     if (exists.length > 0) {
       return res.status(409).json({
-        message:
-          "This time slot is no longer available. Please choose another time.",
+        message: "This time slot is no longer available. Please choose another time.",
       });
     }
 
@@ -156,14 +142,84 @@ export const createMaintenanceRequest = async (req, res) => {
   } catch (err) {
     if (err.code === "ER_DUP_ENTRY") {
       return res.status(409).json({
-        message:
-          "This time slot is no longer available. Please choose another time.",
+        message: "This time slot is no longer available. Please choose another time.",
       });
     }
 
     return res.status(500).json({
       message: err.sqlMessage || err.message || "Failed to create request.",
     });
+  }
+};
+
+export const confirmOnlinePayment = async (req, res) => {
+  try {
+    const requestId = req.params.id;
+    const userId = req.user.id;
+
+    const rows = await query(
+      `
+      SELECT *
+      FROM maintenance_requests
+      WHERE id = ? AND user_id = ?
+      LIMIT 1
+      `,
+      [requestId, userId]
+    );
+
+    if (!rows.length) {
+      return res.status(404).json({ message: "Request not found." });
+    }
+
+    const request = rows[0];
+    const amount = Number(req.body.amount || request.total_price || 0);
+    const transactionId = `mock_txn_${Date.now()}`;
+
+    await query(
+      `
+      INSERT INTO payments
+      (request_id, user_id, technician_id, amount, transaction_id, status)
+      VALUES (?, ?, ?, ?, ?, 'paid')
+      `,
+      [requestId, userId, request.technician_id, amount, transactionId]
+    );
+
+    const techRows = await query(
+      `
+      SELECT u.id AS technician_user_id, u.name AS technician_name
+      FROM technicians t
+      JOIN users u ON u.id = t.user_id
+      WHERE t.id = ?
+      LIMIT 1
+      `,
+      [request.technician_id]
+    );
+
+    const technicianUserId = techRows[0]?.technician_user_id;
+
+    if (technicianUserId) {
+      await query(
+        `
+        INSERT INTO notifications (user_id, title, message, is_read)
+        VALUES (?, ?, ?, 0)
+        `,
+        [
+          technicianUserId,
+          "Online Payment Received",
+          `A mock online payment of ${amount.toFixed(
+            2
+          )} JOD was deposited for request #${requestId}.`,
+        ]
+      );
+    }
+
+    res.json({
+      message: "Payment confirmed successfully.",
+      transactionId,
+      amount,
+    });
+  } catch (err) {
+    res.status(500).json({ message: err.sqlMessage || err.message });
   }
 };
 
@@ -188,9 +244,7 @@ export const getUserMaintenanceRequests = async (req, res) => {
 
     return res.json(rows || []);
   } catch (err) {
-    return res.status(500).json({
-      message: err.sqlMessage || err.message,
-    });
+    return res.status(500).json({ message: err.sqlMessage || err.message });
   }
 };
 
@@ -215,16 +269,12 @@ export const getMaintenanceRequestById = async (req, res) => {
     );
 
     if (!rows.length) {
-      return res.status(404).json({
-        message: "Request not found.",
-      });
+      return res.status(404).json({ message: "Request not found." });
     }
 
     return res.json(rows[0]);
   } catch (err) {
-    return res.status(500).json({
-      message: err.sqlMessage || err.message,
-    });
+    return res.status(500).json({ message: err.sqlMessage || err.message });
   }
 };
 
@@ -246,9 +296,7 @@ export const updateMaintenanceRequestStatus = async (req, res) => {
     const cleanStatus = String(status || "").toLowerCase();
 
     if (!allowed.includes(cleanStatus)) {
-      return res.status(400).json({
-        message: "Invalid status.",
-      });
+      return res.status(400).json({ message: "Invalid status." });
     }
 
     const result = await query(
@@ -261,18 +309,12 @@ export const updateMaintenanceRequestStatus = async (req, res) => {
     );
 
     if (!result.affectedRows) {
-      return res.status(404).json({
-        message: "Request not found.",
-      });
+      return res.status(404).json({ message: "Request not found." });
     }
 
-    return res.json({
-      message: "Request status updated successfully.",
-    });
+    return res.json({ message: "Request status updated successfully." });
   } catch (err) {
-    return res.status(500).json({
-      message: err.sqlMessage || err.message,
-    });
+    return res.status(500).json({ message: err.sqlMessage || err.message });
   }
 };
 
@@ -292,29 +334,21 @@ export const cancelMaintenanceRequest = async (req, res) => {
     );
 
     if (!rows.length) {
-      return res.status(404).json({
-        message: "Request not found.",
-      });
+      return res.status(404).json({ message: "Request not found." });
     }
 
     const request = rows[0];
-    const status = String(request.status || "").toLowerCase();
 
-    if (status !== "pending") {
+    if (String(request.status || "").toLowerCase() !== "pending") {
       return res.status(409).json({
         message:
           "This request cannot be cancelled because the technician already accepted or started it.",
       });
     }
 
-    await query(
-      `
-      UPDATE maintenance_requests
-      SET status = 'cancelled'
-      WHERE id = ?
-      `,
-      [requestId]
-    );
+    await query("UPDATE maintenance_requests SET status = 'cancelled' WHERE id = ?", [
+      requestId,
+    ]);
 
     await query(
       `
@@ -331,10 +365,18 @@ export const cancelMaintenanceRequest = async (req, res) => {
       ]
     ).catch(() => null);
 
-    const isOnline =
-      String(request.payment_method || "").toLowerCase() === "online";
+    const isOnline = String(request.payment_method || "").toLowerCase() === "online";
 
     if (isOnline) {
+      await query(
+        `
+        UPDATE payments
+        SET status = 'refunded'
+        WHERE request_id = ?
+        `,
+        [requestId]
+      ).catch(() => null);
+
       await query(
         `
         INSERT INTO notifications (user_id, title, message, is_read)
@@ -343,7 +385,7 @@ export const cancelMaintenanceRequest = async (req, res) => {
         [
           userId,
           "Refund Processed",
-          `Your online payment for request #${requestId} was refunded successfully.`,
+          `Your mock online payment for request #${requestId} was refunded successfully.`,
         ]
       ).catch(() => null);
     }
@@ -354,8 +396,6 @@ export const cancelMaintenanceRequest = async (req, res) => {
         : "Request cancelled successfully.",
     });
   } catch (err) {
-    return res.status(500).json({
-      message: err.sqlMessage || err.message,
-    });
+    return res.status(500).json({ message: err.sqlMessage || err.message });
   }
 };

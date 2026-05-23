@@ -1,4 +1,4 @@
-import React, { useMemo, useRef, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   View,
   Text,
@@ -9,28 +9,97 @@ import {
   Dimensions,
   Alert,
 } from "react-native";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import Header from "../../components/Common/Header";
+import API from "../../services/api";
 import { deleteTechnicianGalleryPost } from "../../services/technicianService";
 
 const screenWidth = Dimensions.get("window").width;
 const imageWidth = screenWidth - 30;
 
+function getBackendBaseUrl() {
+  const baseURL = API?.defaults?.baseURL || "";
+  return String(baseURL).replace(/\/api\/?$/, "");
+}
+
+function getImageUrl(imageUrl) {
+  if (!imageUrl) return "";
+
+  const value = String(imageUrl).trim();
+
+  if (
+    value.startsWith("http://") ||
+    value.startsWith("https://") ||
+    value.startsWith("data:image/")
+  ) {
+    return value;
+  }
+
+  const cleanPath = value.startsWith("/") ? value : `/${value}`;
+  return `${getBackendBaseUrl()}${cleanPath}`;
+}
+
+function normalizeRole(role) {
+  return role ? String(role).trim().toLowerCase() : "";
+}
+
 function GalleryPostDetails({ route, navigation }) {
   const post = route?.params?.post || null;
+  const routeCanEdit = route?.params?.canEdit;
+  const readOnly = route?.params?.readOnly || false;
+  const technicianId = route?.params?.technicianId || route?.params?.technician_id;
 
   const [selectedImageIndex, setSelectedImageIndex] = useState(0);
   const [menuOpen, setMenuOpen] = useState(false);
+  const [canEdit, setCanEdit] = useState(false);
   const scrollRef = useRef(null);
 
+  useEffect(() => {
+    checkPermission();
+  }, [post]);
+
+  const checkPermission = async () => {
+    if (readOnly) {
+      setCanEdit(false);
+      return;
+    }
+
+    if (routeCanEdit === true) {
+      setCanEdit(true);
+      return;
+    }
+
+    try {
+      const rawUser = await AsyncStorage.getItem("user");
+      const user = rawUser ? JSON.parse(rawUser) : null;
+      const role = normalizeRole(user?.role);
+
+      const postUserId = post?.user_id || post?.technician_user_id;
+      const postTechnicianId =
+        post?.technician_id || post?.technicianId || post?.tech_id;
+
+      const ownerByUser = user?.id && postUserId && Number(user.id) === Number(postUserId);
+      const ownerByTechnician =
+        technicianId && postTechnicianId && Number(technicianId) === Number(postTechnicianId);
+
+      setCanEdit(role === "technician" && (ownerByUser || ownerByTechnician || routeCanEdit));
+    } catch {
+      setCanEdit(false);
+    }
+  };
+
   const images = useMemo(() => {
-    if (!post?.images) return [];
+    if (!post) return [];
 
     if (Array.isArray(post.images)) {
       return post.images.filter(Boolean);
     }
 
+    if (post.image_url) return [post.image_url];
+    if (post.image) return [post.image];
+
     try {
-      const parsed = JSON.parse(post.images);
+      const parsed = JSON.parse(post.images || "[]");
       return Array.isArray(parsed) ? parsed.filter(Boolean) : [];
     } catch {
       return [];
@@ -63,7 +132,7 @@ function GalleryPostDetails({ route, navigation }) {
   };
 
   const handleDelete = () => {
-    if (!post?.id) return;
+    if (!post?.id || !canEdit) return;
 
     Alert.alert("Delete Post", "Are you sure you want to delete this post?", [
       { text: "Cancel", style: "cancel" },
@@ -86,18 +155,23 @@ function GalleryPostDetails({ route, navigation }) {
   };
 
   const handleEdit = () => {
+    if (!canEdit) return;
+
     setMenuOpen(false);
 
-    navigation.navigate("TechnicianDashboard", {
-      openGalleryEdit: true,
+    navigation.navigate("TechnicianGalleryManager", {
+      editMode: true,
       post,
+      postId: post.id,
+      technicianId,
+      technician_id: technicianId,
     });
   };
 
   if (!post) {
     return (
-      <>
-        <Header />
+      <View style={styles.screen}>
+        <Header navigation={navigation} />
 
         <View style={styles.container}>
           <TouchableOpacity
@@ -112,13 +186,13 @@ function GalleryPostDetails({ route, navigation }) {
             <Text style={styles.emptyText}>Post not found.</Text>
           </View>
         </View>
-      </>
+      </View>
     );
   }
 
   return (
-    <>
-      <Header />
+    <View style={styles.screen}>
+      <Header navigation={navigation} />
 
       <ScrollView contentContainerStyle={styles.container}>
         <View style={styles.topRow}>
@@ -129,14 +203,16 @@ function GalleryPostDetails({ route, navigation }) {
             <Text style={styles.backText}>← Back</Text>
           </TouchableOpacity>
 
-          <TouchableOpacity
-            style={styles.menuButton}
-            onPress={() => setMenuOpen((prev) => !prev)}
-          >
-            <Text style={styles.menuText}>⋮</Text>
-          </TouchableOpacity>
+          {canEdit ? (
+            <TouchableOpacity
+              style={styles.menuButton}
+              onPress={() => setMenuOpen((prev) => !prev)}
+            >
+              <Text style={styles.menuText}>⋮</Text>
+            </TouchableOpacity>
+          ) : null}
 
-          {menuOpen ? (
+          {menuOpen && canEdit ? (
             <View style={styles.menuBox}>
               <TouchableOpacity style={styles.menuItem} onPress={handleEdit}>
                 <Text style={styles.menuItemText}>Edit post</Text>
@@ -168,8 +244,9 @@ function GalleryPostDetails({ route, navigation }) {
                 {images.map((img, index) => (
                   <Image
                     key={`${index}-${img}`}
-                    source={{ uri: img }}
+                    source={{ uri: getImageUrl(img) }}
                     style={styles.mainImage}
+                    resizeMode="contain"
                   />
                 ))}
               </ScrollView>
@@ -211,7 +288,10 @@ function GalleryPostDetails({ route, navigation }) {
                   ]}
                   onPress={() => goToImage(index)}
                 >
-                  <Image source={{ uri: img }} style={styles.thumbImage} />
+                  <Image
+                    source={{ uri: getImageUrl(img) }}
+                    style={styles.thumbImage}
+                  />
                 </TouchableOpacity>
               ))}
             </ScrollView>
@@ -219,21 +299,33 @@ function GalleryPostDetails({ route, navigation }) {
 
           <View style={styles.textBox}>
             <Text style={styles.title}>Work Details</Text>
+
             <Text style={styles.description}>
-              {post.description || "No description."}
+              {post.description || post.caption || "No description."}
             </Text>
+
+            {post.location_note || post.location ? (
+              <Text style={styles.location}>
+                📍 {post.location_note || post.location}
+              </Text>
+            ) : null}
           </View>
         </View>
       </ScrollView>
-    </>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
+  screen: {
+    flex: 1,
+    backgroundColor: "#E8DCCF",
+  },
   container: {
     padding: 15,
     backgroundColor: "#E8DCCF",
     flexGrow: 1,
+    paddingBottom: 70,
   },
   topRow: {
     position: "relative",
@@ -245,18 +337,19 @@ const styles = StyleSheet.create({
   backButton: {
     backgroundColor: "#111",
     borderRadius: 999,
-    paddingVertical: 10,
-    paddingHorizontal: 18,
+    paddingVertical: 12,
+    paddingHorizontal: 20,
     alignSelf: "flex-start",
   },
   backText: {
     color: "#FFF",
-    fontWeight: "800",
+    fontWeight: "900",
+    fontSize: 16,
   },
   menuButton: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
+    width: 46,
+    height: 46,
+    borderRadius: 23,
     backgroundColor: "#111",
     alignItems: "center",
     justifyContent: "center",
@@ -269,7 +362,7 @@ const styles = StyleSheet.create({
   menuBox: {
     position: "absolute",
     right: 0,
-    top: 50,
+    top: 52,
     backgroundColor: "#FFF9F3",
     borderRadius: 14,
     borderWidth: 1,
@@ -277,22 +370,23 @@ const styles = StyleSheet.create({
     overflow: "hidden",
     zIndex: 100,
     elevation: 8,
-    minWidth: 150,
+    minWidth: 160,
   },
   menuItem: {
-    paddingVertical: 12,
-    paddingHorizontal: 14,
+    paddingVertical: 13,
+    paddingHorizontal: 15,
   },
   menuItemText: {
     color: "#111",
-    fontWeight: "800",
+    fontWeight: "900",
+    fontSize: 15,
   },
   deleteText: {
     color: "#B00020",
   },
   card: {
     backgroundColor: "#FFF9F3",
-    borderRadius: 20,
+    borderRadius: 22,
     overflow: "hidden",
     borderWidth: 1,
     borderColor: "#D8C8B8",
@@ -305,7 +399,6 @@ const styles = StyleSheet.create({
     width: imageWidth,
     height: 360,
     backgroundColor: "#111",
-    resizeMode: "contain",
   },
   noImageBox: {
     width: imageWidth,
@@ -315,7 +408,7 @@ const styles = StyleSheet.create({
   },
   noImageText: {
     color: "#FFF",
-    fontWeight: "800",
+    fontWeight: "900",
   },
   arrow: {
     position: "absolute",
@@ -349,7 +442,7 @@ const styles = StyleSheet.create({
   },
   counterText: {
     color: "#FFF",
-    fontWeight: "700",
+    fontWeight: "900",
     fontSize: 12,
   },
   thumbs: {
@@ -373,17 +466,24 @@ const styles = StyleSheet.create({
     height: "100%",
   },
   textBox: {
-    padding: 18,
+    padding: 20,
   },
   title: {
-    fontSize: 22,
-    fontWeight: "800",
-    marginBottom: 10,
+    fontSize: 24,
+    fontWeight: "900",
+    marginBottom: 12,
     color: "#111",
   },
   description: {
     color: "#3A3028",
-    lineHeight: 22,
+    lineHeight: 24,
+    fontSize: 17,
+  },
+  location: {
+    color: "#3A3028",
+    marginTop: 14,
+    fontSize: 16,
+    fontWeight: "700",
   },
   emptyCard: {
     backgroundColor: "#FFF9F3",
@@ -391,15 +491,17 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: "#D8C8B8",
     padding: 18,
+    marginTop: 18,
   },
   emptyTitle: {
     fontSize: 22,
-    fontWeight: "800",
+    fontWeight: "900",
     color: "#111",
     marginBottom: 8,
   },
   emptyText: {
     color: "#3A3028",
+    fontSize: 16,
   },
 });
 

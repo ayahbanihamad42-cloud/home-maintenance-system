@@ -20,9 +20,7 @@ const saveBase64ServiceImage = (name, imageBase64) => {
     /^data:image\/([a-zA-Z0-9]+);base64,(.+)$/
   );
 
-  if (!matches) {
-    throw new Error("Invalid image format");
-  }
+  if (!matches) throw new Error("Invalid image format");
 
   const ext = matches[1] === "jpeg" ? "jpg" : matches[1];
   const base64Data = matches[2];
@@ -61,7 +59,9 @@ export const createUser = async (req, res) => {
     const { name, email, phone, dob, city, password, role } = req.body;
 
     if (!name || !email || !password || !role) {
-      return res.status(400).json({ message: "Name, email, password and role are required" });
+      return res.status(400).json({
+        message: "Name, email, password and role are required",
+      });
     }
 
     const hashedPassword = await bcrypt.hash(password, 10);
@@ -98,14 +98,18 @@ export const getAllTechnicians = (req, res) => {
       t.id AS technicianId,
       t.user_id,
       t.service,
+      t.service_id,
       t.experience,
       t.price_per_hour,
       u.name,
       u.email,
       u.phone,
-      u.city
+      u.city,
+      s.image_url AS service_image,
+      COALESCE(s.name, t.service) AS service_name
     FROM technicians t
     JOIN users u ON u.id = t.user_id
+    LEFT JOIN services s ON s.id = t.service_id
     ORDER BY t.id DESC
     `,
     (err, rows) => {
@@ -117,46 +121,91 @@ export const getAllTechnicians = (req, res) => {
 
 export const createTechnician = async (req, res) => {
   try {
-    const { name, email, phone, city, password, service, experience, price_per_hour } = req.body;
+    const {
+      name,
+      email,
+      phone,
+      city,
+      password,
+      service,
+      service_id,
+      experience,
+      price_per_hour,
+    } = req.body;
 
-    if (!name || !email || !password || !service) {
-      return res.status(400).json({ message: "Name, email, password and service are required" });
+    if (!name || !email || !password || (!service && !service_id)) {
+      return res.status(400).json({
+        message: "Name, email, password and service are required",
+      });
     }
 
-    const hashedPassword = await bcrypt.hash(password, 10);
+    const createWithService = async (finalServiceName, finalServiceId) => {
+      const hashedPassword = await bcrypt.hash(password, 10);
 
-    db.query(
-      `
-      INSERT INTO users (name, email, phone, city, password, role, is_verified)
-      VALUES (?, ?, ?, ?, ?, 'technician', 1)
-      `,
-      [name, email, phone || null, city || null, hashedPassword],
-      (userErr, userResult) => {
-        if (userErr) return res.status(500).json({ message: userErr.sqlMessage || userErr.message });
-
-        db.query(
-          `
-          INSERT INTO technicians (user_id, service, experience, price_per_hour)
-          VALUES (?, ?, ?, ?)
-          `,
-          [
-            userResult.insertId,
-            service,
-            Number(experience || 0),
-            Number(price_per_hour || 0),
-          ],
-          (techErr, techResult) => {
-            if (techErr) return res.status(500).json({ message: techErr.sqlMessage || techErr.message });
-
-            res.status(201).json({
-              id: techResult.insertId,
-              user_id: userResult.insertId,
-              message: "Technician created",
+      db.query(
+        `
+        INSERT INTO users (name, email, phone, city, password, role, is_verified)
+        VALUES (?, ?, ?, ?, ?, 'technician', 1)
+        `,
+        [name, email, phone || null, city || null, hashedPassword],
+        (userErr, userResult) => {
+          if (userErr) {
+            return res.status(500).json({
+              message: userErr.sqlMessage || userErr.message,
             });
           }
-        );
-      }
-    );
+
+          db.query(
+            `
+            INSERT INTO technicians (user_id, service, service_id, experience, price_per_hour)
+            VALUES (?, ?, ?, ?, ?)
+            `,
+            [
+              userResult.insertId,
+              finalServiceName,
+              finalServiceId || null,
+              Number(experience || 0),
+              Number(price_per_hour || 0),
+            ],
+            (techErr, techResult) => {
+              if (techErr) {
+                return res.status(500).json({
+                  message: techErr.sqlMessage || techErr.message,
+                });
+              }
+
+              res.status(201).json({
+                id: techResult.insertId,
+                user_id: userResult.insertId,
+                message: "Technician created",
+              });
+            }
+          );
+        }
+      );
+    };
+
+    if (service_id) {
+      db.query(
+        "SELECT id, name FROM services WHERE id = ?",
+        [service_id],
+        async (serviceErr, rows) => {
+          if (serviceErr) {
+            return res.status(500).json({
+              message: serviceErr.sqlMessage || serviceErr.message,
+            });
+          }
+
+          if (!rows.length) {
+            return res.status(400).json({ message: "Selected service not found" });
+          }
+
+          await createWithService(rows[0].name, rows[0].id);
+        }
+      );
+    } else {
+      await createWithService(service, null);
+    }
   } catch (err) {
     res.status(500).json({ message: err.message });
   }
@@ -182,23 +231,53 @@ export const deleteTechnician = (req, res) => {
 
 /* STORES */
 export const getAllStores = (req, res) => {
-  db.query("SELECT * FROM stores ORDER BY id DESC", (err, rows) => {
-    if (err) return res.status(500).json({ message: err.sqlMessage || err.message });
-    res.json(rows || []);
-  });
+  db.query(
+    `
+    SELECT 
+      s.id,
+      s.store_name,
+      s.category,
+      s.city,
+      s.address,
+      s.owner_id,
+      u.name AS owner_name,
+      u.email AS owner_email
+    FROM stores s
+    LEFT JOIN users u ON u.id = s.owner_id
+    ORDER BY s.id DESC
+    `,
+    (err, rows) => {
+      if (err) return res.status(500).json({ message: err.sqlMessage || err.message });
+      res.json(rows || []);
+    }
+  );
 };
 
 export const createStore = (req, res) => {
-  const { name, owner_name, city, phone, address } = req.body;
+  const { store_name, name, category, city, address, owner_id } = req.body;
 
-  if (!name) return res.status(400).json({ message: "Store name is required" });
+  const finalStoreName = String(store_name || name || "").trim();
+
+  if (!finalStoreName) {
+    return res.status(400).json({ message: "Store name is required" });
+  }
+
+  if (!category || !String(category).trim()) {
+    return res.status(400).json({ message: "Category is required" });
+  }
 
   db.query(
     `
-    INSERT INTO stores (name, owner_name, city, phone, address)
+    INSERT INTO stores (store_name, category, city, address, owner_id)
     VALUES (?, ?, ?, ?, ?)
     `,
-    [name, owner_name || null, city || null, phone || null, address || null],
+    [
+      finalStoreName,
+      String(category).trim(),
+      city || null,
+      address || null,
+      owner_id || null,
+    ],
     (err, result) => {
       if (err) return res.status(500).json({ message: err.sqlMessage || err.message });
       res.status(201).json({ id: result.insertId, message: "Store created" });

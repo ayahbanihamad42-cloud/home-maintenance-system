@@ -54,7 +54,8 @@ export const getTechniciansByService = (req, res) => {
       u.email,
       u.phone,
       u.city,
-      COALESCE(AVG(r.rating), 0) AS rating
+      COALESCE(AVG(r.rating), 0) AS rating,
+      COUNT(r.id) AS review_count
     FROM technicians t
     JOIN users u ON u.id = t.user_id
     LEFT JOIN ratings r ON r.technician_id = t.id
@@ -66,11 +67,252 @@ export const getTechniciansByService = (req, res) => {
     [service],
     (err, rows) => {
       if (err) return res.status(500).json({ message: err.sqlMessage || err.message });
-      res.json(rows || []);
+
+      res.json(
+        (rows || []).map((row) => ({
+          ...row,
+          rating: Number(row.rating || 0),
+          review_count: Number(row.review_count || 0),
+        }))
+      );
     }
   );
 };
+function normalizeText(value) {
+  return String(value || "").trim().toLowerCase();
+}
 
+function normalizeArabic(value) {
+  return normalizeText(value)
+    .replace(/[أإآ]/g, "ا")
+    .replace(/ة/g, "ه")
+    .replace(/ى/g, "ي")
+    .replace(/[^\u0600-\u06FFa-zA-Z0-9\s]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function localAnalyzeSearch(searchText) {
+  const q = normalizeArabic(searchText);
+
+  let sort = "none";
+
+  if (
+    q.includes("افضل") ||
+    q.includes("احسن") ||
+    q.includes("اعلى تقييم") ||
+    q.includes("best") ||
+    q.includes("top rated") ||
+    q.includes("highest rating")
+  ) {
+    sort = "rating_desc";
+  }
+
+  if (
+    q.includes("ارخص") ||
+    q.includes("اقل سعر") ||
+    q.includes("cheapest") ||
+    q.includes("lowest price")
+  ) {
+    sort = "price_asc";
+  }
+
+  if (
+    q.includes("اغلى") ||
+    q.includes("اعلى سعر") ||
+    q.includes("highest price") ||
+    q.includes("most expensive")
+  ) {
+    sort = "price_desc";
+  }
+
+  return {
+    keywords: q
+      .replace(/اعطيني|اعطني|هات|بدي|اريد|كل|الفنيين|فنيين|الفني|فني|تكنيشان|تكنشن|الخدمة|خدمة|service|technician|technicians|show|give|me|all|the|in|for/g, " ")
+      .replace(/\s+/g, " ")
+      .trim(),
+    sort,
+    city: "",
+    name: "",
+    service: "",
+  };
+}
+
+async function analyzeWithGemini(searchText, service) {
+  if (!process.env.GEMINI_API_KEY) {
+    return localAnalyzeSearch(searchText);
+  }
+
+  try {
+    const model = process.env.GEMINI_MODEL || "gemini-1.5-flash";
+
+    const prompt = `
+You are a search parser for a home maintenance app.
+
+User search text:
+"${searchText}"
+
+Current service page:
+"${service}"
+
+Return ONLY valid JSON. No markdown.
+
+JSON format:
+{
+  "keywords": "important remaining search words only",
+  "sort": "none | rating_desc | price_asc | price_desc",
+  "city": "",
+  "name": "",
+  "service": ""
+}
+
+Rules:
+- Understand Arabic, Arabizi, English, and casual text.
+- If user asks for best/highest rated => sort rating_desc.
+- If user asks for cheapest/lowest price => sort price_asc.
+- If user asks for most expensive/highest price => sort price_desc.
+- If user asks generally for technicians of the current service, keep keywords empty.
+- Extract technician name if mentioned.
+- Extract city if mentioned.
+- Extract service if mentioned.
+`;
+
+    const response = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${process.env.GEMINI_API_KEY}`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          contents: [
+            {
+              parts: [{ text: prompt }],
+            },
+          ],
+        }),
+      }
+    );
+
+    const data = await response.json();
+    const text = data?.candidates?.[0]?.content?.parts?.[0]?.text || "";
+
+    const cleaned = text.replace(/```json|```/g, "").trim();
+    const parsed = JSON.parse(cleaned);
+
+    return {
+      keywords: parsed.keywords || "",
+      sort: parsed.sort || "none",
+      city: parsed.city || "",
+      name: parsed.name || "",
+      service: parsed.service || "",
+    };
+  } catch (err) {
+    console.error("Gemini smart search fallback:", err.message);
+    return localAnalyzeSearch(searchText);
+  }
+}
+
+export const smartTechnicianSearch = async (req, res) => {
+  const { searchText, service, userCity } = req.body;
+
+  try {
+    const analysis = await analyzeWithGemini(searchText || "", service || "");
+
+    const safeService = String(service || "").trim();
+
+    db.query(
+      `
+      SELECT 
+        t.id AS technicianId,
+        t.id,
+        t.user_id,
+        t.service,
+        t.experience,
+        t.price_per_hour,
+        u.name,
+        u.email,
+        u.phone,
+        u.city,
+        COALESCE(AVG(r.rating), 0) AS rating,
+        COUNT(r.id) AS review_count
+      FROM technicians t
+      JOIN users u ON u.id = t.user_id
+      LEFT JOIN ratings r ON r.technician_id = t.id
+      WHERE LOWER(TRIM(t.service)) = LOWER(TRIM(?))
+      GROUP BY t.id, t.user_id, t.service, t.experience, t.price_per_hour,
+               u.name, u.email, u.phone, u.city
+      `,
+      [safeService],
+      (err, rows) => {
+        if (err) {
+          console.error("smartTechnicianSearch query error:", err);
+          return res.status(500).json({ message: "Server error" });
+        }
+
+        let result = (rows || []).map((row) => ({
+          ...row,
+          rating: Number(row.rating || 0),
+          review_count: Number(row.review_count || 0),
+        }));
+
+        const words = normalizeArabic(
+          `${analysis.keywords || ""} ${analysis.name || ""} ${analysis.city || ""} ${analysis.service || ""}`
+        )
+          .split(" ")
+          .filter((word) => word.length > 1);
+
+        if (words.length) {
+          result = result.filter((tech) => {
+            const text = normalizeArabic(
+              `${tech.name || ""} ${tech.service || ""} ${tech.city || ""}`
+            );
+
+            return words.some((word) => text.includes(word));
+          });
+        }
+
+        if (analysis.city) {
+          result = result.filter(
+            (tech) => normalizeArabic(tech.city) === normalizeArabic(analysis.city)
+          );
+        }
+
+        if (analysis.sort === "rating_desc") {
+          result.sort((a, b) => Number(b.rating || 0) - Number(a.rating || 0));
+        }
+
+        if (analysis.sort === "price_asc") {
+          result.sort(
+            (a, b) => Number(a.price_per_hour || 0) - Number(b.price_per_hour || 0)
+          );
+        }
+
+        if (analysis.sort === "price_desc") {
+          result.sort(
+            (a, b) => Number(b.price_per_hour || 0) - Number(a.price_per_hour || 0)
+          );
+        }
+
+        if (normalizeArabic(searchText).includes("قريب") && userCity) {
+          result.sort((a, b) => {
+            const aSame = normalizeArabic(a.city) === normalizeArabic(userCity) ? 1 : 0;
+            const bSame = normalizeArabic(b.city) === normalizeArabic(userCity) ? 1 : 0;
+            return bSame - aSame;
+          });
+        }
+
+        res.json({
+          analysis,
+          technicians: result,
+        });
+      }
+    );
+  } catch (err) {
+    console.error("smartTechnicianSearch error:", err);
+    res.status(500).json({ message: "Server error" });
+  }
+};
 export const getTechnicianById = (req, res) => {
   db.query(
     `

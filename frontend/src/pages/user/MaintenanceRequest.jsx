@@ -19,16 +19,14 @@ function MaintenanceRequest() {
 
   const [form, setForm] = useState({
     service: location.state?.service || stateTech.service || "",
-    technician_name:
-      location.state?.technicianName || stateTech.name || "",
+    technician_name: location.state?.technicianName || stateTech.name || "",
     scheduled_date: "",
     scheduled_time: "",
     estimated_hours: "1",
     payment_method: "cash",
     location_note: "",
     description: "",
-    price_per_hour:
-      location.state?.price_per_hour || stateTech.price_per_hour || 0,
+    price_per_hour: location.state?.price_per_hour || stateTech.price_per_hour || 0,
   });
 
   const totalPrice = useMemo(() => {
@@ -39,7 +37,21 @@ function MaintenanceRequest() {
 
   const normalizeDate = (value) => {
     if (!value) return "";
-    return String(value).split("T")[0];
+
+    const raw = String(value);
+
+    if (/^\d{4}-\d{2}-\d{2}$/.test(raw)) return raw;
+
+    const d = new Date(value);
+
+    if (!Number.isNaN(d.getTime())) {
+      const yyyy = d.getFullYear();
+      const mm = String(d.getMonth() + 1).padStart(2, "0");
+      const dd = String(d.getDate()).padStart(2, "0");
+      return `${yyyy}-${mm}-${dd}`;
+    }
+
+    return raw.slice(0, 10);
   };
 
   const normalizeTime = (value) => {
@@ -181,6 +193,15 @@ function MaintenanceRequest() {
         return;
       }
 
+      if (!form.description.trim()) {
+        setMessage({
+          type: "error",
+          title: "Error",
+          body: "Please enter description.",
+        });
+        return;
+      }
+
       const payload = {
         user_id: user.id,
         technician_id: technicianId,
@@ -207,6 +228,7 @@ function MaintenanceRequest() {
             requestId,
             amount: Number(totalPrice),
             technicianId,
+            estimated_hours: Number(form.estimated_hours || 1),
           },
         });
       } else {

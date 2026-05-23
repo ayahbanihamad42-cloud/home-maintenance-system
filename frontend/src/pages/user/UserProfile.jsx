@@ -2,6 +2,11 @@ import React, { useEffect, useRef, useState } from "react";
 import Header from "../../components/common/Header";
 import API from "../../services/api";
 import TechnicianProfileGallery from "../technician/TechnicianGalleryManager";
+import {
+  getMyPaymentInfo,
+  saveMyPaymentInfo,
+  getMyBalance,
+} from "../../services/paymentService";
 
 function UserProfile() {
   const currentUser = JSON.parse(localStorage.getItem("user") || "{}");
@@ -12,6 +17,7 @@ function UserProfile() {
 
   const [showEditModal, setShowEditModal] = useState(false);
   const [showPhotoModal, setShowPhotoModal] = useState(false);
+  const [showPaymentModal, setShowPaymentModal] = useState(false);
 
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
@@ -21,12 +27,21 @@ function UserProfile() {
   const [photoPreview, setPhotoPreview] = useState("");
   const [profileMessage, setProfileMessage] = useState(null);
 
+  const [paymentInfo, setPaymentInfo] = useState({
+    account_holder: "",
+    wallet_name: "",
+    wallet_number: "",
+    mock_account_number: "",
+  });
+
   const fileInputRef = useRef(null);
 
   const formatDate = (value) => {
     if (!value) return "";
     return String(value).split("T")[0];
   };
+
+  const isTechnician = String(profile?.role || "").toLowerCase() === "technician";
 
   const loadProfile = async () => {
     try {
@@ -43,11 +58,30 @@ function UserProfile() {
       const savedPhoto = localStorage.getItem(`profile_photo_${currentUser.id}`);
       if (savedPhoto) setPhotoPreview(savedPhoto);
     } catch (err) {
-      console.error("profile load error:", err);
       setProfileMessage({
         type: "error",
         title: "Error",
         body: "Failed to load profile.",
+      });
+    }
+  };
+
+  const loadPaymentInfo = async () => {
+    try {
+      const data = await getMyPaymentInfo();
+
+      setPaymentInfo({
+        account_holder: data?.account_holder || "",
+        wallet_name: data?.wallet_name || "",
+        wallet_number: data?.wallet_number || "",
+        mock_account_number: data?.mock_account_number || "",
+      });
+    } catch {
+      setPaymentInfo({
+        account_holder: "",
+        wallet_name: "",
+        wallet_number: "",
+        mock_account_number: "",
       });
     }
   };
@@ -78,9 +112,7 @@ function UserProfile() {
           userId: currentUser.id,
           ...payload,
         });
-      } catch (emailErr) {
-        console.error("send profile email error:", emailErr);
-      }
+      } catch {}
 
       const updatedProfile = { ...profile, ...payload };
       setProfile(updatedProfile);
@@ -104,14 +136,66 @@ function UserProfile() {
         body: "Profile updated successfully and we sent an email.",
       });
     } catch (err) {
-      console.error("profile update error:", err);
-
       setProfileMessage({
         type: "error",
         title: "Error",
         body: err.response?.data?.message || "Failed to update profile.",
       });
     }
+  };
+
+  const handleSavePaymentInfo = async () => {
+    try {
+      await saveMyPaymentInfo(paymentInfo);
+
+      setShowPaymentModal(false);
+
+      setProfileMessage({
+        type: "success",
+        title: "Payment Info Saved",
+        body: "Your mock wallet information was saved successfully.",
+      });
+    } catch (err) {
+      setProfileMessage({
+        type: "error",
+        title: "Error",
+        body: err.response?.data?.message || "Failed to save payment info.",
+      });
+    }
+  };
+
+  const handleShowBalance = async () => {
+    try {
+      setMenuOpen(false);
+      setSubmenu(null);
+
+      const data = await getMyBalance();
+
+      const info = data.paymentInfo;
+
+      setProfileMessage({
+        type: "success",
+        title: "My Balance",
+        body: `Total earnings: ${Number(data.totalEarnings || 0).toFixed(
+          2
+        )} JOD | Payments: ${data.totalPayments || 0} | Wallet: ${
+          info?.wallet_name || "-"
+        } | Wallet number: ${info?.wallet_number || "-"}`,
+      });
+    } catch (err) {
+      setProfileMessage({
+        type: "error",
+        title: "Error",
+        body: err.response?.data?.message || "Failed to load balance.",
+      });
+    }
+  };
+
+  const openPaymentModal = async () => {
+    setMenuOpen(false);
+    setSubmenu(null);
+    await loadPaymentInfo();
+    setShowPaymentModal(true);
   };
 
   const handlePhotoChange = (e) => {
@@ -229,6 +313,18 @@ function UserProfile() {
                     Edit Photo
                   </button>
 
+                  {isTechnician && (
+                    <>
+                      <button type="button" onClick={openPaymentModal}>
+                        Payment Info
+                      </button>
+
+                      <button type="button" onClick={handleShowBalance}>
+                        My Balance
+                      </button>
+                    </>
+                  )}
+
                   <button
                     type="button"
                     onClick={() =>
@@ -251,7 +347,7 @@ function UserProfile() {
                     <div
                       style={{
                         position: "absolute",
-                        top: "96px",
+                        top: "144px",
                         right: "230px",
                         minWidth: "180px",
                         background: "#fffaf4",
@@ -276,7 +372,7 @@ function UserProfile() {
                     <div
                       style={{
                         position: "absolute",
-                        top: "144px",
+                        top: "190px",
                         right: "230px",
                         minWidth: "180px",
                         background: "#fffaf4",
@@ -309,13 +405,21 @@ function UserProfile() {
           )}
 
           <div className="profile-info">
-            <p><b>Email:</b> {profile.email || "-"}</p>
-            <p><b>Phone:</b> {profile.phone || "-"}</p>
-            <p><b>City:</b> {profile.city || "-"}</p>
-            <p><b>Birth Date:</b> {formatDate(profile.dob) || "-"}</p>
+            <p>
+              <b>Email:</b> {profile.email || "-"}
+            </p>
+            <p>
+              <b>Phone:</b> {profile.phone || "-"}
+            </p>
+            <p>
+              <b>City:</b> {profile.city || "-"}
+            </p>
+            <p>
+              <b>Birth Date:</b> {formatDate(profile.dob) || "-"}
+            </p>
           </div>
 
-          {profile.role === "technician" && profile.technician_id && (
+          {isTechnician && profile.technician_id && (
             <TechnicianProfileGallery technicianId={profile.technician_id} />
           )}
         </div>
@@ -387,6 +491,71 @@ function UserProfile() {
             <div className="modal-actions">
               <button className="secondary" type="button" onClick={() => setShowPhotoModal(false)}>
                 Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showPaymentModal && (
+        <div className="modal-overlay">
+          <div className="modal">
+            <h3>Mock Payment Info</h3>
+
+            <div className="input-group">
+              <label>Account Holder</label>
+              <input
+                value={paymentInfo.account_holder}
+                onChange={(e) =>
+                  setPaymentInfo({ ...paymentInfo, account_holder: e.target.value })
+                }
+                placeholder="Technician name"
+              />
+            </div>
+
+            <div className="input-group">
+              <label>Wallet Name</label>
+              <input
+                value={paymentInfo.wallet_name}
+                onChange={(e) =>
+                  setPaymentInfo({ ...paymentInfo, wallet_name: e.target.value })
+                }
+                placeholder="Example: CliQ / Zain Cash"
+              />
+            </div>
+
+            <div className="input-group">
+              <label>Wallet Number</label>
+              <input
+                value={paymentInfo.wallet_number}
+                onChange={(e) =>
+                  setPaymentInfo({ ...paymentInfo, wallet_number: e.target.value })
+                }
+                placeholder="0790000000"
+              />
+            </div>
+
+            <div className="input-group">
+              <label>Mock Account Number</label>
+              <input
+                value={paymentInfo.mock_account_number}
+                onChange={(e) =>
+                  setPaymentInfo({
+                    ...paymentInfo,
+                    mock_account_number: e.target.value,
+                  })
+                }
+                placeholder="MOCK-ACC-12345"
+              />
+            </div>
+
+            <div className="modal-actions">
+              <button className="secondary" type="button" onClick={() => setShowPaymentModal(false)}>
+                Cancel
+              </button>
+
+              <button className="primary" type="button" onClick={handleSavePaymentInfo}>
+                Save
               </button>
             </div>
           </div>
