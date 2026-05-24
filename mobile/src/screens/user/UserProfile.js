@@ -159,6 +159,21 @@ export default function UserProfile({ navigation }) {
       setDob(formatDate(data.dob));
       setPhotoPreview(getProfilePhoto(data));
 
+      await AsyncStorage.setItem(
+        "user",
+        JSON.stringify({
+          ...savedUser,
+          name: data.name,
+          email: data.email,
+          phone: data.phone,
+          city: data.city,
+          dob: data.dob,
+          role: data.role,
+          profile_image: data.profile_image,
+          technician_id: data.technician_id || savedUser.technician_id,
+        })
+      );
+
       const role = String(data.role || savedUser.role || "").toLowerCase();
       if (role === "technician") {
         await loadMyGallery();
@@ -213,16 +228,10 @@ export default function UserProfile({ navigation }) {
 
       await API.patch(`/users/${userId}`, payload);
 
-      try {
-        await API.post("/users/send-profile-update-email", {
-          userId,
-          ...payload,
-        });
-      } catch {}
-
       const updatedUser = {
         ...currentUser,
         ...payload,
+        profile_image: profile?.profile_image,
       };
 
       await AsyncStorage.setItem("user", JSON.stringify(updatedUser));
@@ -254,8 +263,7 @@ export default function UserProfile({ navigation }) {
       setMenuOpen(false);
       setSubmenu(null);
 
-      const permission =
-        await ImagePicker.requestMediaLibraryPermissionsAsync();
+      const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
 
       if (!permission.granted) {
         setMessage({
@@ -283,12 +291,19 @@ export default function UserProfile({ navigation }) {
 
       const userId = profile?.id || currentUser?.id;
 
-      await API.patch(`/users/${userId}`, {
+      await API.patch(`/users/${userId}/photo`, {
         profile_image: base64Image,
-        profile_photo: base64Image,
-        photo: base64Image,
       });
 
+      const updatedUser = {
+        ...currentUser,
+        profile_image: base64Image,
+      };
+
+      await AsyncStorage.setItem("user", JSON.stringify(updatedUser));
+
+      setCurrentUser(updatedUser);
+      setProfile((prev) => ({ ...prev, profile_image: base64Image }));
       setPhotoPreview(base64Image);
 
       setMessage({
@@ -330,7 +345,7 @@ export default function UserProfile({ navigation }) {
 
   const loadPaymentInfo = async () => {
     try {
-      const res = await API.get("/payments/me/info");
+      const res = await API.get("/payments/my-info");
       const data = res.data?.data || res.data || {};
 
       setPaymentInfo({
@@ -358,7 +373,7 @@ export default function UserProfile({ navigation }) {
 
   const handleSavePaymentInfo = async () => {
     try {
-      await API.post("/payments/me/info", paymentInfo);
+      await API.post("/payments/my-info", paymentInfo);
 
       setShowPaymentModal(false);
 
@@ -381,7 +396,7 @@ export default function UserProfile({ navigation }) {
       setMenuOpen(false);
       setSubmenu(null);
 
-      const res = await API.get("/payments/me/balance");
+      const res = await API.get("/payments/my-balance");
       const data = res.data?.data || res.data || {};
       const info = data.paymentInfo;
 

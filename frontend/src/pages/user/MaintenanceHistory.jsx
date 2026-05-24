@@ -38,10 +38,24 @@ function MaintenanceHistory() {
     );
   }, [requests, statusFilter]);
 
-  const formatDate = (date) => {
-    if (!date) return "-";
-    return String(date).split("T")[0];
-  };
+  const formatDate = (value) => {
+  if (!value) return "-";
+
+  const raw = String(value).trim();
+
+  if (raw.includes("T")) {
+    const d = new Date(raw);
+    if (!Number.isNaN(d.getTime())) {
+      d.setUTCDate(d.getUTCDate() + 1);
+      return d.toISOString().slice(0, 10);
+    }
+  }
+
+  const match = raw.match(/^(\d{4}-\d{2}-\d{2})/);
+  if (match) return match[1];
+
+  return raw.slice(0, 10);
+};
 
   const statusText = (status) => {
     const value = String(status || "pending").toLowerCase();

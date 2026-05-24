@@ -22,6 +22,7 @@ const sendProfileUpdateEmail = async (to, data) => {
     subject: "Profile Updated Successfully",
     html: `
       <h2>Your profile was updated successfully</h2>
+      <p><b>Name:</b> ${data.name || "-"}</p>
       <p><b>Email:</b> ${data.email || "-"}</p>
       <p><b>Phone:</b> ${data.phone || "-"}</p>
       <p><b>City:</b> ${data.city || "-"}</p>
@@ -38,7 +39,25 @@ export const getUserProfile = (req, res) => {
   }
 
   db.query(
-    "SELECT id, name, email, phone, city, dob, role FROM users WHERE id = ?",
+    `
+    SELECT 
+      u.id,
+      u.name,
+      u.email,
+      u.phone,
+      u.city,
+      u.dob,
+      u.role,
+      u.profile_image,
+      t.id AS technician_id,
+      t.service,
+      t.service_id,
+      t.experience,
+      t.price_per_hour
+    FROM users u
+    LEFT JOIN technicians t ON t.user_id = u.id
+    WHERE u.id = ?
+    `,
     [id],
     (err, rows) => {
       if (err) {
@@ -64,7 +83,9 @@ export const updateUserPassword = async (req, res) => {
   }
 
   if (!password || password.length < 6) {
-    return res.status(400).json({ message: "Password must be at least 6 characters." });
+    return res
+      .status(400)
+      .json({ message: "Password must be at least 6 characters." });
   }
 
   try {
@@ -90,7 +111,7 @@ export const updateUserPassword = async (req, res) => {
 
 export const updateUserProfile = (req, res) => {
   const { id } = req.params;
-  const { email, phone, city, dob } = req.body;
+  const { name, email, phone, city, dob } = req.body;
 
   if (Number(id) !== Number(req.user.id)) {
     return res.status(403).json({ message: "Not authorized" });
@@ -111,8 +132,24 @@ export const updateUserProfile = (req, res) => {
     }
 
     db.query(
-      "UPDATE users SET email = ?, phone = ?, city = ?, dob = ? WHERE id = ?",
-      [email, phone || null, city || null, dob || null, id],
+      `
+      UPDATE users
+      SET
+        name = COALESCE(NULLIF(?, ''), name),
+        email = ?,
+        phone = ?,
+        city = ?,
+        dob = ?
+      WHERE id = ?
+      `,
+      [
+        typeof name === "string" ? name.trim() : null,
+        email,
+        phone || null,
+        city || null,
+        dob || null,
+        id,
+      ],
       async (err, result) => {
         if (err) {
           console.error("updateUserProfile update error:", err);
@@ -124,7 +161,7 @@ export const updateUserProfile = (req, res) => {
         }
 
         try {
-          await sendProfileUpdateEmail(email, { email, phone, city, dob });
+          await sendProfileUpdateEmail(email, { name, email, phone, city, dob });
         } catch (mailErr) {
           console.error("profile email send error:", mailErr);
         }

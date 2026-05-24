@@ -36,7 +36,10 @@ export const register = async (req, res) => {
       const hash = await bcrypt.hash(password, 10);
 
       db.query(
-        "INSERT INTO users (name, email, phone, dob, city, password, role) VALUES (?,?,?,?,?,?,?)",
+        `
+        INSERT INTO users (name, email, phone, dob, city, password, role, is_verified)
+        VALUES (?, ?, ?, ?, ?, ?, ?, 1)
+        `,
         [name, email, phone || null, dob || null, city || null, hash, "user"],
         (insertErr) => {
           if (insertErr) {
@@ -61,64 +64,71 @@ export const login = (req, res) => {
     return res.status(400).json({ message: "Missing email or password" });
   }
 
-  db.query("SELECT * FROM users WHERE email = ?", [email], async (err, rows) => {
-    if (err) {
-      console.error("login query error:", err);
-      return res.status(500).json({ message: "Server error" });
-    }
+  db.query(
+    `
+    SELECT 
+      id,
+      name,
+      email,
+      phone,
+      dob,
+      city,
+      password,
+      role,
+      profile_image
+    FROM users
+    WHERE email = ?
+    `,
+    [email],
+    async (err, rows) => {
+      if (err) {
+        console.error("login query error:", err);
+        return res.status(500).json({ message: "Server error" });
+      }
 
-    console.log("LOGIN EMAIL:", email);
-    console.log("ROWS LENGTH:", rows?.length);
-
-    if (!rows.length) {
-      return res.status(401).json({ message: "Invalid email or password" });
-    }
-
-    try {
-      const user = rows[0];
-
-      console.log("DB USER:", {
-        id: user.id,
-        email: user.email,
-        role: user.role,
-        hasPassword: !!user.password,
-      });
-
-      const ok = await bcrypt.compare(password, user.password);
-      console.log("BCRYPT RESULT:", ok);
-
-      if (!ok) {
+      if (!rows.length) {
         return res.status(401).json({ message: "Invalid email or password" });
       }
 
-      if (!process.env.JWT_SECRET) {
-        console.error("JWT_SECRET is missing");
-        return res.status(500).json({ message: "Server configuration error" });
+      try {
+        const user = rows[0];
+
+        const ok = await bcrypt.compare(password, user.password);
+
+        if (!ok) {
+          return res.status(401).json({ message: "Invalid email or password" });
+        }
+
+        if (!process.env.JWT_SECRET) {
+          console.error("JWT_SECRET is missing");
+          return res.status(500).json({ message: "Server configuration error" });
+        }
+
+        const token = jwt.sign(
+          { id: user.id, role: user.role },
+          process.env.JWT_SECRET,
+          { expiresIn: "7d" }
+        );
+
+        return res.json({
+          token,
+          user: {
+            id: user.id,
+            name: user.name,
+            email: user.email,
+            phone: user.phone,
+            dob: user.dob,
+            city: user.city,
+            role: user.role,
+            profile_image: user.profile_image,
+          },
+        });
+      } catch (error) {
+        console.error("login error:", error);
+        return res.status(500).json({ message: "Server error" });
       }
-
-      const token = jwt.sign(
-        { id: user.id, role: user.role },
-        process.env.JWT_SECRET,
-        { expiresIn: "7d" }
-      );
-
-      return res.json({
-        token,
-        user: {
-          id: user.id,
-          name: user.name,
-          email: user.email,
-          phone: user.phone,
-          dob: user.dob,
-          city: user.city,
-          role: user.role,
-        },
-      });
-    } catch (error) {
-      console.error("login error:", error);
-      return res.status(500).json({ message: "Server error" });
     }
-  });
+  );
 };
 
 export const forgotPassword = (req, res) => {
@@ -162,9 +172,7 @@ export const forgotPassword = (req, res) => {
             return res.status(500).json({ message: "Server error" });
           }
 
-          const frontendUrl =
-            process.env.FRONTEND_URL || "http://localhost:3000";
-
+          const frontendUrl = process.env.FRONTEND_URL || "http://localhost:3000";
           const resetUrl = `${frontendUrl}/reset-password/${rawToken}`;
 
           try {

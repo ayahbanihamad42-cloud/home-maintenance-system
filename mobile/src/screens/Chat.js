@@ -16,13 +16,20 @@ import * as Location from "expo-location";
 import API from "../services/api";
 import Header from "../components/Common/Header";
 
-const API_HOST = "http://localhost:5000";
+const getApiHost = () => {
+  return String(API.defaults.baseURL || "").replace(/\/api\/?$/, "");
+};
 
 const fullUrl = (url) => {
   if (!url) return "";
-  if (String(url).startsWith("http")) return url;
-  if (String(url).startsWith("data:image")) return url;
-  return `${API_HOST}${url}`;
+
+  const value = String(url).trim();
+
+  if (value.startsWith("http://")) return value;
+  if (value.startsWith("https://")) return value;
+  if (value.startsWith("data:image")) return value;
+
+  return `${getApiHost()}${value.startsWith("/") ? value : `/${value}`}`;
 };
 
 export default function Chat({ navigation, route }) {

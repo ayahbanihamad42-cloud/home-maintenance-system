@@ -53,6 +53,16 @@ function UserProfile() {
     return raw.slice(0, 10);
   };
 
+  const getProfilePhoto = (data) => {
+    return (
+      data?.profile_image ||
+      data?.profile_photo ||
+      data?.photo ||
+      data?.avatar ||
+      ""
+    );
+  };
+
   const isTechnician =
     String(profile?.role || currentUser?.role || "").toLowerCase() ===
     "technician";
@@ -122,9 +132,7 @@ function UserProfile() {
       setPhone(data.phone || "");
       setCity(data.city || "");
       setDob(formatDate(data.dob));
-
-      const savedPhoto = localStorage.getItem(`profile_photo_${currentUser.id}`);
-      if (savedPhoto) setPhotoPreview(savedPhoto);
+      setPhotoPreview(getProfilePhoto(data));
 
       const role = String(data.role || currentUser.role || "").toLowerCase();
 
@@ -179,16 +187,15 @@ function UserProfile() {
 
   const handleSaveProfile = async () => {
     try {
-      const payload = { email, phone, city, dob };
+      const payload = {
+        name: profile?.name,
+        email,
+        phone,
+        city,
+        dob,
+      };
 
       await API.patch(`/users/${currentUser.id}`, payload);
-
-      try {
-        await API.post("/users/send-profile-update-email", {
-          userId: currentUser.id,
-          ...payload,
-        });
-      } catch {}
 
       const updatedProfile = { ...profile, ...payload };
       setProfile(updatedProfile);
@@ -201,6 +208,7 @@ function UserProfile() {
           phone,
           city,
           dob,
+          profile_image: updatedProfile.profile_image,
         })
       );
 
@@ -211,6 +219,8 @@ function UserProfile() {
         title: "Saved Successfully",
         body: "Profile updated successfully and we sent an email.",
       });
+
+      await loadProfile();
     } catch (err) {
       setProfileMessage({
         type: "error",
@@ -279,16 +289,46 @@ function UserProfile() {
 
     const reader = new FileReader();
 
-    reader.onloadend = () => {
-      localStorage.setItem(`profile_photo_${currentUser.id}`, reader.result);
-      setPhotoPreview(reader.result);
-      setShowPhotoModal(false);
+    reader.onloadend = async () => {
+      try {
+        const base64Image = reader.result;
 
-      setProfileMessage({
-        type: "success",
-        title: "Saved Successfully",
-        body: "Profile photo updated successfully.",
-      });
+        await API.patch(`/users/${currentUser.id}/photo`, {
+          profile_image: base64Image,
+        });
+
+        const updatedProfile = {
+          ...profile,
+          profile_image: base64Image,
+        };
+
+        setProfile(updatedProfile);
+        setPhotoPreview(base64Image);
+
+        localStorage.setItem(
+          "user",
+          JSON.stringify({
+            ...currentUser,
+            profile_image: base64Image,
+          })
+        );
+
+        setShowPhotoModal(false);
+
+        setProfileMessage({
+          type: "success",
+          title: "Saved Successfully",
+          body: "Profile photo updated successfully.",
+        });
+
+        await loadProfile();
+      } catch (err) {
+        setProfileMessage({
+          type: "error",
+          title: "Error",
+          body: err.response?.data?.message || "Failed to update profile photo.",
+        });
+      }
     };
 
     reader.readAsDataURL(file);

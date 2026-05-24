@@ -39,17 +39,18 @@ export const deleteAdminService = (id) =>
 export const getBackendImageUrl = (imageUrl) => {
   if (!imageUrl) return "";
 
+  const value = String(imageUrl).trim();
+
   if (
-    String(imageUrl).startsWith("http://") ||
-    String(imageUrl).startsWith("https://") ||
-    String(imageUrl).startsWith("data:image/")
+    value.startsWith("http://") ||
+    value.startsWith("https://") ||
+    value.startsWith("data:image/")
   ) {
-    return imageUrl;
+    return value;
   }
 
-  const fixedPath = String(imageUrl).startsWith("/")
-    ? imageUrl
-    : `/${imageUrl}`;
+  const apiHost = String(API.defaults.baseURL || "").replace(/\/api\/?$/, "");
+  const fixedPath = value.startsWith("/") ? value : `/${value}`;
 
-  return `http://localhost:5000${fixedPath}`;
+  return `${apiHost}${fixedPath}`;
 };

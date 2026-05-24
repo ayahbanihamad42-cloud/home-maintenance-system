@@ -48,10 +48,26 @@ const saveBase64ServiceImage = (name, imageBase64) => {
 
 /* USERS */
 export const getAllUsers = (req, res) => {
-  db.query("SELECT * FROM users ORDER BY id DESC", (err, rows) => {
-    if (err) return res.status(500).json({ message: err.sqlMessage || err.message });
-    res.json(rows || []);
-  });
+  db.query(
+    `
+    SELECT
+      id,
+      name,
+      email,
+      phone,
+      dob,
+      city,
+      role,
+      is_verified,
+      profile_image
+    FROM users
+    ORDER BY id DESC
+    `,
+    (err, rows) => {
+      if (err) return res.status(500).json({ message: err.sqlMessage || err.message });
+      res.json(rows || []);
+    }
+  );
 };
 
 export const createUser = async (req, res) => {
@@ -105,6 +121,7 @@ export const getAllTechnicians = (req, res) => {
       u.email,
       u.phone,
       u.city,
+      u.profile_image,
       s.image_url AS service_image,
       COALESCE(s.name, t.service) AS service_name
     FROM technicians t

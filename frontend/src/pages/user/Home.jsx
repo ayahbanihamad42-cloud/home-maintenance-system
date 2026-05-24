@@ -3,10 +3,16 @@ import { useNavigate } from "react-router-dom";
 import Header from "../../components/common/Header";
 import API from "../../services/api.jsx";
 
-function getBackendImageUrl(imageUrl) {
-  if (!imageUrl) return "";
+function getApiHost() {
+  return String(API.defaults.baseURL || "http://localhost:5000/api").replace(
+    /\/api\/?$/,
+    ""
+  );
+}
 
-  const value = String(imageUrl).trim();
+function getBackendImageUrl(imageUrl, serviceName = "") {
+  const apiHost = getApiHost();
+  const value = String(imageUrl || "").trim();
 
   if (
     value.startsWith("http://") ||
@@ -16,37 +22,48 @@ function getBackendImageUrl(imageUrl) {
     return value;
   }
 
-  if (value.startsWith("/images/")) {
-    return `http://localhost:5000${value}`;
+  if (value.startsWith("/")) {
+    return `${apiHost}${value}`;
   }
 
   if (value.startsWith("images/")) {
-    return `http://localhost:5000/${value}`;
+    return `${apiHost}/${value}`;
   }
 
-  return `http://localhost:5000/images/services/${value}`;
+  if (value) {
+    return `${apiHost}/images/services/${value}`;
+  }
+
+  return `${apiHost}/images/services/${String(serviceName)
+    .trim()
+    .toLowerCase()}.png`;
 }
 
 function Home() {
   const navigate = useNavigate();
+
   const [services, setServices] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
-  const loadServices = () => {
-    setLoading(true);
-    setError("");
+  const loadServices = async () => {
+    try {
+      setLoading(true);
+      setError("");
 
-    API.get("/services")
-      .then((res) => {
-        setServices(Array.isArray(res.data) ? res.data : []);
-      })
-      .catch((err) => {
-        console.error("load services error:", err);
-        setServices([]);
-        setError("Failed to load services. Please try again.");
-      })
-      .finally(() => setLoading(false));
+      const res = await API.get("/services");
+      const data = Array.isArray(res.data) ? res.data : [];
+
+      console.log("SERVICES FROM API:", data);
+
+      setServices(data);
+    } catch (err) {
+      console.error("load services error:", err);
+      setServices([]);
+      setError("Failed to load services. Please try again.");
+    } finally {
+      setLoading(false);
+    }
   };
 
   useEffect(() => {
@@ -74,28 +91,50 @@ function Home() {
           <div className="home-message">No services available yet.</div>
         ) : (
           <div className="services-container">
-            {services.map((service) => (
-              <div className="service-item" key={service.id}>
-                <button
-                  type="button"
-                  className="service-circle"
-                  onClick={() =>
-                    navigate(`/technicians/${encodeURIComponent(service.name)}`)
-                  }
-                >
-                  {service.image_url ? (
-                    <img
-                      src={getBackendImageUrl(service.image_url)}
-                      alt={service.name}
-                    />
-                  ) : (
-                    <span className="service-fallback-icon">🛠️</span>
-                  )}
-                </button>
+            {services.map((service) => {
+              const imageSrc = getBackendImageUrl(
+                service.image_url,
+                service.name
+              );
 
-                <div className="service-name">{service.name}</div>
-              </div>
-            ))}
+              return (
+                <div className="service-item" key={service.id}>
+                  <button
+                    type="button"
+                    className="service-circle"
+                    onClick={() =>
+                      navigate(
+                        `/technicians/${encodeURIComponent(service.name)}`
+                      )
+                    }
+                  >
+                    {service.image_url ? (
+                      <img
+                        src={imageSrc}
+                        alt={service.name}
+                        onError={(e) => {
+                          console.log("Image failed:", e.currentTarget.src);
+
+                          const fallback = `${getApiHost()}/images/services/${String(
+                            service.name || ""
+                          )
+                            .trim()
+                            .toLowerCase()}.png`;
+
+                          if (e.currentTarget.src !== fallback) {
+                            e.currentTarget.src = fallback;
+                          }
+                        }}
+                      />
+                    ) : (
+                      <span className="service-fallback-icon">🛠️</span>
+                    )}
+                  </button>
+
+                  <div className="service-name">{service.name}</div>
+                </div>
+              );
+            })}
           </div>
         )}
       </div>

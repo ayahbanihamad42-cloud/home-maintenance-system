@@ -33,7 +33,10 @@ const JORDAN_CITIES = [
 
 function formatDate(value) {
   if (!value) return "";
-  return String(value).split("T")[0];
+  const raw = String(value).trim();
+  const match = raw.match(/^(\d{4}-\d{2}-\d{2})/);
+  if (match) return match[1];
+  return raw.slice(0, 10);
 }
 
 function AdminDashboard() {
@@ -98,6 +101,23 @@ function AdminDashboard() {
   useEffect(() => {
     loadServices();
   }, [loadServices]);
+
+  const handleServiceImageFile = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+
+    reader.onloadend = () => {
+      setForm((prev) => ({
+        ...prev,
+        image_base64: reader.result,
+        image_url: "",
+      }));
+    };
+
+    reader.readAsDataURL(file);
+  };
 
   const handleAdd = async () => {
     try {
@@ -213,16 +233,31 @@ function AdminDashboard() {
         <h2>Admin Dashboard</h2>
 
         <div className="admin-actions">
-          <button className={activeClass("users")} onClick={() => changeView("users")}>
+          <button
+            className={activeClass("users")}
+            onClick={() => changeView("users")}
+          >
             Manage Users
           </button>
-          <button className={activeClass("technicians")} onClick={() => changeView("technicians")}>
+
+          <button
+            className={activeClass("technicians")}
+            onClick={() => changeView("technicians")}
+          >
             Manage Technicians
           </button>
-          <button className={activeClass("stores")} onClick={() => changeView("stores")}>
+
+          <button
+            className={activeClass("stores")}
+            onClick={() => changeView("stores")}
+          >
             Manage Stores
           </button>
-          <button className={activeClass("services")} onClick={() => changeView("services")}>
+
+          <button
+            className={activeClass("services")}
+            onClick={() => changeView("services")}
+          >
             Manage Services
           </button>
         </div>
@@ -254,12 +289,20 @@ function AdminDashboard() {
                   <td>{u.city || "-"}</td>
                   <td>{u.role}</td>
                   <td>
-                    <button className="btn-outline" onClick={() => setSelectedProfile({ type: "user", data: u })}>
+                    <button
+                      className="btn-outline"
+                      onClick={() =>
+                        setSelectedProfile({ type: "user", data: u })
+                      }
+                    >
                       View
                     </button>
                   </td>
                   <td>
-                    <button className="btn-outline" onClick={() => handleDelete("user", u.id)}>
+                    <button
+                      className="btn-outline"
+                      onClick={() => handleDelete("user", u.id)}
+                    >
                       Delete
                     </button>
                   </td>
@@ -298,12 +341,25 @@ function AdminDashboard() {
                   <td>{t.experience || 0}</td>
                   <td>{Number(t.price_per_hour || 0).toFixed(2)}</td>
                   <td>
-                    <button className="btn-outline" onClick={() => setSelectedProfile({ type: "technician", data: t })}>
+                    <button
+                      className="btn-outline"
+                      onClick={() =>
+                        setSelectedProfile({
+                          type: "technician",
+                          data: t,
+                        })
+                      }
+                    >
                       View
                     </button>
                   </td>
                   <td>
-                    <button className="btn-outline" onClick={() => handleDelete("technician", t.technicianId)}>
+                    <button
+                      className="btn-outline"
+                      onClick={() =>
+                        handleDelete("technician", t.technicianId)
+                      }
+                    >
                       Delete
                     </button>
                   </td>
@@ -335,7 +391,10 @@ function AdminDashboard() {
                   <td>{s.address || "-"}</td>
                   <td>{s.owner_name || s.owner_id || "-"}</td>
                   <td>
-                    <button className="btn-outline" onClick={() => handleDelete("store", s.id)}>
+                    <button
+                      className="btn-outline"
+                      onClick={() => handleDelete("store", s.id)}
+                    >
                       Delete
                     </button>
                   </td>
@@ -364,7 +423,12 @@ function AdminDashboard() {
                       <img
                         src={getBackendImageUrl(s.image_url)}
                         alt={s.name}
-                        style={{ width: 55, height: 55, borderRadius: "50%", objectFit: "cover" }}
+                        style={{
+                          width: 55,
+                          height: 55,
+                          borderRadius: "50%",
+                          objectFit: "cover",
+                        }}
                       />
                     ) : (
                       "-"
@@ -373,7 +437,10 @@ function AdminDashboard() {
                   <td>{s.name}</td>
                   <td>{s.image_url}</td>
                   <td>
-                    <button className="btn-outline" onClick={() => handleDelete("service", s.id)}>
+                    <button
+                      className="btn-outline"
+                      onClick={() => handleDelete("service", s.id)}
+                    >
                       Delete
                     </button>
                   </td>
@@ -398,32 +465,54 @@ function AdminDashboard() {
             <>
               <div className="input-group">
                 <label>Name</label>
-                <input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
+                <input
+                  value={form.name}
+                  onChange={(e) => setForm({ ...form, name: e.target.value })}
+                />
               </div>
 
               <div className="input-group">
                 <label>Email</label>
-                <input value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} />
+                <input
+                  value={form.email}
+                  onChange={(e) => setForm({ ...form, email: e.target.value })}
+                />
               </div>
 
               <div className="input-group">
                 <label>Phone</label>
-                <input value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} />
+                <input
+                  value={form.phone}
+                  onChange={(e) => setForm({ ...form, phone: e.target.value })}
+                />
               </div>
 
               <div className="input-group">
                 <label>Birth Date</label>
-                <input type="date" value={form.dob} onChange={(e) => setForm({ ...form, dob: e.target.value })} />
+                <input
+                  type="date"
+                  value={form.dob}
+                  onChange={(e) => setForm({ ...form, dob: e.target.value })}
+                />
               </div>
 
               <div className="input-group">
                 <label>City</label>
-                <CitySelect value={form.city} onChange={(city) => setForm({ ...form, city })} />
+                <CitySelect
+                  value={form.city}
+                  onChange={(city) => setForm({ ...form, city })}
+                />
               </div>
 
               <div className="input-group">
                 <label>Password</label>
-                <input type="password" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} />
+                <input
+                  type="password"
+                  value={form.password}
+                  onChange={(e) =>
+                    setForm({ ...form, password: e.target.value })
+                  }
+                />
               </div>
             </>
           )}
@@ -432,17 +521,34 @@ function AdminDashboard() {
             <>
               <div className="input-group">
                 <label>Service</label>
-                <ServiceSelect value={form.service_id} onChange={(service_id) => setForm({ ...form, service_id })} />
+                <ServiceSelect
+                  value={form.service_id}
+                  onChange={(service_id) =>
+                    setForm({ ...form, service_id })
+                  }
+                />
               </div>
 
               <div className="input-group">
                 <label>Experience</label>
-                <input type="number" value={form.experience} onChange={(e) => setForm({ ...form, experience: e.target.value })} />
+                <input
+                  type="number"
+                  value={form.experience}
+                  onChange={(e) =>
+                    setForm({ ...form, experience: e.target.value })
+                  }
+                />
               </div>
 
               <div className="input-group">
                 <label>Price Per Hour</label>
-                <input type="number" value={form.price_per_hour} onChange={(e) => setForm({ ...form, price_per_hour: e.target.value })} />
+                <input
+                  type="number"
+                  value={form.price_per_hour}
+                  onChange={(e) =>
+                    setForm({ ...form, price_per_hour: e.target.value })
+                  }
+                />
               </div>
             </>
           )}
@@ -451,27 +557,51 @@ function AdminDashboard() {
             <>
               <div className="input-group">
                 <label>Store Name</label>
-                <input value={form.store_name} onChange={(e) => setForm({ ...form, store_name: e.target.value })} />
+                <input
+                  value={form.store_name}
+                  onChange={(e) =>
+                    setForm({ ...form, store_name: e.target.value })
+                  }
+                />
               </div>
 
               <div className="input-group">
                 <label>Category</label>
-                <ServiceSelect value={form.category} onChange={(category) => setForm({ ...form, category })} placeholder="Select category" />
+                <ServiceSelect
+                  value={form.category}
+                  onChange={(category) =>
+                    setForm({ ...form, category })
+                  }
+                  placeholder="Select category"
+                />
               </div>
 
               <div className="input-group">
                 <label>City</label>
-                <CitySelect value={form.city} onChange={(city) => setForm({ ...form, city })} />
+                <CitySelect
+                  value={form.city}
+                  onChange={(city) => setForm({ ...form, city })}
+                />
               </div>
 
               <div className="input-group">
                 <label>Address</label>
-                <input value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })} />
+                <input
+                  value={form.address}
+                  onChange={(e) =>
+                    setForm({ ...form, address: e.target.value })
+                  }
+                />
               </div>
 
               <div className="input-group">
                 <label>Owner User ID</label>
-                <input value={form.owner_id} onChange={(e) => setForm({ ...form, owner_id: e.target.value })} />
+                <input
+                  value={form.owner_id}
+                  onChange={(e) =>
+                    setForm({ ...form, owner_id: e.target.value })
+                  }
+                />
               </div>
             </>
           )}
@@ -480,17 +610,44 @@ function AdminDashboard() {
             <>
               <div className="input-group">
                 <label>Service Name</label>
-                <input value={form.service_name} onChange={(e) => setForm({ ...form, service_name: e.target.value })} />
+                <input
+                  value={form.service_name}
+                  onChange={(e) =>
+                    setForm({ ...form, service_name: e.target.value })
+                  }
+                />
               </div>
 
               <div className="input-group">
-                <label>Image URL</label>
-                <input value={form.image_url} onChange={(e) => setForm({ ...form, image_url: e.target.value })} />
+                <label>Service Image</label>
+                <input
+                  type="file"
+                  accept="image/*"
+                  onChange={handleServiceImageFile}
+                />
               </div>
+
+              {form.image_base64 ? (
+                <div style={{ marginTop: 10 }}>
+                  <img
+                    src={form.image_base64}
+                    alt="preview"
+                    style={{
+                      width: 90,
+                      height: 90,
+                      borderRadius: "50%",
+                      objectFit: "cover",
+                      border: "1px solid #ddd",
+                    }}
+                  />
+                </div>
+              ) : null}
             </>
           )}
 
-          <button className="primary" onClick={handleAdd}>Add</button>
+          <button className="primary" onClick={handleAdd}>
+            Add
+          </button>
         </div>
       </div>
 
@@ -499,27 +656,67 @@ function AdminDashboard() {
           <div className="admin-profile-modal">
             <div className="admin-profile-header">
               <div>
-                <h3>{selectedProfile.type === "user" ? "User Profile" : "Technician Profile"}</h3>
+                <h3>
+                  {selectedProfile.type === "user"
+                    ? "User Profile"
+                    : "Technician Profile"}
+                </h3>
                 <p>{selectedProfile.data.role || selectedProfile.type}</p>
               </div>
 
-              <button className="btn-outline" onClick={() => setSelectedProfile(null)}>
+              <button
+                className="btn-outline"
+                onClick={() => setSelectedProfile(null)}
+              >
                 Close
               </button>
             </div>
 
             <div className="admin-profile-grid">
-              <div className="admin-profile-item"><b>Name</b>{selectedProfile.data.name || "-"}</div>
-              <div className="admin-profile-item"><b>Email</b>{selectedProfile.data.email || "-"}</div>
-              <div className="admin-profile-item"><b>Phone</b>{selectedProfile.data.phone || "-"}</div>
-              <div className="admin-profile-item"><b>Birth Date</b>{formatDate(selectedProfile.data.dob) || "-"}</div>
-              <div className="admin-profile-item"><b>City</b>{selectedProfile.data.city || "-"}</div>
+              <div className="admin-profile-item">
+                <b>Name</b>
+                {selectedProfile.data.name || "-"}
+              </div>
+
+              <div className="admin-profile-item">
+                <b>Email</b>
+                {selectedProfile.data.email || "-"}
+              </div>
+
+              <div className="admin-profile-item">
+                <b>Phone</b>
+                {selectedProfile.data.phone || "-"}
+              </div>
+
+              <div className="admin-profile-item">
+                <b>Birth Date</b>
+                {formatDate(selectedProfile.data.dob) || "-"}
+              </div>
+
+              <div className="admin-profile-item">
+                <b>City</b>
+                {selectedProfile.data.city || "-"}
+              </div>
 
               {selectedProfile.type === "technician" ? (
                 <>
-                  <div className="admin-profile-item"><b>Service</b>{selectedProfile.data.service || "-"}</div>
-                  <div className="admin-profile-item"><b>Experience</b>{selectedProfile.data.experience || 0} years</div>
-                  <div className="admin-profile-item"><b>Price/hr</b>{Number(selectedProfile.data.price_per_hour || 0).toFixed(2)} JOD</div>
+                  <div className="admin-profile-item">
+                    <b>Service</b>
+                    {selectedProfile.data.service || "-"}
+                  </div>
+
+                  <div className="admin-profile-item">
+                    <b>Experience</b>
+                    {selectedProfile.data.experience || 0} years
+                  </div>
+
+                  <div className="admin-profile-item">
+                    <b>Price/hr</b>
+                    {Number(selectedProfile.data.price_per_hour || 0).toFixed(
+                      2
+                    )}{" "}
+                    JOD
+                  </div>
                 </>
               ) : null}
             </div>
