@@ -5,7 +5,6 @@ import {
   ScrollView,
   TouchableOpacity,
   TextInput,
-  ActivityIndicator,
   StyleSheet,
 } from "react-native";
 import Header from "../../components/Common/Header";
@@ -15,6 +14,53 @@ import {
 } from "../../services/maintenanceService";
 import { addRating, getRatingByRequest } from "../../services/ratingService";
 
+const formatDateOnly = (value) => {
+  if (!value) return "-";
+
+  const raw = String(value).trim();
+
+  if (/^\d{4}-\d{2}-\d{2}$/.test(raw)) return raw;
+
+  if (raw.includes("T")) {
+    const date = new Date(raw);
+
+    if (!Number.isNaN(date.getTime())) {
+      return new Intl.DateTimeFormat("en-CA", {
+        timeZone: "Asia/Amman",
+        year: "numeric",
+        month: "2-digit",
+        day: "2-digit",
+      }).format(date);
+    }
+  }
+
+  const match = raw.match(/^(\d{4}-\d{2}-\d{2})/);
+  if (match) return match[1];
+
+  return raw.slice(0, 10);
+};
+
+const formatDateTime = (value) => {
+  if (!value) return "-";
+
+  const raw = String(value).trim();
+
+  if (!raw.includes("T")) return raw;
+
+  const date = new Date(raw);
+
+  if (Number.isNaN(date.getTime())) return raw;
+
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Amman",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+  }).format(date);
+};
+
 export default function Review({ navigation, route }) {
   const requestId = route?.params?.requestId || route?.params?.id;
 
@@ -23,30 +69,24 @@ export default function Review({ navigation, route }) {
   const [rating, setRating] = useState(5);
   const [comment, setComment] = useState("");
   const [message, setMessage] = useState(null);
-  const [loading, setLoading] = useState(true);
-
-  const formatDateOnly = (value) => {
-    if (!value) return "-";
-    const raw = String(value);
-    const match = raw.match(/^(\d{4}-\d{2}-\d{2})/);
-    if (match) return match[1];
-    return raw.slice(0, 10);
-  };
-
-  const formatDateTime = (value) => {
-    if (!value) return "-";
-    const d = new Date(value);
-    if (Number.isNaN(d.getTime())) return String(value);
-    return d.toLocaleString();
-  };
+  const [refreshing, setRefreshing] = useState(false);
 
   const loadRequest = async () => {
+    if (!requestId) {
+      setMessage({
+        type: "error",
+        title: "Error",
+        body: "Request id is missing.",
+      });
+      return;
+    }
+
     try {
-      setLoading(true);
+      setRefreshing(true);
       setMessage(null);
 
       const data = await getRequestById(requestId);
-      setRequest(data);
+      setRequest(data || route?.params?.request || null);
 
       const ratingData = await getRatingByRequest(requestId).catch(() => null);
       setOldRating(ratingData || null);
@@ -62,22 +102,17 @@ export default function Review({ navigation, route }) {
         body: err?.response?.data?.message || "Failed to load request.",
       });
     } finally {
-      setLoading(false);
+      setRefreshing(false);
     }
   };
 
   useEffect(() => {
-    if (requestId) {
-      loadRequest();
-    } else {
-      setLoading(false);
-      setMessage({
-        type: "error",
-        title: "Error",
-        body: "Request id is missing.",
-      });
-    }
+    loadRequest();
   }, [requestId]);
+
+  const status = String(request?.status || "").toLowerCase();
+  const canCancel = status === "pending";
+  const canReview = status === "completed";
 
   const handleCancel = async () => {
     try {
@@ -114,7 +149,7 @@ export default function Review({ navigation, route }) {
 
       await addRating({
         technician_id: request.technician_id,
-        request_id: request.id,
+        request_id: request.id || requestId,
         rating,
         comment,
       });
@@ -134,21 +169,6 @@ export default function Review({ navigation, route }) {
       });
     }
   };
-
-  if (loading) {
-    return (
-      <View style={styles.screen}>
-        <Header navigation={navigation} />
-        <View style={styles.loadingBox}>
-          <ActivityIndicator size="large" color="#111" />
-        </View>
-      </View>
-    );
-  }
-
-  const status = String(request?.status || "").toLowerCase();
-  const canCancel = status === "pending";
-  const canReview = status === "completed";
 
   return (
     <View style={styles.screen}>
@@ -172,7 +192,16 @@ export default function Review({ navigation, route }) {
         {!request ? (
           <View style={styles.card}>
             <Text style={styles.emptyTitle}>Request not found</Text>
-            <Text style={styles.emptyText}>Please go back and try again.</Text>
+            <Text style={styles.emptyText}>
+              {refreshing ? "Loading request..." : "Please go back and try again."}
+            </Text>
+
+            <TouchableOpacity
+              style={styles.secondaryBtn}
+              onPress={() => navigation.navigate("MaintenanceHistory")}
+            >
+              <Text style={styles.secondaryText}>Back to History</Text>
+            </TouchableOpacity>
           </View>
         ) : (
           <>
@@ -184,9 +213,7 @@ export default function Review({ navigation, route }) {
                 </View>
               </View>
 
-              <Text style={styles.description}>
-                {request.description || "-"}
-              </Text>
+              <Text style={styles.description}>{request.description || "-"}</Text>
 
               <Text style={styles.info}>
                 <Text style={styles.bold}>Date:</Text>{" "}
@@ -223,14 +250,23 @@ export default function Review({ navigation, route }) {
                 {Number(request.total_price || 0).toFixed(2)} JOD
               </Text>
 
-              {canCancel ? (
+              <View style={styles.actionRow}>
+                {canCancel ? (
+                  <TouchableOpacity
+                    style={styles.secondaryBtn}
+                    onPress={handleCancel}
+                  >
+                    <Text style={styles.secondaryText}>Cancel Request</Text>
+                  </TouchableOpacity>
+                ) : null}
+
                 <TouchableOpacity
-                  style={styles.secondaryBtn}
-                  onPress={handleCancel}
+                  style={styles.primaryBtnSmall}
+                  onPress={() => navigation.navigate("MaintenanceHistory")}
                 >
-                  <Text style={styles.secondaryText}>Cancel Request</Text>
+                  <Text style={styles.primaryText}>Back to History</Text>
                 </TouchableOpacity>
-              ) : null}
+              </View>
             </View>
 
             {!canReview ? (
@@ -238,13 +274,6 @@ export default function Review({ navigation, route }) {
                 <Text style={styles.emptyText}>
                   Review is available only after the request is completed.
                 </Text>
-
-                <TouchableOpacity
-                  style={styles.secondaryBtn}
-                  onPress={() => navigation.navigate("MaintenanceHistory")}
-                >
-                  <Text style={styles.secondaryText}>Back to History</Text>
-                </TouchableOpacity>
               </View>
             ) : oldRating ? (
               <View style={[styles.card, styles.successBox]}>
@@ -262,10 +291,7 @@ export default function Review({ navigation, route }) {
 
                 <View style={styles.starsRow}>
                   {[1, 2, 3, 4, 5].map((star) => (
-                    <TouchableOpacity
-                      key={star}
-                      onPress={() => setRating(star)}
-                    >
+                    <TouchableOpacity key={star} onPress={() => setRating(star)}>
                       <Text
                         style={[
                           styles.star,
@@ -287,10 +313,7 @@ export default function Review({ navigation, route }) {
                   placeholder="Write your review..."
                 />
 
-                <TouchableOpacity
-                  style={styles.primaryBtn}
-                  onPress={submitRating}
-                >
+                <TouchableOpacity style={styles.primaryBtn} onPress={submitRating}>
                   <Text style={styles.primaryText}>Submit Review</Text>
                 </TouchableOpacity>
               </View>
@@ -303,19 +326,8 @@ export default function Review({ navigation, route }) {
 }
 
 const styles = StyleSheet.create({
-  screen: {
-    flex: 1,
-    backgroundColor: "#E8DCCF",
-  },
-  loadingBox: {
-    flex: 1,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  container: {
-    padding: 18,
-    paddingBottom: 60,
-  },
+  screen: { flex: 1, backgroundColor: "#E8DCCF" },
+  container: { padding: 18, paddingBottom: 70 },
   title: {
     fontSize: 38,
     fontWeight: "900",
@@ -367,9 +379,12 @@ const styles = StyleSheet.create({
     marginBottom: 11,
     lineHeight: 24,
   },
-  bold: {
-    color: "#111",
-    fontWeight: "900",
+  bold: { color: "#111", fontWeight: "900" },
+  actionRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 12,
+    marginTop: 8,
   },
   primaryBtn: {
     backgroundColor: "#111",
@@ -379,10 +394,15 @@ const styles = StyleSheet.create({
     alignItems: "center",
     marginTop: 12,
   },
-  primaryText: {
-    color: "#FFF",
-    fontWeight: "900",
+  primaryBtnSmall: {
+    backgroundColor: "#111",
+    paddingVertical: 13,
+    paddingHorizontal: 22,
+    borderRadius: 999,
+    alignSelf: "flex-start",
+    marginTop: 12,
   },
+  primaryText: { color: "#FFF", fontWeight: "900" },
   secondaryBtn: {
     borderWidth: 1,
     borderColor: "#111",
@@ -392,56 +412,27 @@ const styles = StyleSheet.create({
     alignSelf: "flex-start",
     marginTop: 12,
   },
-  secondaryText: {
-    color: "#111",
-    fontWeight: "900",
-  },
+  secondaryText: { color: "#111", fontWeight: "900" },
   messageBox: {
     borderWidth: 1,
     borderRadius: 18,
     padding: 14,
     marginBottom: 18,
   },
-  successBox: {
-    backgroundColor: "#F5FBF6",
-    borderColor: "#CFE8D4",
-  },
-  errorBox: {
-    backgroundColor: "#FFF3F3",
-    borderColor: "#EFC3C3",
-  },
-  messageTitle: {
-    fontWeight: "900",
-    color: "#111",
-    marginBottom: 6,
-  },
-  messageText: {
-    color: "#3A3028",
-    lineHeight: 22,
-  },
+  successBox: { backgroundColor: "#F5FBF6", borderColor: "#CFE8D4" },
+  errorBox: { backgroundColor: "#FFF3F3", borderColor: "#EFC3C3" },
+  messageTitle: { fontWeight: "900", color: "#111", marginBottom: 6 },
+  messageText: { color: "#3A3028", lineHeight: 22 },
   emptyTitle: {
     fontSize: 24,
     fontWeight: "900",
     color: "#111",
     marginBottom: 8,
   },
-  emptyText: {
-    color: "#6B5E52",
-    fontSize: 16,
-    lineHeight: 24,
-  },
-  starsRow: {
-    flexDirection: "row",
-    gap: 8,
-    marginVertical: 14,
-  },
-  star: {
-    fontSize: 36,
-    color: "#C8B8A8",
-  },
-  activeStar: {
-    color: "#111",
-  },
+  emptyText: { color: "#6B5E52", fontSize: 16, lineHeight: 24 },
+  starsRow: { flexDirection: "row", gap: 8, marginVertical: 14 },
+  star: { fontSize: 36, color: "#C8B8A8" },
+  activeStar: { color: "#111" },
   label: {
     color: "#111",
     fontWeight: "900",
@@ -456,8 +447,5 @@ const styles = StyleSheet.create({
     padding: 12,
     color: "#111",
   },
-  textArea: {
-    minHeight: 110,
-    textAlignVertical: "top",
-  },
+  textArea: { minHeight: 110, textAlignVertical: "top" },
 });

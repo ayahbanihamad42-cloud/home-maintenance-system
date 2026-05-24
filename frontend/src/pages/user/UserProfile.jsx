@@ -12,6 +12,8 @@ function UserProfile() {
   const currentUser = JSON.parse(localStorage.getItem("user") || "{}");
 
   const [profile, setProfile] = useState(null);
+  const [technicianGalleryId, setTechnicianGalleryId] = useState("");
+
   const [menuOpen, setMenuOpen] = useState(false);
   const [submenu, setSubmenu] = useState(null);
 
@@ -38,25 +40,99 @@ function UserProfile() {
 
   const formatDate = (value) => {
     if (!value) return "";
-    return String(value).split("T")[0];
+
+    const raw = String(value).trim();
+
+    if (/^\d{4}-\d{2}-\d{2}$/.test(raw)) {
+      return raw;
+    }
+
+    const match = raw.match(/^(\d{4}-\d{2}-\d{2})/);
+    if (match) return match[1];
+
+    return raw.slice(0, 10);
   };
 
-  const isTechnician = String(profile?.role || "").toLowerCase() === "technician";
+  const isTechnician =
+    String(profile?.role || currentUser?.role || "").toLowerCase() ===
+    "technician";
+
+  const getTechnicianIdFromData = (data) => {
+    if (!data) return "";
+
+    return (
+      data.technician_id ||
+      data.technicianId ||
+      data.tech_id ||
+      data.technician?.id ||
+      data.technician?.technician_id ||
+      data.technician?.technicianId ||
+      ""
+    );
+  };
+
+  const loadTechnicianGalleryId = async (profileData) => {
+    const directId =
+      getTechnicianIdFromData(profileData) ||
+      getTechnicianIdFromData(currentUser);
+
+    if (directId) {
+      setTechnicianGalleryId(directId);
+      return;
+    }
+
+    const possibleUrls = [
+      `/technicians/me`,
+      `/technicians/user/${currentUser.id}`,
+      `/technicians/by-user/${currentUser.id}`,
+    ];
+
+    for (const url of possibleUrls) {
+      try {
+        const res = await API.get(url);
+        const data = res.data?.technician || res.data?.data || res.data;
+
+        const foundId =
+          getTechnicianIdFromData(data) ||
+          data?.id ||
+          data?.technician_id ||
+          data?.technicianId ||
+          "";
+
+        if (foundId) {
+          setTechnicianGalleryId(foundId);
+          return;
+        }
+      } catch (err) {}
+    }
+
+    setTechnicianGalleryId("");
+  };
 
   const loadProfile = async () => {
     try {
       setProfileMessage(null);
 
       const res = await API.get(`/users/${currentUser.id}`);
+      const data = res.data || {};
 
-      setProfile(res.data);
-      setEmail(res.data.email || "");
-      setPhone(res.data.phone || "");
-      setCity(res.data.city || "");
-      setDob(formatDate(res.data.dob));
+      setProfile(data);
+
+      setEmail(data.email || "");
+      setPhone(data.phone || "");
+      setCity(data.city || "");
+      setDob(formatDate(data.dob));
 
       const savedPhoto = localStorage.getItem(`profile_photo_${currentUser.id}`);
       if (savedPhoto) setPhotoPreview(savedPhoto);
+
+      const role = String(data.role || currentUser.role || "").toLowerCase();
+
+      if (role === "technician") {
+        await loadTechnicianGalleryId(data);
+      } else {
+        setTechnicianGalleryId("");
+      }
     } catch (err) {
       setProfileMessage({
         type: "error",
@@ -170,7 +246,6 @@ function UserProfile() {
       setSubmenu(null);
 
       const data = await getMyBalance();
-
       const info = data.paymentInfo;
 
       setProfileMessage({
@@ -419,8 +494,20 @@ function UserProfile() {
             </p>
           </div>
 
-          {isTechnician && profile.technician_id && (
-            <TechnicianProfileGallery technicianId={profile.technician_id} />
+          {isTechnician && (
+            <div className="profile-gallery-section" style={{ marginTop: "28px" }}>
+              {technicianGalleryId ? (
+                <TechnicianProfileGallery technicianId={technicianGalleryId} />
+              ) : (
+                <div className="message-box-card warning">
+                  <div className="message-box-title">Gallery</div>
+                  <div className="message-box-body">
+                    Technician gallery id is missing. Please make sure the backend
+                    returns technician_id for this technician user.
+                  </div>
+                </div>
+              )}
+            </div>
           )}
         </div>
       </div>
@@ -447,11 +534,19 @@ function UserProfile() {
 
             <div className="input-group">
               <label>Birth Date</label>
-              <input type="date" value={dob} onChange={(e) => setDob(e.target.value)} />
+              <input
+                type="date"
+                value={dob}
+                onChange={(e) => setDob(e.target.value)}
+              />
             </div>
 
             <div className="modal-actions">
-              <button className="secondary" type="button" onClick={() => setShowEditModal(false)}>
+              <button
+                className="secondary"
+                type="button"
+                onClick={() => setShowEditModal(false)}
+              >
                 Cancel
               </button>
 
@@ -489,7 +584,11 @@ function UserProfile() {
             </div>
 
             <div className="modal-actions">
-              <button className="secondary" type="button" onClick={() => setShowPhotoModal(false)}>
+              <button
+                className="secondary"
+                type="button"
+                onClick={() => setShowPhotoModal(false)}
+              >
                 Cancel
               </button>
             </div>
@@ -507,7 +606,10 @@ function UserProfile() {
               <input
                 value={paymentInfo.account_holder}
                 onChange={(e) =>
-                  setPaymentInfo({ ...paymentInfo, account_holder: e.target.value })
+                  setPaymentInfo({
+                    ...paymentInfo,
+                    account_holder: e.target.value,
+                  })
                 }
                 placeholder="Technician name"
               />
@@ -518,7 +620,10 @@ function UserProfile() {
               <input
                 value={paymentInfo.wallet_name}
                 onChange={(e) =>
-                  setPaymentInfo({ ...paymentInfo, wallet_name: e.target.value })
+                  setPaymentInfo({
+                    ...paymentInfo,
+                    wallet_name: e.target.value,
+                  })
                 }
                 placeholder="Example: CliQ / Zain Cash"
               />
@@ -529,7 +634,10 @@ function UserProfile() {
               <input
                 value={paymentInfo.wallet_number}
                 onChange={(e) =>
-                  setPaymentInfo({ ...paymentInfo, wallet_number: e.target.value })
+                  setPaymentInfo({
+                    ...paymentInfo,
+                    wallet_number: e.target.value,
+                  })
                 }
                 placeholder="0790000000"
               />
@@ -550,11 +658,19 @@ function UserProfile() {
             </div>
 
             <div className="modal-actions">
-              <button className="secondary" type="button" onClick={() => setShowPaymentModal(false)}>
+              <button
+                className="secondary"
+                type="button"
+                onClick={() => setShowPaymentModal(false)}
+              >
                 Cancel
               </button>
 
-              <button className="primary" type="button" onClick={handleSavePaymentInfo}>
+              <button
+                className="primary"
+                type="button"
+                onClick={handleSavePaymentInfo}
+              >
                 Save
               </button>
             </div>

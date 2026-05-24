@@ -5,7 +5,6 @@ import {
   ScrollView,
   TouchableOpacity,
   TextInput,
-  ActivityIndicator,
   StyleSheet,
   Modal,
 } from "react-native";
@@ -19,6 +18,23 @@ import {
   smartSearchTechnicians,
 } from "../../services/technicianService";
 
+const jordanCities = [
+  "Amman",
+  "Irbid",
+  "Zarqa",
+  "Aqaba",
+  "Salt",
+  "Madaba",
+  "Karak",
+  "Mafraq",
+  "Jerash",
+  "Ajloun",
+  "Tafilah",
+  "Maan",
+  "Ramtha",
+  "Russeifa",
+];
+
 const getTechnicianId = (tech) =>
   tech.technicianId || tech.technician_id || tech.tech_id || tech.id;
 
@@ -28,12 +44,9 @@ const getPrice = (tech) => Number(tech.price_per_hour || 0);
 
 function CommentsModal({ visible, onClose, technicianId }) {
   const [comments, setComments] = useState([]);
-  const [loading, setLoading] = useState(false);
 
   const loadComments = async () => {
     if (!visible || !technicianId) return;
-
-    setLoading(true);
 
     try {
       const res = await API.get(`/ratings/technician/${technicianId}`);
@@ -41,8 +54,6 @@ function CommentsModal({ visible, onClose, technicianId }) {
     } catch (err) {
       console.log("comments error:", err?.response?.data || err.message);
       setComments([]);
-    } finally {
-      setLoading(false);
     }
   };
 
@@ -56,9 +67,7 @@ function CommentsModal({ visible, onClose, technicianId }) {
         <View style={styles.commentsModal}>
           <Text style={styles.commentsTitle}>Comments</Text>
 
-          {loading ? (
-            <ActivityIndicator color="#111" style={{ marginTop: 20 }} />
-          ) : comments.length === 0 ? (
+          {comments.length === 0 ? (
             <Text style={styles.noComments}>No comments yet.</Text>
           ) : (
             <ScrollView style={{ maxHeight: 360 }}>
@@ -71,7 +80,9 @@ function CommentsModal({ visible, onClose, technicianId }) {
                     <Text style={styles.commentRating}>⭐ {item.rating}</Text>
                   </View>
 
-                  <Text style={styles.commentText}>{item.comment}</Text>
+                  <Text style={styles.commentText}>
+                    {item.comment || "No comment."}
+                  </Text>
                 </View>
               ))}
             </ScrollView>
@@ -91,7 +102,7 @@ export default function TechniciansByService({ route, navigation }) {
 
   const [technicians, setTechnicians] = useState([]);
   const [smartResults, setSmartResults] = useState(null);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [smartLoading, setSmartLoading] = useState(false);
   const [userCity, setUserCity] = useState("");
 
@@ -152,20 +163,29 @@ export default function TechniciansByService({ route, navigation }) {
       } finally {
         setSmartLoading(false);
       }
-    }, 800);
+    }, 600);
 
     return () => clearTimeout(timer);
   }, [search, service, userCity]);
 
-  const cities = useMemo(() => {
-    const result = [];
+  const locationOptions = useMemo(() => {
+    const fromTechnicians = technicians
+      .map((tech) => String(tech.city || "").trim())
+      .filter(Boolean);
 
-    technicians.forEach((tech) => {
-      const city = String(tech.city || "").trim();
-      if (city && !result.includes(city)) result.push(city);
+    const merged = [...jordanCities, ...fromTechnicians];
+
+    const unique = [];
+    merged.forEach((city) => {
+      if (!unique.some((item) => normalizeText(item) === normalizeText(city))) {
+        unique.push(city);
+      }
     });
 
-    return result;
+    return [
+      { label: "All locations", value: "all" },
+      ...unique.map((city) => ({ label: city, value: city })),
+    ];
   }, [technicians]);
 
   const filteredTechnicians = useMemo(() => {
@@ -263,10 +283,7 @@ export default function TechniciansByService({ route, navigation }) {
               <CustomDropdown
                 value={locationFilter}
                 onChange={setLocationFilter}
-                options={[
-                  { label: "All locations", value: "all" },
-                  ...cities.map((city) => ({ label: city, value: city })),
-                ]}
+                options={locationOptions}
               />
             </View>
 
@@ -285,7 +302,9 @@ export default function TechniciansByService({ route, navigation }) {
           </View>
 
           {loading ? (
-            <ActivityIndicator size="large" color="#111" style={{ marginTop: 30 }} />
+            <View style={styles.emptyCard}>
+              <Text style={styles.emptyText}>Loading technicians...</Text>
+            </View>
           ) : resultType === "stores" ? (
             <View style={styles.emptyCard}>
               <Text style={styles.emptyText}>
@@ -341,7 +360,9 @@ export default function TechniciansByService({ route, navigation }) {
                       onPress={() =>
                         navigation.navigate("TechnicianProfile", {
                           technicianId,
+                          technician_id: technicianId,
                           tech,
+                          readOnlyGallery: true,
                         })
                       }
                     >
@@ -353,6 +374,7 @@ export default function TechniciansByService({ route, navigation }) {
                       onPress={() =>
                         navigation.navigate("MaintenanceRequest", {
                           technicianId,
+                          technician_id: technicianId,
                           technicianName: tech.name,
                           service: tech.service || service,
                           price_per_hour: tech.price_per_hour || 0,
@@ -384,19 +406,19 @@ export default function TechniciansByService({ route, navigation }) {
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: "#E7DCCC" },
-  container: { padding: 24, paddingBottom: 80 },
+  container: { padding: 18, paddingBottom: 80 },
   panel: {
     backgroundColor: "#FFFAF4",
     borderWidth: 1,
     borderColor: "#D8C8B8",
     borderRadius: 30,
-    padding: 24,
+    padding: 20,
   },
   title: {
-    fontSize: 42,
+    fontSize: 38,
     fontWeight: "900",
     color: "#111",
-    marginBottom: 24,
+    marginBottom: 20,
   },
   search: {
     backgroundColor: "#F6EDE2",
@@ -424,7 +446,8 @@ const styles = StyleSheet.create({
   filterGrid: {
     flexDirection: "row",
     flexWrap: "wrap",
-    gap: 12,
+    justifyContent: "space-between",
+    rowGap: 12,
     marginBottom: 22,
   },
   filterItem: { width: "48%" },
@@ -507,21 +530,9 @@ const styles = StyleSheet.create({
     gap: 12,
     marginBottom: 8,
   },
-  commentUser: {
-    color: "#111",
-    fontWeight: "900",
-    fontSize: 17,
-  },
-  commentRating: {
-    color: "#111",
-    fontWeight: "900",
-    fontSize: 16,
-  },
-  commentText: {
-    color: "#3A3028",
-    fontSize: 16,
-    lineHeight: 23,
-  },
+  commentUser: { color: "#111", fontWeight: "900", fontSize: 17 },
+  commentRating: { color: "#111", fontWeight: "900", fontSize: 16 },
+  commentText: { color: "#3A3028", fontSize: 16, lineHeight: 23 },
   closeBtn: {
     backgroundColor: "#111",
     borderRadius: 999,
@@ -529,9 +540,5 @@ const styles = StyleSheet.create({
     marginTop: 18,
     alignItems: "center",
   },
-  closeBtnText: {
-    color: "#fff",
-    fontWeight: "900",
-    fontSize: 17,
-  },
+  closeBtnText: { color: "#fff", fontWeight: "900", fontSize: 17 },
 });

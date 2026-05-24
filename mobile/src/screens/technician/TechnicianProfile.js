@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import {
   View,
   Text,
@@ -6,19 +6,15 @@ import {
   TouchableOpacity,
   StyleSheet,
   Image,
-  ActivityIndicator,
 } from "react-native";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 
 import Header from "../../components/Common/Header";
 import API from "../../services/api";
-
-const apiGetWithTimeout = (url, config = {}, ms = 8000) =>
-  Promise.race([
-    API.get(url, config),
-    new Promise((_, reject) =>
-      setTimeout(() => reject(new Error("Request timeout")), ms)
-    ),
-  ]);
+import {
+  getTechnicianById,
+  getTechnicianGallery,
+} from "../../services/technicianService";
 
 const getApiHost = () => {
   const base = API?.defaults?.baseURL || "";
@@ -27,9 +23,14 @@ const getApiHost = () => {
 
 const getImageUrl = (url) => {
   if (!url) return null;
+
   const value = String(url).trim();
+
   if (!value) return null;
-  if (value.startsWith("http")) return value;
+  if (value.startsWith("http://")) return value;
+  if (value.startsWith("https://")) return value;
+  if (value.startsWith("data:image/")) return value;
+
   return `${getApiHost()}${value.startsWith("/") ? value : `/${value}`}`;
 };
 
@@ -54,6 +55,14 @@ const normalizeImages = (post = {}) => {
   }
 };
 
+const normalizeGalleryResponse = (data) => {
+  if (Array.isArray(data)) return data;
+  if (Array.isArray(data?.posts)) return data.posts;
+  if (Array.isArray(data?.gallery)) return data.gallery;
+  if (Array.isArray(data?.data)) return data.data;
+  return [];
+};
+
 export default function TechnicianProfile({ navigation, route }) {
   const params = route?.params || {};
   const initialTech = params.tech || params.technician || {};
@@ -68,6 +77,7 @@ export default function TechnicianProfile({ navigation, route }) {
   const [loading, setLoading] = useState(false);
   const [galleryLoading, setGalleryLoading] = useState(false);
   const [message, setMessage] = useState(null);
+  const [canEditGallery, setCanEditGallery] = useState(false);
 
   const loadProfile = async () => {
     if (!technicianId) {
@@ -78,12 +88,12 @@ export default function TechnicianProfile({ navigation, route }) {
       return;
     }
 
-    setLoading(true);
-    setMessage(null);
-
     try {
-      const res = await apiGetWithTimeout(`/technicians/${technicianId}`);
-      setTech(res.data || initialTech || {});
+      setLoading(true);
+      setMessage(null);
+
+      const data = await getTechnicianById(technicianId);
+      setTech(data || initialTech || {});
     } catch (err) {
       console.log("technician profile error:", err?.response?.data || err.message);
       setTech(initialTech || {});
@@ -102,20 +112,11 @@ export default function TechnicianProfile({ navigation, route }) {
       return;
     }
 
-    setGalleryLoading(true);
-
     try {
-      const res = await apiGetWithTimeout(`/technicians/${technicianId}/gallery`);
+      setGalleryLoading(true);
 
-      const data = Array.isArray(res.data)
-        ? res.data
-        : Array.isArray(res.data?.posts)
-        ? res.data.posts
-        : Array.isArray(res.data?.gallery)
-        ? res.data.gallery
-        : [];
-
-      setGallery(data);
+      const data = await getTechnicianGallery(technicianId);
+      setGallery(normalizeGalleryResponse(data));
     } catch (err) {
       console.log("technician gallery error:", err?.response?.data || err.message);
       setGallery([]);
@@ -124,14 +125,59 @@ export default function TechnicianProfile({ navigation, route }) {
     }
   };
 
-  useEffect(() => {
-    const unsubscribe = navigation.addListener("focus", () => {
-      loadProfile();
-      loadGallery();
-    });
+  const checkGalleryPermission = async (profileData = tech) => {
+    try {
+      const raw = await AsyncStorage.getItem("user");
+      const user = raw ? JSON.parse(raw) : null;
 
+      const role = String(user?.role || "").toLowerCase();
+
+      const profileUserId =
+        profileData?.user_id ||
+        profileData?.userId ||
+        profileData?.technician_user_id ||
+        null;
+
+      const profileTechnicianId =
+        profileData?.technician_id ||
+        profileData?.technicianId ||
+        profileData?.tech_id ||
+        profileData?.id ||
+        technicianId;
+
+      const ownerByUser =
+        user?.id && profileUserId && Number(user.id) === Number(profileUserId);
+
+      const ownerByTechnician =
+        user?.technician_id &&
+        profileTechnicianId &&
+        Number(user.technician_id) === Number(profileTechnicianId);
+
+      setCanEditGallery(role === "technician" && (ownerByUser || ownerByTechnician));
+    } catch {
+      setCanEditGallery(false);
+    }
+  };
+
+  useEffect(() => {
+    const run = async () => {
+      await loadProfile();
+      await loadGallery();
+    };
+
+    run();
+
+    const unsubscribe = navigation.addListener("focus", run);
     return unsubscribe;
   }, [navigation, technicianId]);
+
+  useEffect(() => {
+    checkGalleryPermission(tech);
+  }, [tech, technicianId]);
+
+  const galleryPosts = useMemo(() => {
+    return Array.isArray(gallery) ? gallery : [];
+  }, [gallery]);
 
   return (
     <View style={styles.screen}>
@@ -149,78 +195,94 @@ export default function TechnicianProfile({ navigation, route }) {
           </View>
         ) : null}
 
-        {loading ? (
-          <ActivityIndicator size="large" color="#111" style={{ marginTop: 35 }} />
-        ) : (
-          <View style={styles.card}>
-            <Text style={styles.name}>{tech.name || "Technician"}</Text>
-            <Text style={styles.service}>{tech.service || "-"}</Text>
+        <View style={styles.card}>
+          {loading ? (
+            <Text style={styles.empty}>Loading technician...</Text>
+          ) : (
+            <>
+              <Text style={styles.name}>{tech.name || "Technician"}</Text>
+              <Text style={styles.service}>{tech.service || "-"}</Text>
 
-            <Text style={styles.line}>City: {tech.city || "-"}</Text>
-            <Text style={styles.line}>Phone: {tech.phone || "-"}</Text>
-            <Text style={styles.line}>
-              Experience: {tech.experience || 0} years
-            </Text>
-            <Text style={styles.line}>
-              Price: {Number(tech.price_per_hour || 0).toFixed(2)} JOD/hour
-            </Text>
-            <Text style={styles.line}>
-              Rating: ⭐ {tech.rating || tech.average_rating || "0.0"}
-            </Text>
+              <Text style={styles.line}>City: {tech.city || "-"}</Text>
+              <Text style={styles.line}>Phone: {tech.phone || "-"}</Text>
+              <Text style={styles.line}>
+                Experience: {tech.experience || 0} years
+              </Text>
+              <Text style={styles.line}>
+                Price: {Number(tech.price_per_hour || 0).toFixed(2)} JOD/hour
+              </Text>
+              <Text style={styles.line}>
+                Rating: ⭐ {tech.rating || tech.average_rating || "0.0"}
+              </Text>
 
-            <Text style={styles.bio}>
-              {tech.bio || "Experienced technician ready to help."}
-            </Text>
+              <Text style={styles.bio}>
+                {tech.bio || "Experienced technician ready to help."}
+              </Text>
 
-            <View style={styles.actions}>
-              <TouchableOpacity
-                style={styles.btn}
-                onPress={() =>
-                  navigation.navigate("Chat", {
-                    userId: tech.user_id,
-                    receiverId: tech.user_id,
-                    name: tech.name,
-                    user: {
-                      id: tech.user_id,
+              <View style={styles.actions}>
+                <TouchableOpacity
+                  style={styles.btn}
+                  onPress={() =>
+                    navigation.navigate("Chat", {
+                      userId: tech.user_id,
+                      receiverId: tech.user_id,
                       name: tech.name,
-                    },
-                  })
-                }
-              >
-                <Text style={styles.btnText}>Send Message</Text>
-              </TouchableOpacity>
+                      user: {
+                        id: tech.user_id,
+                        name: tech.name,
+                      },
+                    })
+                  }
+                >
+                  <Text style={styles.btnText}>Send Message</Text>
+                </TouchableOpacity>
 
-              <TouchableOpacity
-                style={styles.btn}
-                onPress={() =>
-                  navigation.navigate("MaintenanceRequest", {
-                    technicianId,
-                    technician_id: technicianId,
-                    technician: tech,
-                    tech,
-                    service: tech.service,
-                    technicianName: tech.name,
-                    price_per_hour: tech.price_per_hour,
-                  })
-                }
-              >
-                <Text style={styles.btnText}>Book Now</Text>
-              </TouchableOpacity>
-            </View>
-
-            <View style={styles.softDivider} />
-          </View>
-        )}
+                <TouchableOpacity
+                  style={styles.btn}
+                  onPress={() =>
+                    navigation.navigate("MaintenanceRequest", {
+                      technicianId,
+                      technician_id: technicianId,
+                      technician: tech,
+                      tech,
+                      service: tech.service,
+                      technicianName: tech.name,
+                      price_per_hour: tech.price_per_hour,
+                    })
+                  }
+                >
+                  <Text style={styles.btnText}>Book Now</Text>
+                </TouchableOpacity>
+              </View>
+            </>
+          )}
+        </View>
 
         <View style={styles.galleryBox}>
-          <Text style={styles.galleryTitle}>Work Gallery</Text>
+          <View style={styles.galleryHeader}>
+            <Text style={styles.galleryTitle}>Work Gallery</Text>
+
+            {canEditGallery ? (
+              <TouchableOpacity
+                style={styles.addPostBtn}
+                onPress={() =>
+                  navigation.navigate("TechnicianGalleryManager", {
+                    technicianId,
+                    technician_id: technicianId,
+                  })
+                }
+              >
+                <Text style={styles.addPostText}>＋</Text>
+              </TouchableOpacity>
+            ) : null}
+          </View>
 
           {galleryLoading ? (
-            <ActivityIndicator color="#111" style={{ marginTop: 22 }} />
-          ) : gallery.length === 0 ? (
+            <Text style={styles.empty}>Loading gallery...</Text>
+          ) : galleryPosts.length === 0 ? (
             <Text style={styles.empty}>No gallery posts yet.</Text>
           ) : (
-            gallery.map((post) => {
+            galleryPosts.map((post) => {
               const images = normalizeImages(post);
 
               return (
@@ -233,18 +295,42 @@ export default function TechnicianProfile({ navigation, route }) {
                       technicianId,
                       technician_id: technicianId,
                       tech,
+                      readOnly: !canEditGallery,
+                      canEdit: canEditGallery,
                     })
                   }
                 >
-                  <Text style={styles.postCaption}>
-                    {post.description || post.caption || "No description"}
-                  </Text>
+                  <View style={styles.postHeader}>
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.postCaption}>
+                        {post.description || post.caption || "No description"}
+                      </Text>
 
-                  {post.location_note || post.location ? (
-                    <Text style={styles.postLocation}>
-                      📍 {post.location_note || post.location}
-                    </Text>
-                  ) : null}
+                      {post.location_note || post.location ? (
+                        <Text style={styles.postLocation}>
+                          📍 {post.location_note || post.location}
+                        </Text>
+                      ) : null}
+                    </View>
+
+                    {canEditGallery ? (
+                      <TouchableOpacity
+                        style={styles.postDots}
+                        onPress={() =>
+                          navigation.navigate("GalleryPostDetails", {
+                            post,
+                            technicianId,
+                            technician_id: technicianId,
+                            tech,
+                            canEdit: true,
+                            readOnly: false,
+                          })
+                        }
+                      >
+                        <Text style={styles.postDotsText}>⋮</Text>
+                      </TouchableOpacity>
+                    ) : null}
+                  </View>
 
                   {images.length > 0 ? (
                     <ScrollView horizontal showsHorizontalScrollIndicator={false}>
@@ -304,12 +390,6 @@ const styles = StyleSheet.create({
   line: { fontSize: 22, marginTop: 10, color: "#3D342D" },
   bio: { fontSize: 21, marginTop: 28, color: "#3D342D", lineHeight: 32 },
   actions: { flexDirection: "row", gap: 14, marginTop: 28, flexWrap: "wrap" },
-  softDivider: {
-    height: 1,
-    backgroundColor: "#111",
-    opacity: 0.24,
-    marginTop: 26,
-  },
   btn: {
     backgroundColor: "#111",
     paddingVertical: 18,
@@ -325,7 +405,26 @@ const styles = StyleSheet.create({
     borderColor: "#D8C8B8",
     marginTop: 4,
   },
-  galleryTitle: { fontSize: 32, fontWeight: "900", marginBottom: 18, color: "#111" },
+  galleryHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 18,
+  },
+  galleryTitle: { fontSize: 32, fontWeight: "900", color: "#111" },
+  addPostBtn: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: "#111",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  addPostText: {
+    color: "#FFF",
+    fontSize: 26,
+    fontWeight: "900",
+  },
   empty: { fontSize: 19, color: "#6B5E55" },
   post: {
     padding: 16,
@@ -335,8 +434,34 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: "#E2D3C4",
   },
-  postCaption: { fontSize: 19, fontWeight: "800", marginBottom: 8, color: "#111" },
-  postLocation: { fontSize: 17, marginBottom: 12, color: "#3D342D" },
+  postHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "flex-start",
+    gap: 12,
+    marginBottom: 10,
+  },
+  postCaption: {
+    fontSize: 19,
+    fontWeight: "900",
+    color: "#111",
+    marginBottom: 6,
+  },
+  postLocation: { fontSize: 17, color: "#3D342D" },
+  postDots: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: "#111",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  postDotsText: {
+    color: "#FFF",
+    fontSize: 24,
+    fontWeight: "900",
+    lineHeight: 26,
+  },
   noImageText: { fontSize: 16, color: "#6B5E55", marginTop: 6 },
   postImg: {
     width: 170,

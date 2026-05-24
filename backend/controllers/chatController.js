@@ -1,59 +1,101 @@
 import { db } from "../database/connection.js";
 
-const normalizeMessageType = (type) => {
-  const allowedTypes = ["text", "image", "location"];
+const query = (sql, params = []) =>
+  new Promise((resolve, reject) => {
+    db.query(sql, params, (err, result) => {
+      if (err) reject(err);
+      else resolve(result);
+    });
+  });
 
-  if (allowedTypes.includes(String(type || "").toLowerCase())) {
-    return String(type).toLowerCase();
-  }
+const allowedTypes = ["text", "image", "location"];
 
-  return "text";
+const isBase64Image = (value) => {
+  if (!value) return false;
+  return /^data:image\/(png|jpg|jpeg|webp);base64,/.test(String(value));
 };
 
-export const sendMessage = (req, res) => {
-  const senderId = req.user?.id;
-  const { receiver_id, message, type = "text" } = req.body;
+const isSafeImageSize = (value, maxMB = 2) => {
+  if (!value) return true;
 
-  if (!senderId) {
-    return res.status(401).json({ message: "Unauthorized" });
-  }
+  const sizeInBytes = (String(value).length * 3) / 4;
+  const maxBytes = maxMB * 1024 * 1024;
 
-  if (!receiver_id) {
-    return res.status(400).json({ message: "Receiver is required" });
-  }
+  return sizeInBytes <= maxBytes;
+};
 
-  if (!message) {
-    return res.status(400).json({ message: "Message is required" });
-  }
+export const sendMessage = async (req, res) => {
+  try {
+    const senderId = req.user?.id;
+    const { receiver_id, message } = req.body;
+    const rawType = req.body.type || req.body.message_type || "text";
+    const messageType = String(rawType).toLowerCase();
 
-  const messageType = normalizeMessageType(type);
+    if (!senderId) {
+      return res.status(401).json({ message: "Unauthorized" });
+    }
 
-  const q = `
-    INSERT INTO messages (sender_id, receiver_id, message, type)
-    VALUES (?, ?, ?, ?)
-  `;
+    if (!receiver_id) {
+      return res.status(400).json({ message: "Receiver is required" });
+    }
 
-  db.query(
-    q,
-    [senderId, Number(receiver_id), message, messageType],
-    (err, result) => {
-      if (err) {
-        console.error("sendMessage insert error:", err);
-        return res.status(500).json({
-          message: err.sqlMessage || err.message || "Server error",
+    if (Number(receiver_id) === Number(senderId)) {
+      return res.status(400).json({ message: "You cannot message yourself" });
+    }
+
+    if (!message || String(message).trim() === "") {
+      return res.status(400).json({ message: "Message cannot be empty" });
+    }
+
+    if (!allowedTypes.includes(messageType)) {
+      return res.status(400).json({ message: "Invalid message type" });
+    }
+
+    if (messageType === "image") {
+      if (!isBase64Image(message)) {
+        return res.status(400).json({
+          message: "Invalid image format. Use png, jpg, jpeg, or webp.",
         });
       }
 
-      return res.status(201).json({
-        id: result.insertId,
-        sender_id: senderId,
-        receiver_id: Number(receiver_id),
-        message,
-        type: messageType,
-        created_at: new Date(),
-      });
+      if (!isSafeImageSize(message, 2)) {
+        return res.status(400).json({
+          message: "Image is too large. Maximum size is 2MB.",
+        });
+      }
     }
-  );
+
+    const receiverRows = await query(
+      "SELECT id FROM users WHERE id = ? LIMIT 1",
+      [receiver_id]
+    );
+
+    if (!receiverRows.length) {
+      return res.status(404).json({ message: "Receiver not found" });
+    }
+
+    const result = await query(
+      `
+      INSERT INTO messages (sender_id, receiver_id, message, type)
+      VALUES (?, ?, ?, ?)
+      `,
+      [senderId, Number(receiver_id), message, messageType]
+    );
+
+    return res.status(201).json({
+      id: result.insertId,
+      sender_id: senderId,
+      receiver_id: Number(receiver_id),
+      message,
+      type: messageType,
+      created_at: new Date(),
+    });
+  } catch (err) {
+    console.error("sendMessage error:", err);
+    return res.status(500).json({
+      message: err.sqlMessage || err.message || "Server error",
+    });
+  }
 };
 
 export const getMessages = (req, res) => {

@@ -7,6 +7,35 @@ import {
   smartSearchTechnicians,
 } from "../../services/technicianService.jsx";
 
+const jordanCities = [
+  "Amman",
+  "Irbid",
+  "Zarqa",
+  "Russeifa",
+  "Salt",
+  "Madaba",
+  "Aqaba",
+  "Jerash",
+  "Ajloun",
+  "Mafraq",
+  "Karak",
+  "Tafilah",
+  "Ma'an",
+  "Ramtha",
+  "Sahab",
+  "Fuheis",
+  "Mahis",
+  "Balqa",
+  "Wadi Musa",
+  "Kufranjah",
+  "Karak City",
+  "Taybeh",
+  "Shobak",
+  "Southern Shuna",
+  "Northern Shuna",
+  "Deir Alla",
+];
+
 function normalizeText(value) {
   return String(value || "").trim().toLowerCase();
 }
@@ -67,7 +96,7 @@ function CommentsBox({ technicianId }) {
                   <b>{item.user_name || "User"}</b>
                   <span>⭐ {item.rating}</span>
                 </div>
-                <div className="comment-text">{item.comment}</div>
+                <div className="comment-text">{item.comment || "-"}</div>
               </div>
             ))
           )}
@@ -80,11 +109,13 @@ function CommentsBox({ technicianId }) {
 export default function TechniciansByService() {
   const { service } = useParams();
   const navigate = useNavigate();
-
   const currentUser = JSON.parse(localStorage.getItem("user") || "{}");
+
+  const decodedService = decodeURIComponent(service || "");
 
   const [technicians, setTechnicians] = useState([]);
   const [smartResults, setSmartResults] = useState(null);
+
   const [loading, setLoading] = useState(true);
   const [smartLoading, setSmartLoading] = useState(false);
 
@@ -93,23 +124,26 @@ export default function TechniciansByService() {
   const [priceFilter, setPriceFilter] = useState("all");
   const [locationFilter, setLocationFilter] = useState("all");
   const [ratingFilter, setRatingFilter] = useState("all");
+  const [sortFilter, setSortFilter] = useState("recommended");
+
+  const loadTechnicians = async () => {
+    try {
+      setLoading(true);
+      setSmartResults(null);
+
+      const data = await getTechnicians(decodedService);
+      setTechnicians(Array.isArray(data) ? data : []);
+    } catch (err) {
+      console.error("technicians by service error:", err);
+      setTechnicians([]);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
-    setLoading(true);
-    setSmartResults(null);
-
-    getTechnicians(service)
-      .then((data) => {
-        setTechnicians(Array.isArray(data) ? data : []);
-      })
-      .catch((err) => {
-        console.error("technicians by service error:", err);
-        setTechnicians([]);
-      })
-      .finally(() => {
-        setLoading(false);
-      });
-  }, [service]);
+    loadTechnicians();
+  }, [decodedService]);
 
   useEffect(() => {
     const value = search.trim();
@@ -126,7 +160,7 @@ export default function TechniciansByService() {
 
         const data = await smartSearchTechnicians({
           searchText: value,
-          service: decodeURIComponent(service || ""),
+          service: decodedService,
           userCity: currentUser?.city || "",
         });
 
@@ -137,26 +171,18 @@ export default function TechniciansByService() {
       } finally {
         setSmartLoading(false);
       }
-    }, 800);
+    }, 700);
 
     return () => clearTimeout(timer);
-  }, [search, service, currentUser?.city]);
-
-  const cities = useMemo(() => {
-    const result = [];
-
-    technicians.forEach((tech) => {
-      const city = String(tech.city || "").trim();
-      if (city && !result.includes(city)) result.push(city);
-    });
-
-    return result;
-  }, [technicians]);
+  }, [search, decodedService, currentUser?.city]);
 
   const filteredTechnicians = useMemo(() => {
     if (resultType !== "technicians") return [];
 
-    let result = search.trim() && Array.isArray(smartResults) ? smartResults : [...technicians];
+    let result =
+      search.trim() && Array.isArray(smartResults)
+        ? [...smartResults]
+        : [...technicians];
 
     if (priceFilter === "low") {
       result = result.filter((tech) => getPrice(tech) <= 10);
@@ -182,6 +208,22 @@ export default function TechniciansByService() {
       result = result.filter((tech) => getRating(tech) >= Number(ratingFilter));
     }
 
+    if (sortFilter === "rating") {
+      result.sort((a, b) => getRating(b) - getRating(a));
+    }
+
+    if (sortFilter === "price_low") {
+      result.sort((a, b) => getPrice(a) - getPrice(b));
+    }
+
+    if (sortFilter === "price_high") {
+      result.sort((a, b) => getPrice(b) - getPrice(a));
+    }
+
+    if (sortFilter === "experience") {
+      result.sort((a, b) => Number(b.experience || 0) - Number(a.experience || 0));
+    }
+
     return result;
   }, [
     technicians,
@@ -191,7 +233,18 @@ export default function TechniciansByService() {
     priceFilter,
     locationFilter,
     ratingFilter,
+    sortFilter,
   ]);
+
+  const clearFilters = () => {
+    setSearch("");
+    setResultType("technicians");
+    setPriceFilter("all");
+    setLocationFilter("all");
+    setRatingFilter("all");
+    setSortFilter("recommended");
+    setSmartResults(null);
+  };
 
   return (
     <>
@@ -199,13 +252,24 @@ export default function TechniciansByService() {
 
       <div className="technicians-page">
         <div className="technicians-panel">
-          <h1>{decodeURIComponent(service || "")} Technicians</h1>
+          <div className="technicians-page-header">
+            <div>
+              <h1>{decodedService} Technicians</h1>
+              <p className="page-subtitle">
+                Choose a technician, filter by city, rating, price, or experience.
+              </p>
+            </div>
+
+            <button className="secondary" type="button" onClick={clearFilters}>
+              Clear Filters
+            </button>
+          </div>
 
           <input
             className="technician-search-input"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="Ask or search: name, city, cheapest, best technician..."
+            placeholder="Search: name, city, cheapest, best technician..."
           />
 
           <div className="technician-filters-grid">
@@ -218,25 +282,25 @@ export default function TechniciansByService() {
             </select>
 
             <select
-              value={priceFilter}
-              onChange={(e) => setPriceFilter(e.target.value)}
-            >
-              <option value="all">All prices</option>
-              <option value="low">Low</option>
-              <option value="mid">Medium</option>
-              <option value="high">High</option>
-            </select>
-
-            <select
               value={locationFilter}
               onChange={(e) => setLocationFilter(e.target.value)}
             >
-              <option value="all">All locations</option>
-              {cities.map((city) => (
+              <option value="all">All Jordan cities</option>
+              {jordanCities.map((city) => (
                 <option key={city} value={city}>
                   {city}
                 </option>
               ))}
+            </select>
+
+            <select
+              value={priceFilter}
+              onChange={(e) => setPriceFilter(e.target.value)}
+            >
+              <option value="all">All prices</option>
+              <option value="low">Low: 10 JOD or less</option>
+              <option value="mid">Medium: 11 - 25 JOD</option>
+              <option value="high">High: more than 25 JOD</option>
             </select>
 
             <select
@@ -248,6 +312,8 @@ export default function TechniciansByService() {
               <option value="4">4+</option>
               <option value="3">3+</option>
             </select>
+
+            
           </div>
 
           {search.trim() ? (
@@ -286,8 +352,18 @@ export default function TechniciansByService() {
 
                 return (
                   <div className="technician-card" key={technicianId}>
-                    <h2>{tech.name || "Technician"}</h2>
-                    <p className="technician-service">{tech.service || service}</p>
+                    <div className="technician-card-top">
+                      <div>
+                        <h2>{tech.name || "Technician"}</h2>
+                        <p className="technician-service">
+                          {tech.service || decodedService}
+                        </p>
+                      </div>
+
+                      <span className="status-pill">
+                        ⭐ {getRating(tech).toFixed(1)}
+                      </span>
+                    </div>
 
                     <p>
                       <b>City:</b> {tech.city || "-"}
@@ -302,8 +378,8 @@ export default function TechniciansByService() {
                       <b>Price:</b> {getPrice(tech).toFixed(2)} JOD/hour
                     </p>
                     <p>
-                      <b>Rating:</b> ⭐ {getRating(tech).toFixed(1)}
-                      {tech.review_count ? ` (${tech.review_count} reviews)` : ""}
+                      <b>Reviews:</b>{" "}
+                      {tech.review_count ? `${tech.review_count} reviews` : "No reviews yet"}
                     </p>
 
                     <CommentsBox technicianId={technicianId} />
@@ -321,10 +397,13 @@ export default function TechniciansByService() {
                         className="primary"
                         type="button"
                         onClick={() =>
-                          navigate(`/request/${technicianId}`, {
+                          navigate("/request", {
                             state: {
+                              technicianId,
                               technician: tech,
-                              service: tech.service || service,
+                              service: tech.service || decodedService,
+                              technicianName: tech.name || "",
+                              price_per_hour: tech.price_per_hour || 0,
                             },
                           })
                         }

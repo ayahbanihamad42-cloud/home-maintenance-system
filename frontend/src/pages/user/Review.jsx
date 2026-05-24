@@ -5,10 +5,7 @@ import {
   getRequestById,
   cancelMaintenanceRequest,
 } from "../../services/maintenanceService";
-import {
-  addRating,
-  getRatingByRequest,
-} from "../../services/ratingService";
+import { addRating, getRatingByRequest } from "../../services/ratingService";
 
 function Review() {
   const { requestId } = useParams();
@@ -22,16 +19,48 @@ function Review() {
 
   const formatDateOnly = (value) => {
     if (!value) return "-";
-    const raw = String(value);
+
+    const raw = String(value).trim();
+
+    if (/^\d{4}-\d{2}-\d{2}$/.test(raw)) {
+      return raw;
+    }
+
+    if (raw.includes("T")) {
+      const d = new Date(raw);
+
+      if (!Number.isNaN(d.getTime())) {
+        const yyyy = d.getFullYear();
+        const mm = String(d.getMonth() + 1).padStart(2, "0");
+        const dd = String(d.getDate()).padStart(2, "0");
+        return `${yyyy}-${mm}-${dd}`;
+      }
+    }
+
     const match = raw.match(/^(\d{4}-\d{2}-\d{2})/);
     if (match) return match[1];
+
     return raw.slice(0, 10);
+  };
+
+  const formatTimeOnly = (value) => {
+    if (!value) return "-";
+
+    const raw = String(value).trim();
+    const match = raw.match(/^(\d{2}:\d{2})(:\d{2})?/);
+
+    if (match) return match[0];
+
+    return raw.slice(0, 8);
   };
 
   const formatDateTime = (value) => {
     if (!value) return "-";
+
     const d = new Date(value);
+
     if (Number.isNaN(d.getTime())) return String(value);
+
     return d.toLocaleString();
   };
 
@@ -157,30 +186,38 @@ function Review() {
         <div className="history-card">
           <div className="history-card-header">
             <h3>{request.service || "-"}</h3>
-            <span className="status-pill">{request.status || "-"}</span>
+            <span className="status-pill">
+              {String(request.status || "-").replaceAll("_", " ")}
+            </span>
           </div>
 
           <p className="history-description">{request.description || "-"}</p>
 
           <div className="history-info-grid">
             <p>
-              <b>Date:</b> {formatDateOnly(request.scheduled_date)}
+              <b>Request Date:</b> {formatDateOnly(request.scheduled_date)}
             </p>
+
             <p>
-              <b>Time:</b> {request.scheduled_time || "-"}
+              <b>Request Time:</b> {formatTimeOnly(request.scheduled_time)}
             </p>
+
             <p>
               <b>Created At:</b> {formatDateTime(request.created_at)}
             </p>
+
             <p>
               <b>Technician:</b> {request.technician_name || "-"}
             </p>
+
             <p>
               <b>Location:</b> {request.location_note || request.city || "-"}
             </p>
+
             <p>
               <b>Payment:</b> {request.payment_method || "-"}
             </p>
+
             <p>
               <b>Total:</b> {Number(request.total_price || 0).toFixed(2)} JOD
             </p>

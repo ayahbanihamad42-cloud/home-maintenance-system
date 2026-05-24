@@ -3,14 +3,25 @@ import { useNavigate, useParams, useLocation } from "react-router-dom";
 import Header from "../../components/common/Header";
 
 import { createMaintenanceRequest } from "../../services/maintenanceService";
-import { getTechnicianById, getAvailability } from "../../services/technicianService";
+import {
+  getTechnicianById,
+  getAvailability,
+} from "../../services/technicianService";
 
 function MaintenanceRequest() {
   const navigate = useNavigate();
-  const { technicianId } = useParams();
+  const params = useParams();
   const location = useLocation();
 
   const stateTech = location.state?.technician || location.state?.tech || {};
+  const selectedTechnicianId =
+    params.technicianId ||
+    location.state?.technicianId ||
+    stateTech.technicianId ||
+    stateTech.technician_id ||
+    stateTech.id ||
+    "";
+
   const user = JSON.parse(localStorage.getItem("user") || "{}");
 
   const [availableDates, setAvailableDates] = useState([]);
@@ -26,7 +37,8 @@ function MaintenanceRequest() {
     payment_method: "cash",
     location_note: "",
     description: "",
-    price_per_hour: location.state?.price_per_hour || stateTech.price_per_hour || 0,
+    price_per_hour:
+      location.state?.price_per_hour || stateTech.price_per_hour || 0,
   });
 
   const totalPrice = useMemo(() => {
@@ -35,36 +47,68 @@ function MaintenanceRequest() {
     ).toFixed(2);
   }, [form.price_per_hour, form.estimated_hours]);
 
+  const isBooked = (item) => {
+    return (
+      Number(item?.is_booked) === 1 ||
+      item?.is_booked === true ||
+      String(item?.is_booked).toLowerCase() === "true"
+    );
+  };
+
   const normalizeDate = (value) => {
     if (!value) return "";
 
-    const raw = String(value);
+    const raw = String(value).trim();
 
-    if (/^\d{4}-\d{2}-\d{2}$/.test(raw)) return raw;
-
-    const d = new Date(value);
-
-    if (!Number.isNaN(d.getTime())) {
-      const yyyy = d.getFullYear();
-      const mm = String(d.getMonth() + 1).padStart(2, "0");
-      const dd = String(d.getDate()).padStart(2, "0");
-      return `${yyyy}-${mm}-${dd}`;
+    if (/^\d{4}-\d{2}-\d{2}$/.test(raw)) {
+      return raw;
     }
+
+    const isoDateMatch = raw.match(/^(\d{4}-\d{2}-\d{2})T/);
+
+    if (isoDateMatch) {
+      const d = new Date(raw);
+
+      if (!Number.isNaN(d.getTime())) {
+        const yyyy = d.getFullYear();
+        const mm = String(d.getMonth() + 1).padStart(2, "0");
+        const dd = String(d.getDate()).padStart(2, "0");
+        return `${yyyy}-${mm}-${dd}`;
+      }
+
+      return isoDateMatch[1];
+    }
+
+    const normalMatch = raw.match(/^(\d{4}-\d{2}-\d{2})/);
+    if (normalMatch) return normalMatch[1];
 
     return raw.slice(0, 10);
   };
 
   const normalizeTime = (value) => {
     if (!value) return "";
-    return String(value).slice(0, 8);
+
+    const raw = String(value).trim();
+
+    const match = raw.match(/^(\d{2}:\d{2})(:\d{2})?/);
+    if (match) return match[0].length === 5 ? `${match[0]}:00` : match[0];
+
+    return raw.slice(0, 8);
   };
 
   useEffect(() => {
     const loadTechnician = async () => {
       try {
-        if (!technicianId) return;
+        if (!selectedTechnicianId) {
+          setMessage({
+            type: "error",
+            title: "Missing Technician",
+            body: "Please choose a technician first.",
+          });
+          return;
+        }
 
-        const tech = await getTechnicianById(technicianId);
+        const tech = await getTechnicianById(selectedTechnicianId);
 
         setForm((prev) => ({
           ...prev,
@@ -74,34 +118,47 @@ function MaintenanceRequest() {
         }));
       } catch (err) {
         console.error("load technician error:", err);
+        setMessage({
+          type: "error",
+          title: "Error",
+          body: "Failed to load technician information.",
+        });
       }
     };
 
     loadTechnician();
-  }, [technicianId]);
+  }, [selectedTechnicianId]);
 
   useEffect(() => {
     const loadDates = async () => {
       try {
         setMessage(null);
 
-        const data = await getAvailability(technicianId);
+        if (!selectedTechnicianId) {
+          setAvailableDates([]);
+          setAvailableTimes([]);
+          return;
+        }
+
+        const data = await getAvailability(selectedTechnicianId);
         const list = Array.isArray(data) ? data : [];
 
         const dates = [
           ...new Set(
             list
-              .filter((x) => Number(x.is_booked) !== 1 && x.is_booked !== true)
+              .filter((x) => !isBooked(x))
               .map((x) => normalizeDate(x.available_date))
               .filter(Boolean)
           ),
-        ];
+        ].sort();
 
         setAvailableDates(dates);
 
         setForm((prev) => ({
           ...prev,
-          scheduled_date: dates[0] || "",
+          scheduled_date: dates.includes(prev.scheduled_date)
+            ? prev.scheduled_date
+            : dates[0] || "",
           scheduled_time: "",
         }));
       } catch (err) {
@@ -116,33 +173,44 @@ function MaintenanceRequest() {
       }
     };
 
-    if (technicianId) loadDates();
-  }, [technicianId]);
+    loadDates();
+  }, [selectedTechnicianId]);
 
   useEffect(() => {
     const loadTimes = async () => {
       try {
-        if (!technicianId || !form.scheduled_date) {
+        if (!selectedTechnicianId || !form.scheduled_date) {
           setAvailableTimes([]);
+          setForm((prev) => ({ ...prev, scheduled_time: "" }));
           return;
         }
 
-        const data = await getAvailability(technicianId, form.scheduled_date);
+        const data = await getAvailability(
+          selectedTechnicianId,
+          form.scheduled_date
+        );
+
         const list = Array.isArray(data) ? data : [];
 
         const times = list
-          .filter((x) => Number(x.is_booked) !== 1 && x.is_booked !== true)
+          .filter((x) => !isBooked(x))
+          .filter((x) => normalizeDate(x.available_date) === form.scheduled_date)
           .map((x) => ({
             id: x.id,
             value: normalizeTime(x.start_time),
-            label: `${normalizeTime(x.start_time)} - ${normalizeTime(x.end_time)}`,
-          }));
+            label: `${normalizeTime(x.start_time)} - ${normalizeTime(
+              x.end_time
+            )}`,
+          }))
+          .filter((x) => x.value);
 
         setAvailableTimes(times);
 
         setForm((prev) => ({
           ...prev,
-          scheduled_time: times[0]?.value || "",
+          scheduled_time: times.some((t) => t.value === prev.scheduled_time)
+            ? prev.scheduled_time
+            : times[0]?.value || "",
         }));
       } catch (err) {
         console.error("load times error:", err);
@@ -152,16 +220,15 @@ function MaintenanceRequest() {
     };
 
     loadTimes();
-  }, [technicianId, form.scheduled_date]);
+  }, [selectedTechnicianId, form.scheduled_date]);
 
   const checkSlotStillAvailable = async () => {
-    const data = await getAvailability(technicianId, form.scheduled_date);
+    const data = await getAvailability(selectedTechnicianId, form.scheduled_date);
     const list = Array.isArray(data) ? data : [];
 
     return list.some(
       (x) =>
-        Number(x.is_booked) !== 1 &&
-        x.is_booked !== true &&
+        !isBooked(x) &&
         normalizeDate(x.available_date) === form.scheduled_date &&
         normalizeTime(x.start_time) === normalizeTime(form.scheduled_time)
     );
@@ -172,6 +239,15 @@ function MaintenanceRequest() {
 
     try {
       setMessage(null);
+
+      if (!selectedTechnicianId) {
+        setMessage({
+          type: "error",
+          title: "Missing Technician",
+          body: "Please choose a technician first.",
+        });
+        return;
+      }
 
       if (!form.scheduled_date || !form.scheduled_time) {
         setMessage({
@@ -202,17 +278,20 @@ function MaintenanceRequest() {
         return;
       }
 
+      const selectedDate = String(form.scheduled_date).trim();
+      const selectedTime = normalizeTime(form.scheduled_time);
+
       const payload = {
         user_id: user.id,
-        technician_id: technicianId,
+        technician_id: selectedTechnicianId,
         service: form.service,
         service_type: form.service,
-        description: form.description,
+        description: form.description.trim(),
         city: user.city || "",
         location: form.location_note,
         location_note: form.location_note,
-        scheduled_date: form.scheduled_date,
-        scheduled_time: form.scheduled_time,
+        scheduled_date: selectedDate,
+        scheduled_time: selectedTime,
         estimated_hours: Number(form.estimated_hours || 1),
         payment_method: form.payment_method,
         price_per_hour: Number(form.price_per_hour || 0),
@@ -227,12 +306,12 @@ function MaintenanceRequest() {
           state: {
             requestId,
             amount: Number(totalPrice),
-            technicianId,
+            technicianId: selectedTechnicianId,
             estimated_hours: Number(form.estimated_hours || 1),
           },
         });
       } else {
-        navigate(`/review/${requestId}`);
+        navigate("/history");
       }
     } catch (err) {
       console.error("submit request error:", err);

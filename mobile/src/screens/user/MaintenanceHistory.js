@@ -4,141 +4,191 @@ import {
   Text,
   ScrollView,
   TouchableOpacity,
-  ActivityIndicator,
   StyleSheet,
 } from "react-native";
-import AsyncStorage from "@react-native-async-storage/async-storage";
 import Header from "../../components/Common/Header";
-import API from "../../services/api";
-import CustomDropdown from "../../components/Common/CustomDropdown";
+import { getUserRequests } from "../../services/maintenanceService";
+
+const canReview = (status) => {
+  return String(status || "").toLowerCase() === "completed";
+};
+
+const formatDateOnly = (value) => {
+  if (!value) return "-";
+
+  const raw = String(value).trim();
+
+  if (/^\d{4}-\d{2}-\d{2}$/.test(raw)) return raw;
+
+  if (raw.includes("T")) {
+    const date = new Date(raw);
+
+    if (!Number.isNaN(date.getTime())) {
+      return new Intl.DateTimeFormat("en-CA", {
+        timeZone: "Asia/Amman",
+        year: "numeric",
+        month: "2-digit",
+        day: "2-digit",
+      }).format(date);
+    }
+  }
+
+  const match = raw.match(/^(\d{4}-\d{2}-\d{2})/);
+  if (match) return match[1];
+
+  return raw.slice(0, 10);
+};
+
+const filters = [
+  { label: "All", value: "all" },
+  { label: "Pending", value: "pending" },
+  { label: "Accepted", value: "accepted" },
+  { label: "On Way", value: "on_the_way" },
+  { label: "In Process", value: "in_progress" },
+  { label: "Completed", value: "completed" },
+  { label: "Rejected", value: "rejected" },
+  { label: "Cancelled", value: "cancelled" },
+];
 
 export default function MaintenanceHistory({ navigation }) {
   const [requests, setRequests] = useState([]);
   const [statusFilter, setStatusFilter] = useState("all");
-  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [error, setError] = useState("");
+
+  const loadHistory = async () => {
+    try {
+      setRefreshing(true);
+      setError("");
+
+      const data = await getUserRequests();
+      setRequests(Array.isArray(data) ? data : []);
+    } catch (err) {
+      console.log("history error:", err?.response?.data || err.message);
+      setRequests([]);
+      setError(err?.response?.data?.message || "Failed to load history.");
+    } finally {
+      setRefreshing(false);
+    }
+  };
 
   useEffect(() => {
+    loadHistory();
     const unsubscribe = navigation.addListener("focus", loadHistory);
     return unsubscribe;
   }, [navigation]);
 
-  const loadHistory = async () => {
-    setLoading(true);
-
-    try {
-      const rawUser = await AsyncStorage.getItem("user");
-      const user = rawUser ? JSON.parse(rawUser) : null;
-
-      if (!user?.id) {
-        setRequests([]);
-        return;
-      }
-
-      let res;
-
-      try {
-        res = await API.get("/maintenance/my");
-      } catch {
-        res = await API.get(`/maintenance/user/${user.id}`);
-      }
-
-      setRequests(Array.isArray(res.data) ? res.data : []);
-    } catch (err) {
-      console.log("history error:", err?.response?.data || err.message);
-      setRequests([]);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const filtered = useMemo(() => {
+  const filteredRequests = useMemo(() => {
     if (statusFilter === "all") return requests;
 
     return requests.filter(
-      (request) =>
-        String(request.status || "").toLowerCase() ===
-        String(statusFilter).toLowerCase()
+      (item) => String(item.status || "").toLowerCase() === statusFilter
     );
   }, [requests, statusFilter]);
-
-  const formatDate = (value) => {
-    if (!value) return "-";
-    return String(value).split("T")[0];
-  };
-
-  const formatTime = (value) => {
-    if (!value) return "-";
-    return String(value).slice(0, 8);
-  };
 
   return (
     <View style={styles.screen}>
       <Header navigation={navigation} />
 
       <ScrollView contentContainerStyle={styles.container}>
-        <Text style={styles.title}>Maintenance History</Text>
+        <Text style={styles.title}>Requests History</Text>
 
-        <CustomDropdown
-          value={statusFilter}
-          onChange={setStatusFilter}
-          placeholder="All requests"
-          options={[
-            { label: "All requests", value: "all" },
-            { label: "Pending", value: "pending" },
-            { label: "Accepted", value: "accepted" },
-            { label: "On The Way", value: "on_the_way" },
-            { label: "In Progress", value: "in_progress" },
-            { label: "Completed", value: "completed" },
-            { label: "Rejected", value: "rejected" },
-            { label: "Cancelled", value: "cancelled" },
-          ]}
-        />
+        <TouchableOpacity style={styles.refreshBtn} onPress={loadHistory}>
+          <Text style={styles.refreshText}>Refresh</Text>
+        </TouchableOpacity>
 
-        {loading ? (
-          <ActivityIndicator size="large" color="#111" style={{ marginTop: 40 }} />
-        ) : filtered.length === 0 ? (
-          <View style={styles.emptyCard}>
-            <Text style={styles.emptyText}>No requests found.</Text>
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.filtersRow}
+        >
+          {filters.map((filter) => (
+            <TouchableOpacity
+              key={filter.value}
+              style={[
+                styles.filterBtn,
+                statusFilter === filter.value && styles.filterBtnActive,
+              ]}
+              onPress={() => setStatusFilter(filter.value)}
+            >
+              <Text
+                style={[
+                  styles.filterText,
+                  statusFilter === filter.value && styles.filterTextActive,
+                ]}
+              >
+                {filter.label}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </ScrollView>
+
+        {error ? (
+          <View style={styles.messageBox}>
+            <Text style={styles.errorTitle}>Error</Text>
+            <Text style={styles.errorText}>{error}</Text>
+          </View>
+        ) : filteredRequests.length === 0 ? (
+          <View style={styles.messageBox}>
+            <Text style={styles.emptyText}>
+              {refreshing ? "Loading history..." : "No maintenance requests yet."}
+            </Text>
           </View>
         ) : (
-          filtered.map((request) => (
-            <View key={request.id} style={styles.requestCard}>
-              <View style={styles.cardTop}>
-                <Text style={styles.serviceText}>
-                  {request.service || request.service_type || "Maintenance"}
-                </Text>
-
-                <Text style={styles.statusBadge}>{request.status || "pending"}</Text>
+          filteredRequests.map((item) => (
+            <View key={item.id} style={styles.card}>
+              <View style={styles.cardHeader}>
+                <Text style={styles.service}>{item.service || "-"}</Text>
+                <Text style={styles.statusBadge}>{item.status || "-"}</Text>
               </View>
 
-              <Text style={styles.description}>
-                {request.description || "No description"}
+              <Text style={styles.text}>
+                <Text style={styles.bold}>Technician:</Text>{" "}
+                {item.technician_name || "N/A"}
               </Text>
 
-              <Text style={styles.info}>
-                Technician: {request.technician_name || request.technician_id || "-"}
-              </Text>
-              <Text style={styles.info}>Date: {formatDate(request.scheduled_date)}</Text>
-              <Text style={styles.info}>Time: {formatTime(request.scheduled_time)}</Text>
-              <Text style={styles.info}>
-                Location: {request.location_note || request.location || request.city || "-"}
-              </Text>
-              <Text style={styles.info}>Payment: {request.payment_method || "-"}</Text>
-              <Text style={styles.info}>
-                Total: {Number(request.total_price || request.total || 0).toFixed(2)} JOD
+              <Text style={styles.text}>
+                <Text style={styles.bold}>Date:</Text>{" "}
+                {formatDateOnly(item.scheduled_date)}
               </Text>
 
-              <TouchableOpacity
-                style={styles.reviewBtn}
-                onPress={() =>
-                  navigation.navigate("Review", {
-                    requestId: request.id,
-                    request,
-                  })
-                }
-              >
-                <Text style={styles.reviewBtnText}>Review</Text>
-              </TouchableOpacity>
+              <Text style={styles.text}>
+                <Text style={styles.bold}>Time:</Text>{" "}
+                {item.scheduled_time || "-"}
+              </Text>
+
+              <Text style={styles.description}>{item.description || "-"}</Text>
+
+              <View style={styles.buttonsRow}>
+                <TouchableOpacity
+                  style={styles.detailsBtn}
+                  onPress={() =>
+                    navigation.navigate("Review", {
+                      requestId: item.id,
+                      id: item.id,
+                      request: item,
+                    })
+                  }
+                >
+                  <Text style={styles.btnText}>Details</Text>
+                </TouchableOpacity>
+
+                {canReview(item.status) ? (
+                  <TouchableOpacity
+                    style={styles.reviewBtn}
+                    onPress={() =>
+                      navigation.navigate("Review", {
+                        requestId: item.id,
+                        id: item.id,
+                        request: item,
+                        technicianId: item.technician_id,
+                      })
+                    }
+                  >
+                    <Text style={styles.btnText}>Review</Text>
+                  </TouchableOpacity>
+                ) : null}
+              </View>
             </View>
           ))
         )}
@@ -148,83 +198,95 @@ export default function MaintenanceHistory({ navigation }) {
 }
 
 const styles = StyleSheet.create({
-  screen: {
-    flex: 1,
-    backgroundColor: "#E8DCCF",
-  },
-  container: {
-    padding: 24,
-    paddingBottom: 80,
-  },
+  screen: { flex: 1, backgroundColor: "#E8DCCF" },
+  container: { padding: 24, paddingBottom: 90 },
   title: {
-    fontSize: 42,
+    fontSize: 34,
     fontWeight: "900",
     color: "#111",
-    marginBottom: 24,
+    marginBottom: 14,
   },
-  emptyCard: {
-    marginTop: 28,
+  refreshBtn: {
+    backgroundColor: "#111",
+    paddingVertical: 12,
+    paddingHorizontal: 22,
+    borderRadius: 999,
+    alignSelf: "flex-start",
+    marginBottom: 18,
+  },
+  refreshText: { color: "#FFF", fontWeight: "900", fontSize: 16 },
+  filtersRow: { gap: 10, paddingBottom: 18 },
+  filterBtn: {
     backgroundColor: "#FFF9F3",
     borderWidth: 1,
     borderColor: "#D8C8B8",
-    borderRadius: 28,
-    padding: 34,
+    borderRadius: 999,
+    paddingVertical: 10,
+    paddingHorizontal: 16,
   },
-  emptyText: {
-    textAlign: "center",
-    fontSize: 22,
-    color: "#4D433B",
-  },
-  requestCard: {
+  filterBtnActive: { backgroundColor: "#111", borderColor: "#111" },
+  filterText: { color: "#111", fontWeight: "900", fontSize: 14 },
+  filterTextActive: { color: "#FFF" },
+  messageBox: {
     backgroundColor: "#FFF9F3",
+    borderRadius: 24,
+    padding: 20,
     borderWidth: 1,
     borderColor: "#D8C8B8",
-    borderRadius: 28,
-    padding: 22,
+  },
+  errorTitle: {
+    color: "#B4232B",
+    fontWeight: "900",
+    fontSize: 18,
+    marginBottom: 6,
+  },
+  errorText: { color: "#B4232B", fontSize: 15, fontWeight: "700" },
+  emptyText: { fontSize: 18, fontWeight: "800", color: "#5C5048" },
+  card: {
+    backgroundColor: "#FFF9F3",
+    borderRadius: 24,
+    padding: 20,
+    marginBottom: 14,
+    borderWidth: 1,
+    borderColor: "#D8C8B8",
+  },
+  cardHeader: { gap: 8, marginBottom: 10 },
+  service: { fontSize: 24, fontWeight: "900", color: "#111" },
+  statusBadge: {
+    alignSelf: "flex-start",
+    backgroundColor: "#F7EFE7",
+    borderRadius: 999,
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    color: "#6B5E55",
+    fontWeight: "900",
+    textTransform: "capitalize",
+  },
+  text: { fontSize: 16, color: "#2F2723", marginBottom: 5, fontWeight: "700" },
+  bold: { fontWeight: "900", color: "#111" },
+  description: {
+    fontSize: 15,
+    color: "#5C5048",
+    marginTop: 10,
+    lineHeight: 22,
+  },
+  buttonsRow: {
+    flexDirection: "row",
+    gap: 12,
+    flexWrap: "wrap",
     marginTop: 18,
   },
-  cardTop: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    gap: 12,
-    alignItems: "flex-start",
-  },
-  serviceText: {
-    flex: 1,
-    fontSize: 24,
-    fontWeight: "900",
-    color: "#111",
-  },
-  statusBadge: {
+  detailsBtn: {
     backgroundColor: "#111",
-    color: "#fff",
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    borderRadius: 999,
-    overflow: "hidden",
-    fontWeight: "900",
-  },
-  description: {
-    fontSize: 18,
-    marginVertical: 14,
-    color: "#111",
-  },
-  info: {
-    fontSize: 17,
-    marginTop: 7,
-    color: "#3D342D",
+    borderRadius: 20,
+    paddingVertical: 12,
+    paddingHorizontal: 18,
   },
   reviewBtn: {
     backgroundColor: "#111",
-    paddingVertical: 14,
-    paddingHorizontal: 24,
-    borderRadius: 999,
-    alignSelf: "flex-start",
-    marginTop: 18,
+    borderRadius: 20,
+    paddingVertical: 12,
+    paddingHorizontal: 18,
   },
-  reviewBtnText: {
-    color: "#fff",
-    fontSize: 16,
-    fontWeight: "900",
-  },
+  btnText: { color: "#FFF", fontWeight: "900", fontSize: 15 },
 });

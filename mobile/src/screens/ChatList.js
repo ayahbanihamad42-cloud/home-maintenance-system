@@ -4,45 +4,45 @@ import {
   Text,
   ScrollView,
   TouchableOpacity,
-  ActivityIndicator,
   StyleSheet,
+  TextInput,
 } from "react-native";
 import Header from "../components/Common/Header";
-import API from "../services/api";
-
-const getChatConversations = () =>
-  API.get("/chat/conversations").then((res) => res.data);
+import { getChatConversations } from "../services/chatService";
 
 export default function ChatList({ navigation }) {
   const [conversations, setConversations] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const [search, setSearch] = useState("");
+  const [refreshing, setRefreshing] = useState(false);
+  const [error, setError] = useState("");
+
+  const loadConversations = async () => {
+    try {
+      setRefreshing(true);
+      setError("");
+
+      const data = await getChatConversations();
+      setConversations(Array.isArray(data) ? data : []);
+    } catch (err) {
+      console.log("chat list error:", err?.response?.data || err.message);
+      setConversations([]);
+      setError(err?.response?.data?.message || "Failed to load chats.");
+    } finally {
+      setRefreshing(false);
+    }
+  };
 
   useEffect(() => {
+    loadConversations();
     const unsubscribe = navigation.addListener("focus", loadConversations);
     return unsubscribe;
   }, [navigation]);
 
-  const loadConversations = () => {
-    setLoading(true);
-
-    getChatConversations()
-      .then((data) => {
-        setConversations(Array.isArray(data) ? data : []);
-      })
-      .catch((err) => {
-        console.log("chat conversations error:", err?.response?.data || err.message);
-        setConversations([]);
-      })
-      .finally(() => {
-        setLoading(false);
-      });
-  };
-
-  const renderLastMessage = (item) => {
-    if (item.lastMessageType === "image") return "📷 Image";
-    if (item.lastMessageType === "location") return "📍 Location";
-    return item.lastMessage || "No messages yet";
-  };
+  const filteredConversations = conversations.filter((item) =>
+    String(item.name || "")
+      .toLowerCase()
+      .includes(search.trim().toLowerCase())
+  );
 
   return (
     <View style={styles.screen}>
@@ -51,61 +51,60 @@ export default function ChatList({ navigation }) {
       <ScrollView contentContainerStyle={styles.container}>
         <Text style={styles.title}>Chats</Text>
 
-        {loading ? (
+        <View style={styles.topRow}>
+          <TextInput
+            value={search}
+            onChangeText={setSearch}
+            placeholder="Search chats..."
+            style={styles.searchInput}
+          />
+
+          <TouchableOpacity style={styles.refreshBtn} onPress={loadConversations}>
+            <Text style={styles.refreshText}>Refresh</Text>
+          </TouchableOpacity>
+        </View>
+
+        {error ? (
           <View style={styles.messageBox}>
-            <Text style={styles.messageTitle}>Notice</Text>
-            <Text style={styles.messageBody}>Loading conversations...</Text>
-            <ActivityIndicator color="#111" style={{ marginTop: 14 }} />
+            <Text style={styles.errorTitle}>Error</Text>
+            <Text style={styles.errorText}>{error}</Text>
           </View>
-        ) : conversations.length === 0 ? (
+        ) : filteredConversations.length === 0 ? (
           <View style={styles.messageBox}>
-            <Text style={styles.messageTitle}>No chats yet</Text>
-            <Text style={styles.messageBody}>
-              Your conversations will appear here when you start chatting.
+            <Text style={styles.emptyText}>
+              {refreshing ? "Loading chats..." : "No chats yet."}
             </Text>
           </View>
         ) : (
-          <View style={styles.chatListGrid}>
-            {conversations.map((item) => (
-              <TouchableOpacity
-                key={item.userId}
-                style={styles.chatCard}
-                activeOpacity={0.85}
-                onPress={() =>
-                  navigation.navigate("Chat", {
-                    userId: item.userId,
-                    receiverId: item.userId,
-                    name: item.name,
-                    user: {
-                      id: item.userId,
-                      name: item.name,
-                    },
-                  })
-                }
-              >
-                <View style={styles.avatar}>
-                  <Text style={styles.avatarText}>
-                    {(item.name || "?").charAt(0).toUpperCase()}
-                  </Text>
-                </View>
+          filteredConversations.map((item) => (
+            <TouchableOpacity
+              key={item.userId || item.id}
+              style={styles.chatCard}
+              onPress={() =>
+                navigation.navigate("Chat", {
+                  userId: item.userId || item.id,
+                  name: item.name,
+                })
+              }
+            >
+              <View style={styles.avatar}>
+                <Text style={styles.avatarText}>
+                  {String(item.name || "?").charAt(0).toUpperCase()}
+                </Text>
+              </View>
 
-                <View style={styles.chatContent}>
-                  <View style={styles.chatTop}>
-                    <Text style={styles.chatName}>{item.name || "User"}</Text>
-                    <Text style={styles.chatTime}>
-                      {item.lastMessageAt
-                        ? new Date(item.lastMessageAt).toLocaleString()
-                        : ""}
-                    </Text>
-                  </View>
-
-                  <Text style={styles.lastMessage} numberOfLines={1}>
-                    {renderLastMessage(item)}
-                  </Text>
-                </View>
-              </TouchableOpacity>
-            ))}
-          </View>
+              <View style={styles.chatInfo}>
+                <Text style={styles.name}>{item.name || "User"}</Text>
+                <Text style={styles.lastMessage} numberOfLines={1}>
+                  {item.lastMessageType === "image"
+                    ? "📷 Image"
+                    : item.lastMessageType === "location"
+                    ? "📍 Location"
+                    : item.lastMessage || "No messages yet"}
+                </Text>
+              </View>
+            </TouchableOpacity>
+          ))
         )}
       </ScrollView>
     </View>
@@ -113,86 +112,73 @@ export default function ChatList({ navigation }) {
 }
 
 const styles = StyleSheet.create({
-  screen: {
-    flex: 1,
-    backgroundColor: "#E8DCCF",
-  },
-  container: {
-    padding: 24,
-    paddingBottom: 80,
-  },
+  screen: { flex: 1, backgroundColor: "#E8DCCF" },
+  container: { padding: 24, paddingBottom: 90 },
   title: {
-    fontSize: 42,
+    fontSize: 34,
     fontWeight: "900",
     color: "#111",
-    marginBottom: 34,
+    marginBottom: 14,
   },
+  topRow: {
+    gap: 12,
+    marginBottom: 18,
+  },
+  searchInput: {
+    backgroundColor: "#FFF9F3",
+    borderRadius: 22,
+    borderWidth: 1,
+    borderColor: "#D8C8B8",
+    minHeight: 54,
+    paddingHorizontal: 16,
+    fontSize: 16,
+    color: "#111",
+    fontWeight: "700",
+  },
+  refreshBtn: {
+    backgroundColor: "#111",
+    paddingVertical: 12,
+    paddingHorizontal: 22,
+    borderRadius: 999,
+    alignSelf: "flex-start",
+  },
+  refreshText: { color: "#FFF", fontWeight: "900", fontSize: 16 },
   messageBox: {
     backgroundColor: "#FFF9F3",
+    borderRadius: 24,
+    padding: 20,
     borderWidth: 1,
     borderColor: "#D8C8B8",
-    borderRadius: 28,
-    padding: 28,
   },
-  messageTitle: {
-    fontSize: 24,
+  errorTitle: {
+    color: "#B4232B",
     fontWeight: "900",
-    color: "#111",
-    marginBottom: 10,
+    fontSize: 18,
+    marginBottom: 6,
   },
-  messageBody: {
-    fontSize: 19,
-    color: "#4D433B",
-    lineHeight: 28,
-  },
-  chatListGrid: {
-    gap: 16,
-  },
+  errorText: { color: "#B4232B", fontSize: 15, fontWeight: "700" },
+  emptyText: { fontSize: 18, fontWeight: "800", color: "#5C5048" },
   chatCard: {
     backgroundColor: "#FFF9F3",
+    borderRadius: 24,
+    padding: 18,
+    marginBottom: 14,
     borderWidth: 1,
     borderColor: "#D8C8B8",
-    borderRadius: 26,
-    padding: 18,
     flexDirection: "row",
     alignItems: "center",
   },
   avatar: {
-    width: 62,
-    height: 62,
-    borderRadius: 31,
+    width: 54,
+    height: 54,
+    borderRadius: 27,
     backgroundColor: "#111",
     alignItems: "center",
     justifyContent: "center",
-    marginRight: 16,
+    marginRight: 14,
   },
-  avatarText: {
-    color: "#fff",
-    fontSize: 24,
-    fontWeight: "900",
-  },
-  chatContent: {
-    flex: 1,
-  },
-  chatTop: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    gap: 10,
-    alignItems: "center",
-  },
-  chatName: {
-    fontSize: 22,
-    fontWeight: "900",
-    color: "#111",
-    flex: 1,
-  },
-  chatTime: {
-    fontSize: 11,
-    color: "#6F6257",
-  },
-  lastMessage: {
-    marginTop: 6,
-    fontSize: 17,
-    color: "#6F6257",
-  },
+  avatarText: { color: "#FFF", fontWeight: "900", fontSize: 22 },
+  chatInfo: { flex: 1 },
+  name: { fontSize: 20, fontWeight: "900", color: "#111", marginBottom: 4 },
+  lastMessage: { fontSize: 15, color: "#6B5E55", fontWeight: "700" },
 });

@@ -41,42 +41,66 @@ const findMyTechnicianId = (userId, callback) => {
 export const getTechniciansByService = (req, res) => {
   const service = decodeURIComponent(req.params.service || "").trim();
 
-  db.query(
-    `
+  if (!service) {
+    return res.status(400).json({ message: "Service is required" });
+  }
+
+  const sql = `
     SELECT 
+      t.id AS id,
       t.id AS technicianId,
-      t.id,
       t.user_id,
       t.service,
       t.experience,
       t.price_per_hour,
+
+      u.id AS userId,
       u.name,
       u.email,
       u.phone,
       u.city,
+      u.role,
+
       COALESCE(AVG(r.rating), 0) AS rating,
       COUNT(r.id) AS review_count
     FROM technicians t
     JOIN users u ON u.id = t.user_id
     LEFT JOIN ratings r ON r.technician_id = t.id
-    WHERE LOWER(TRIM(t.service)) = LOWER(TRIM(?))
-    GROUP BY t.id, t.user_id, t.service, t.experience, t.price_per_hour,
-             u.name, u.email, u.phone, u.city
+    WHERE 
+      LOWER(TRIM(t.service)) = LOWER(TRIM(?))
+      OR LOWER(TRIM(t.service)) LIKE CONCAT('%', LOWER(TRIM(?)), '%')
+      OR LOWER(TRIM(?)) LIKE CONCAT('%', LOWER(TRIM(t.service)), '%')
+    GROUP BY 
+      t.id,
+      t.user_id,
+      t.service,
+      t.experience,
+      t.price_per_hour,
+      u.id,
+      u.name,
+      u.email,
+      u.phone,
+      u.city,
+      u.role
     ORDER BY t.id DESC
-    `,
-    [service],
-    (err, rows) => {
-      if (err) return res.status(500).json({ message: err.sqlMessage || err.message });
+  `;
 
-      res.json(
-        (rows || []).map((row) => ({
-          ...row,
-          rating: Number(row.rating || 0),
-          review_count: Number(row.review_count || 0),
-        }))
-      );
+  db.query(sql, [service, service, service], (err, rows) => {
+    if (err) {
+      console.error("getTechniciansByService error:", err);
+      return res.status(500).json({
+        message: err.sqlMessage || err.message || "Failed to load technicians",
+      });
     }
-  );
+
+    return res.json(
+      (rows || []).map((row) => ({
+        ...row,
+        rating: Number(row.rating || 0),
+        review_count: Number(row.review_count || 0),
+      }))
+    );
+  });
 };
 function normalizeText(value) {
   return String(value || "").trim().toLowerCase();
@@ -414,12 +438,38 @@ export const createAvailability = (req, res) => {
   const { available_date, start_time, end_time } = req.body;
 
   if (!available_date || !start_time || !end_time) {
-    return res.status(400).json({ message: "Date, start time and end time are required" });
+    return res.status(400).json({
+      message: "Date, start time and end time are required",
+    });
+  }
+
+  const selectedDate = new Date(`${available_date}T00:00:00`);
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  if (Number.isNaN(selectedDate.getTime())) {
+    return res.status(400).json({
+      message: "Invalid date format. Use YYYY-MM-DD",
+    });
+  }
+
+  if (selectedDate < today) {
+    return res.status(400).json({
+      message: "You cannot add availability for a past date",
+    });
+  }
+
+  if (timeToMinutes(start_time) >= timeToMinutes(end_time)) {
+    return res.status(400).json({
+      message: "End time must be after start time",
+    });
   }
 
   findMyTechnicianId(req.user.id, (lookupErr, technicianId) => {
     if (lookupErr) return res.status(500).json({ message: "Server error" });
-    if (!technicianId) return res.status(404).json({ message: "Technician not found" });
+    if (!technicianId) {
+      return res.status(404).json({ message: "Technician not found" });
+    }
 
     db.query(
       `
@@ -427,9 +477,18 @@ export const createAvailability = (req, res) => {
       (technician_id, available_date, start_time, end_time, is_booked)
       VALUES (?, ?, ?, ?, 0)
       `,
-      [technicianId, available_date, normalizeTime(start_time), normalizeTime(end_time)],
+      [
+        technicianId,
+        available_date,
+        normalizeTime(start_time),
+        normalizeTime(end_time),
+      ],
       (err, result) => {
-        if (err) return res.status(500).json({ message: err.sqlMessage || err.message });
+        if (err) {
+          return res.status(500).json({
+            message: err.sqlMessage || err.message,
+          });
+        }
 
         res.status(201).json({
           id: result.insertId,
@@ -803,12 +862,36 @@ export const createGalleryPost = (req, res) => {
   const { description, images, location_note } = req.body;
 
   if (!description || !images) {
-    return res.status(400).json({ message: "Description and images are required" });
+    return res.status(400).json({
+      message: "Description and images are required",
+    });
+  }
+
+  const imageList = Array.isArray(images) ? images : [images];
+
+  for (const img of imageList) {
+    if (String(img).startsWith("data:image")) {
+      if (!/^data:image\/(png|jpg|jpeg|webp);base64,/.test(String(img))) {
+        return res.status(400).json({
+          message: "Invalid image format.",
+        });
+      }
+
+      const sizeInBytes = (String(img).length * 3) / 4;
+
+      if (sizeInBytes > 2 * 1024 * 1024) {
+        return res.status(400).json({
+          message: "Image is too large. Maximum size is 2MB.",
+        });
+      }
+    }
   }
 
   findMyTechnicianId(req.user.id, (lookupErr, technicianId) => {
     if (lookupErr) return res.status(500).json({ message: "Server error" });
-    if (!technicianId) return res.status(404).json({ message: "Technician not found" });
+    if (!technicianId) {
+      return res.status(404).json({ message: "Technician not found" });
+    }
 
     db.query(
       `
@@ -823,7 +906,11 @@ export const createGalleryPost = (req, res) => {
         location_note || null,
       ],
       (err, result) => {
-        if (err) return res.status(500).json({ message: err.sqlMessage || err.message });
+        if (err) {
+          return res.status(500).json({
+            message: err.sqlMessage || err.message,
+          });
+        }
 
         res.status(201).json({
           id: result.insertId,
@@ -841,9 +928,31 @@ export const updateGalleryPost = (req, res) => {
   const { postId } = req.params;
   const { description, images, location_note } = req.body;
 
+  const imageList = Array.isArray(images) ? images : [images];
+
+  for (const img of imageList) {
+    if (img && String(img).startsWith("data:image")) {
+      if (!/^data:image\/(png|jpg|jpeg|webp);base64,/.test(String(img))) {
+        return res.status(400).json({
+          message: "Invalid image format.",
+        });
+      }
+
+      const sizeInBytes = (String(img).length * 3) / 4;
+
+      if (sizeInBytes > 2 * 1024 * 1024) {
+        return res.status(400).json({
+          message: "Image is too large. Maximum size is 2MB.",
+        });
+      }
+    }
+  }
+
   findMyTechnicianId(req.user.id, (lookupErr, technicianId) => {
     if (lookupErr) return res.status(500).json({ message: "Server error" });
-    if (!technicianId) return res.status(404).json({ message: "Technician not found" });
+    if (!technicianId) {
+      return res.status(404).json({ message: "Technician not found" });
+    }
 
     db.query(
       `
@@ -859,14 +968,21 @@ export const updateGalleryPost = (req, res) => {
         technicianId,
       ],
       (err, result) => {
-        if (err) return res.status(500).json({ message: err.sqlMessage || err.message });
-        if (!result.affectedRows) return res.status(404).json({ message: "Post not found" });
+        if (err) {
+          return res.status(500).json({
+            message: err.sqlMessage || err.message,
+          });
+        }
+
+        if (!result.affectedRows) {
+          return res.status(404).json({ message: "Post not found" });
+        }
+
         res.json({ message: "Post updated" });
       }
     );
   });
 };
-
 export const deleteGalleryPost = (req, res) => {
   const { postId } = req.params;
 

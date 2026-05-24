@@ -1,4 +1,6 @@
 import express from "express";
+import auth from "../utils/authMiddleware.js";
+import requireRole from "../utils/requireRole.js";
 
 import {
   getAllUsers,
@@ -16,6 +18,9 @@ import {
 } from "../controllers/adminController.js";
 
 const router = express.Router();
+
+router.use(auth);
+router.use(requireRole("admin"));
 
 router.get("/users", getAllUsers);
 router.post("/users", createUser);

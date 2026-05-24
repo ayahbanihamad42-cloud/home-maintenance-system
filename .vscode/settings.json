@@ -5,7 +5,7 @@
                 "authProtocol": "default",
                 "enableSsl": "Enabled",
                 "ssl": {
-                    "ca": "D:\\gp1ayah\\certs\\tidb-ca.pem"
+                    "ca": "D:\\gp1ayah\\New folder\\home-maintenance-system\\backend\\certs\\tidb-ca.pem"
                 }
             },
             "ssh": "Disabled",

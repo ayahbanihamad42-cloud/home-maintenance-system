@@ -2,10 +2,18 @@ import { db } from "../database/connection.js";
 
 const normalizeDate = (date) => {
   if (!date) return null;
-  if (/^\d{4}-\d{2}-\d{2}$/.test(String(date))) return String(date);
 
-  const d = new Date(date);
-  if (Number.isNaN(d.getTime())) return String(date).slice(0, 10);
+  const value = String(date).trim();
+
+  if (/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+    return value;
+  }
+
+  const d = new Date(value);
+
+  if (Number.isNaN(d.getTime())) {
+    return value.slice(0, 10);
+  }
 
   const yyyy = d.getFullYear();
   const mm = String(d.getMonth() + 1).padStart(2, "0");
@@ -16,9 +24,12 @@ const normalizeDate = (date) => {
 
 const normalizeTime = (time) => {
   if (!time) return null;
+
   const value = String(time).trim();
+
   if (/^\d{2}:\d{2}:\d{2}$/.test(value)) return value;
   if (/^\d{2}:\d{2}$/.test(value)) return `${value}:00`;
+
   return value;
 };
 
@@ -30,9 +41,11 @@ const query = (sql, params = []) =>
     });
   });
 
+const getRole = (req) => String(req.user?.role || "").toLowerCase();
+
 export const createMaintenanceRequest = async (req, res) => {
   try {
-    const user_id = req.user?.id || req.body.user_id;
+    const user_id = req.user?.id;
 
     const {
       technician_id,
@@ -63,11 +76,15 @@ export const createMaintenanceRequest = async (req, res) => {
       !cleanDate ||
       !cleanTime
     ) {
-      return res.status(400).json({ message: "Missing required request data." });
+      return res.status(400).json({
+        message: "Missing required request data.",
+      });
     }
 
     if (!["cash", "online"].includes(cleanPaymentMethod)) {
-      return res.status(400).json({ message: "Invalid payment method." });
+      return res.status(400).json({
+        message: "Invalid payment method.",
+      });
     }
 
     const exists = await query(
@@ -85,7 +102,8 @@ export const createMaintenanceRequest = async (req, res) => {
 
     if (exists.length > 0) {
       return res.status(409).json({
-        message: "This time slot is no longer available. Please choose another time.",
+        message:
+          "This time slot is no longer available. Please choose another time.",
       });
     }
 
@@ -142,7 +160,8 @@ export const createMaintenanceRequest = async (req, res) => {
   } catch (err) {
     if (err.code === "ER_DUP_ENTRY") {
       return res.status(409).json({
-        message: "This time slot is no longer available. Please choose another time.",
+        message:
+          "This time slot is no longer available. Please choose another time.",
       });
     }
 
@@ -152,80 +171,21 @@ export const createMaintenanceRequest = async (req, res) => {
   }
 };
 
-export const confirmOnlinePayment = async (req, res) => {
-  try {
-    const requestId = req.params.id;
-    const userId = req.user.id;
-
-    const rows = await query(
-      `
-      SELECT *
-      FROM maintenance_requests
-      WHERE id = ? AND user_id = ?
-      LIMIT 1
-      `,
-      [requestId, userId]
-    );
-
-    if (!rows.length) {
-      return res.status(404).json({ message: "Request not found." });
-    }
-
-    const request = rows[0];
-    const amount = Number(req.body.amount || request.total_price || 0);
-    const transactionId = `mock_txn_${Date.now()}`;
-
-    await query(
-      `
-      INSERT INTO payments
-      (request_id, user_id, technician_id, amount, transaction_id, status)
-      VALUES (?, ?, ?, ?, ?, 'paid')
-      `,
-      [requestId, userId, request.technician_id, amount, transactionId]
-    );
-
-    const techRows = await query(
-      `
-      SELECT u.id AS technician_user_id, u.name AS technician_name
-      FROM technicians t
-      JOIN users u ON u.id = t.user_id
-      WHERE t.id = ?
-      LIMIT 1
-      `,
-      [request.technician_id]
-    );
-
-    const technicianUserId = techRows[0]?.technician_user_id;
-
-    if (technicianUserId) {
-      await query(
-        `
-        INSERT INTO notifications (user_id, title, message, is_read)
-        VALUES (?, ?, ?, 0)
-        `,
-        [
-          technicianUserId,
-          "Online Payment Received",
-          `A mock online payment of ${amount.toFixed(
-            2
-          )} JOD was deposited for request #${requestId}.`,
-        ]
-      );
-    }
-
-    res.json({
-      message: "Payment confirmed successfully.",
-      transactionId,
-      amount,
-    });
-  } catch (err) {
-    res.status(500).json({ message: err.sqlMessage || err.message });
-  }
-};
-
 export const getUserMaintenanceRequests = async (req, res) => {
   try {
-    const userId = req.params.user_id || req.user?.id;
+    const requestedUserId = Number(req.params.user_id);
+    const loggedUserId = Number(req.user?.id);
+    const role = getRole(req);
+
+    if (!requestedUserId) {
+      return res.status(400).json({ message: "User id is required." });
+    }
+
+    if (role !== "admin" && requestedUserId !== loggedUserId) {
+      return res.status(403).json({
+        message: "You are not allowed to view another user's history.",
+      });
+    }
 
     const rows = await query(
       `
@@ -239,23 +199,35 @@ export const getUserMaintenanceRequests = async (req, res) => {
       WHERE mr.user_id = ?
       ORDER BY mr.id DESC
       `,
-      [userId]
+      [requestedUserId]
     );
 
     return res.json(rows || []);
   } catch (err) {
-    return res.status(500).json({ message: err.sqlMessage || err.message });
+    return res.status(500).json({
+      message: err.sqlMessage || err.message,
+    });
   }
+};
+
+export const getMyMaintenanceRequests = async (req, res) => {
+  req.params.user_id = req.user.id;
+  return getUserMaintenanceRequests(req, res);
 };
 
 export const getMaintenanceRequestById = async (req, res) => {
   try {
+    const requestId = Number(req.params.id);
+    const loggedUserId = Number(req.user?.id);
+    const role = getRole(req);
+
     const rows = await query(
       `
       SELECT 
         mr.*,
         tu.name AS technician_name,
         tu.phone AS technician_phone,
+        t.user_id AS technician_user_id,
         uu.name AS user_name,
         uu.phone AS user_phone
       FROM maintenance_requests mr
@@ -265,22 +237,41 @@ export const getMaintenanceRequestById = async (req, res) => {
       WHERE mr.id = ?
       LIMIT 1
       `,
-      [req.params.id]
+      [requestId]
     );
 
     if (!rows.length) {
       return res.status(404).json({ message: "Request not found." });
     }
 
-    return res.json(rows[0]);
+    const request = rows[0];
+
+    const isOwner = Number(request.user_id) === loggedUserId;
+    const isAssignedTechnician =
+      request.technician_user_id &&
+      Number(request.technician_user_id) === loggedUserId;
+    const isAdmin = role === "admin";
+
+    if (!isOwner && !isAssignedTechnician && !isAdmin) {
+      return res.status(403).json({
+        message: "You are not allowed to view this request.",
+      });
+    }
+
+    return res.json(request);
   } catch (err) {
-    return res.status(500).json({ message: err.sqlMessage || err.message });
+    return res.status(500).json({
+      message: err.sqlMessage || err.message,
+    });
   }
 };
 
 export const updateMaintenanceRequestStatus = async (req, res) => {
   try {
-    const { status } = req.body;
+    const requestId = Number(req.params.id);
+    const loggedUserId = Number(req.user?.id);
+    const role = getRole(req);
+    const cleanStatus = String(req.body.status || "").toLowerCase();
 
     const allowed = [
       "pending",
@@ -293,28 +284,58 @@ export const updateMaintenanceRequestStatus = async (req, res) => {
       "cancelled",
     ];
 
-    const cleanStatus = String(status || "").toLowerCase();
-
     if (!allowed.includes(cleanStatus)) {
       return res.status(400).json({ message: "Invalid status." });
     }
 
-    const result = await query(
+    const rows = await query(
+      `
+      SELECT 
+        mr.id,
+        mr.user_id,
+        mr.technician_id,
+        t.user_id AS technician_user_id
+      FROM maintenance_requests mr
+      LEFT JOIN technicians t ON t.id = mr.technician_id
+      WHERE mr.id = ?
+      LIMIT 1
+      `,
+      [requestId]
+    );
+
+    if (!rows.length) {
+      return res.status(404).json({ message: "Request not found." });
+    }
+
+    const request = rows[0];
+
+    const isAdmin = role === "admin";
+    const isAssignedTechnician =
+      request.technician_user_id &&
+      Number(request.technician_user_id) === loggedUserId;
+
+    if (!isAdmin && !isAssignedTechnician) {
+      return res.status(403).json({
+        message: "Only the assigned technician or admin can update this status.",
+      });
+    }
+
+    await query(
       `
       UPDATE maintenance_requests
       SET status = ?
       WHERE id = ?
       `,
-      [cleanStatus, req.params.id]
+      [cleanStatus, requestId]
     );
 
-    if (!result.affectedRows) {
-      return res.status(404).json({ message: "Request not found." });
-    }
-
-    return res.json({ message: "Request status updated successfully." });
+    return res.json({
+      message: "Request status updated successfully.",
+    });
   } catch (err) {
-    return res.status(500).json({ message: err.sqlMessage || err.message });
+    return res.status(500).json({
+      message: err.sqlMessage || err.message,
+    });
   }
 };
 
@@ -346,9 +367,10 @@ export const cancelMaintenanceRequest = async (req, res) => {
       });
     }
 
-    await query("UPDATE maintenance_requests SET status = 'cancelled' WHERE id = ?", [
-      requestId,
-    ]);
+    await query(
+      "UPDATE maintenance_requests SET status = 'cancelled' WHERE id = ?",
+      [requestId]
+    );
 
     await query(
       `
@@ -365,7 +387,8 @@ export const cancelMaintenanceRequest = async (req, res) => {
       ]
     ).catch(() => null);
 
-    const isOnline = String(request.payment_method || "").toLowerCase() === "online";
+    const isOnline =
+      String(request.payment_method || "").toLowerCase() === "online";
 
     if (isOnline) {
       await query(
@@ -396,6 +419,85 @@ export const cancelMaintenanceRequest = async (req, res) => {
         : "Request cancelled successfully.",
     });
   } catch (err) {
-    return res.status(500).json({ message: err.sqlMessage || err.message });
+    return res.status(500).json({
+      message: err.sqlMessage || err.message,
+    });
+  }
+};
+
+export const confirmOnlinePayment = async (req, res) => {
+  try {
+    const requestId = req.params.id;
+    const userId = req.user.id;
+
+    const rows = await query(
+      `
+      SELECT *
+      FROM maintenance_requests
+      WHERE id = ? AND user_id = ?
+      LIMIT 1
+      `,
+      [requestId, userId]
+    );
+
+    if (!rows.length) {
+      return res.status(404).json({ message: "Request not found." });
+    }
+
+    const request = rows[0];
+    const amount = Number(req.body.amount || request.total_price || 0);
+    const transactionId = `mock_txn_${Date.now()}`;
+
+    if (!amount || amount <= 0) {
+      return res.status(400).json({ message: "Valid amount is required." });
+    }
+
+    await query(
+      `
+      INSERT INTO payments
+      (request_id, user_id, technician_id, amount, transaction_id, status)
+      VALUES (?, ?, ?, ?, ?, 'paid')
+      `,
+      [requestId, userId, request.technician_id, amount, transactionId]
+    );
+
+    const techRows = await query(
+      `
+      SELECT u.id AS technician_user_id
+      FROM technicians t
+      JOIN users u ON u.id = t.user_id
+      WHERE t.id = ?
+      LIMIT 1
+      `,
+      [request.technician_id]
+    );
+
+    const technicianUserId = techRows[0]?.technician_user_id;
+
+    if (technicianUserId) {
+      await query(
+        `
+        INSERT INTO notifications (user_id, title, message, is_read)
+        VALUES (?, ?, ?, 0)
+        `,
+        [
+          technicianUserId,
+          "Online Payment Received",
+          `A mock online payment of ${amount.toFixed(
+            2
+          )} JOD was deposited for request #${requestId}.`,
+        ]
+      ).catch(() => null);
+    }
+
+    return res.json({
+      message: "Payment confirmed successfully.",
+      transactionId,
+      amount,
+    });
+  } catch (err) {
+    return res.status(500).json({
+      message: err.sqlMessage || err.message,
+    });
   }
 };

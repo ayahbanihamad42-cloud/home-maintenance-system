@@ -4,12 +4,18 @@ import {
   getMyPaymentInfo,
   saveMyPaymentInfo,
   getMyBalance,
+  createPaymentIntent,
+  confirmPayment,
 } from "../controllers/paymentController.js";
 
 const router = express.Router();
 
-router.get("/my-info", auth, getMyPaymentInfo);
-router.post("/my-info", auth, saveMyPaymentInfo);
-router.get("/my-balance", auth, getMyBalance);
+router.use(auth);
+
+router.get("/my-info", getMyPaymentInfo);
+router.post("/my-info", saveMyPaymentInfo);
+router.get("/my-balance", getMyBalance);
+router.post("/create-intent", createPaymentIntent);
+router.post("/confirm", confirmPayment);
 
 export default router;

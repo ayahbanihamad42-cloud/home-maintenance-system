@@ -4,6 +4,7 @@ import auth from "../utils/authMiddleware.js";
 import {
   createMaintenanceRequest,
   getUserMaintenanceRequests,
+  getMyMaintenanceRequests,
   getMaintenanceRequestById,
   updateMaintenanceRequestStatus,
   cancelMaintenanceRequest,
@@ -14,19 +15,12 @@ const router = express.Router();
 
 router.post("/", auth, createMaintenanceRequest);
 
-router.get("/my", auth, (req, res) => {
-  req.params.user_id = req.user.id;
-  return getUserMaintenanceRequests(req, res);
-});
-
+router.get("/my", auth, getMyMaintenanceRequests);
 router.get("/user/:user_id", auth, getUserMaintenanceRequests);
-
 router.get("/:id", auth, getMaintenanceRequestById);
 
 router.put("/:id/status", auth, updateMaintenanceRequestStatus);
-
-router.post("/:id/online-payment", auth, confirmOnlinePayment);
-
 router.delete("/:id", auth, cancelMaintenanceRequest);
+router.post("/:id/online-payment", auth, confirmOnlinePayment);
 
 export default router;

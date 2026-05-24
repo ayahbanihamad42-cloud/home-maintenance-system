@@ -1,8 +1,8 @@
-import API from "./api";
+import API from "./api.jsx";
 
 export const getServices = async () => {
-  const res = await API.get("/admin/services");
-  return res.data || [];
+  const res = await API.get("/services");
+  return res.data;
 };
 
 export const createService = async (serviceData) => {
@@ -13,14 +13,4 @@ export const createService = async (serviceData) => {
 export const deleteService = async (serviceId) => {
   const res = await API.delete(`/admin/services/${serviceId}`);
   return res.data;
-};
-
-export const getImageUrl = (imageUrl) => {
-  if (!imageUrl) return "";
-
-  if (imageUrl.startsWith("http")) {
-    return imageUrl;
-  }
-
-  return `http://localhost:5000${imageUrl}`;
 };

@@ -35,9 +35,9 @@ export const getMyPaymentInfo = async (req, res) => {
       [technicianId]
     );
 
-    res.json(rows[0] || null);
+    return res.json(rows[0] || null);
   } catch (err) {
-    res.status(500).json({ message: err.sqlMessage || err.message });
+    return res.status(500).json({ message: err.sqlMessage || err.message });
   }
 };
 
@@ -101,9 +101,9 @@ export const saveMyPaymentInfo = async (req, res) => {
       );
     }
 
-    res.json({ message: "Payment info saved successfully." });
+    return res.json({ message: "Payment info saved successfully." });
   } catch (err) {
-    res.status(500).json({ message: err.sqlMessage || err.message });
+    return res.status(500).json({ message: err.sqlMessage || err.message });
   }
 };
 
@@ -148,13 +148,99 @@ export const getMyBalance = async (req, res) => {
       [technicianId]
     );
 
-    res.json({
+    return res.json({
       paymentInfo: paymentInfoRows[0] || null,
       totalEarnings: Number(balanceRows[0]?.total_earnings || 0),
       totalPayments: Number(balanceRows[0]?.total_payments || 0),
       lastTransaction: lastRows[0] || null,
     });
   } catch (err) {
-    res.status(500).json({ message: err.sqlMessage || err.message });
+    return res.status(500).json({ message: err.sqlMessage || err.message });
+  }
+};
+
+export const createPaymentIntent = async (req, res) => {
+  try {
+    const amount = Number(req.body.amount);
+
+    if (!amount || amount <= 0) {
+      return res.status(400).json({
+        message: "Valid amount is required.",
+      });
+    }
+
+    return res.json({
+      message: "Payment intent created successfully in demo mode.",
+      clientSecret: `demo_client_secret_${Date.now()}`,
+      amount,
+      currency: "JOD",
+      mode: "demo",
+    });
+  } catch (err) {
+    return res.status(500).json({ message: err.sqlMessage || err.message });
+  }
+};
+
+export const confirmPayment = async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const requestId = req.body.request_id || req.body.requestId || req.body.id;
+    const amount = Number(req.body.amount);
+
+    if (!requestId) {
+      return res.status(400).json({
+        message: "Request id is required.",
+      });
+    }
+
+    const rows = await query(
+      `
+      SELECT *
+      FROM maintenance_requests
+      WHERE id = ? AND user_id = ?
+      LIMIT 1
+      `,
+      [requestId, userId]
+    );
+
+    if (!rows.length) {
+      return res.status(404).json({
+        message: "Request not found.",
+      });
+    }
+
+    const request = rows[0];
+    const finalAmount = amount || Number(request.total_price || 0);
+
+    if (!finalAmount || finalAmount <= 0) {
+      return res.status(400).json({
+        message: "Valid amount is required.",
+      });
+    }
+
+    const transactionId = `mock_txn_${Date.now()}`;
+
+    await query(
+      `
+      INSERT INTO payments
+      (request_id, user_id, technician_id, amount, transaction_id, status)
+      VALUES (?, ?, ?, ?, ?, 'paid')
+      `,
+      [
+        requestId,
+        userId,
+        request.technician_id,
+        finalAmount,
+        transactionId,
+      ]
+    );
+
+    return res.json({
+      message: "Payment confirmed successfully.",
+      transactionId,
+      amount: finalAmount,
+    });
+  } catch (err) {
+    return res.status(500).json({ message: err.sqlMessage || err.message });
   }
 };

@@ -140,8 +140,9 @@ vite.config.ts.timestamp-*
 # Environment files
 .env
 backend/.env
-
-
+backend/certs/
+frontend/.env
+mobile/.env
 # Node modules
 node_modules/
 backend/node_modules/

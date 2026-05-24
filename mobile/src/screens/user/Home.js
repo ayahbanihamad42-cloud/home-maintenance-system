@@ -2,153 +2,209 @@ import React, { useEffect, useState } from "react";
 import {
   View,
   Text,
-  TouchableOpacity,
   ScrollView,
+  TouchableOpacity,
   StyleSheet,
   Image,
-  ActivityIndicator,
 } from "react-native";
 import Header from "../../components/Common/Header";
 import API from "../../services/api";
 
-function getBackendBaseUrl() {
-  const baseURL = API?.defaults?.baseURL || "";
-  return String(baseURL).replace(/\/api\/?$/, "");
-}
+const API_ORIGIN = API.defaults.baseURL.replace("/api", "");
 
-function getBackendImageUrl(imageUrl) {
-  if (!imageUrl) return "";
+const getImageUrl = (imageUrl, serviceName) => {
+  const fallbackMap = {
+    plumbing: "/images/services/plumbing.png",
+    electrical: "/images/services/Electrical.png",
+    painting: "/images/services/Painting.png",
+    decoration: "/images/services/Decoration.png",
+  };
 
-  const value = String(imageUrl).trim();
+  const cleanName = String(serviceName || "").trim().toLowerCase();
+  const finalPath = imageUrl || fallbackMap[cleanName];
+
+  if (!finalPath) return null;
 
   if (
-    value.startsWith("http://") ||
-    value.startsWith("https://") ||
-    value.startsWith("data:image/")
+    String(finalPath).startsWith("http://") ||
+    String(finalPath).startsWith("https://") ||
+    String(finalPath).startsWith("data:image")
   ) {
-    return value;
+    return finalPath;
   }
 
-  const cleanPath = value.startsWith("/") ? value : `/${value}`;
-  return `${getBackendBaseUrl()}${cleanPath}`;
-}
+  const path = String(finalPath).startsWith("/") ? finalPath : `/${finalPath}`;
+  return `${API_ORIGIN}${path}`;
+};
 
 export default function Home({ navigation }) {
   const [services, setServices] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [error, setError] = useState("");
+
+  const loadServices = async () => {
+    try {
+      setRefreshing(true);
+      setError("");
+
+      const res = await API.get("/services");
+      setServices(Array.isArray(res.data) ? res.data : []);
+    } catch (err) {
+      console.log("mobile home services error:", err?.response?.data || err.message);
+      setServices([]);
+      setError(err?.response?.data?.message || "Failed to load services.");
+    } finally {
+      setRefreshing(false);
+    }
+  };
 
   useEffect(() => {
-    API.get("/admin/services")
-      .then((res) => {
-        setServices(Array.isArray(res.data) ? res.data : []);
-      })
-      .catch((err) => {
-        console.log("load services error:", err?.response?.data || err.message);
-        setServices([]);
-      })
-      .finally(() => {
-        setLoading(false);
-      });
-  }, []);
+    loadServices();
+    const unsubscribe = navigation.addListener("focus", loadServices);
+    return unsubscribe;
+  }, [navigation]);
 
   return (
     <View style={styles.screen}>
       <Header navigation={navigation} />
 
-      <ScrollView contentContainerStyle={styles.homeContainer}>
-        <Text style={styles.homeTitle}>Welcome to our services:</Text>
+      <ScrollView contentContainerStyle={styles.container}>
+        <View style={styles.panel}>
+          <Text style={styles.title}>Welcome to our services:</Text>
+          <Text style={styles.subtitle}>Choose the service you need</Text>
 
-        {loading ? (
-          <ActivityIndicator color="#111" size="large" style={{ marginTop: 30 }} />
-        ) : (
-          <View style={styles.servicesContainer}>
-            {services.map((service) => (
-              <View style={styles.serviceItem} key={service.id}>
-                <TouchableOpacity
-                  style={styles.serviceCircle}
-                  activeOpacity={0.85}
-                  onPress={() =>
-                    navigation.navigate("TechniciansByService", {
-                      service: service.name,
-                    })
-                  }
-                >
-                  {service.image_url ? (
-                    <Image
-                      source={{ uri: getBackendImageUrl(service.image_url) }}
-                      style={styles.serviceImage}
-                      resizeMode="cover"
-                    />
-                  ) : (
-                    <Text style={styles.fallbackIcon}>🛠️</Text>
-                  )}
-                </TouchableOpacity>
+          {error ? (
+            <View style={styles.messageBox}>
+              <Text style={styles.errorTitle}>Error</Text>
+              <Text style={styles.errorText}>{error}</Text>
 
-                <Text style={styles.serviceName}>{service.name}</Text>
-              </View>
-            ))}
-          </View>
-        )}
+              <TouchableOpacity style={styles.retryBtn} onPress={loadServices}>
+                <Text style={styles.retryText}>Try Again</Text>
+              </TouchableOpacity>
+            </View>
+          ) : services.length === 0 ? (
+            <View style={styles.messageBox}>
+              <Text style={styles.emptyText}>
+                {refreshing ? "Loading services..." : "No services available."}
+              </Text>
+            </View>
+          ) : (
+            <View style={styles.grid}>
+              {services.map((service) => {
+                const imageUri = getImageUrl(service.image_url, service.name);
+
+                return (
+                  <TouchableOpacity
+                    key={service.id || service.name}
+                    style={styles.serviceItem}
+                    onPress={() =>
+                      navigation.navigate("TechniciansByService", {
+                        service: service.name,
+                      })
+                    }
+                  >
+                    <View style={styles.circle}>
+                      {imageUri ? (
+                        <Image
+                          source={{ uri: imageUri }}
+                          style={styles.image}
+                          resizeMode="contain"
+                        />
+                      ) : (
+                        <Text style={styles.icon}>🛠️</Text>
+                      )}
+                    </View>
+
+                    <Text style={styles.serviceName}>{service.name}</Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+          )}
+        </View>
       </ScrollView>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  screen: {
-    flex: 1,
-    backgroundColor: "#E8DCCF",
+  screen: { flex: 1, backgroundColor: "#E8DCCF" },
+  container: { padding: 22, paddingBottom: 90 },
+  panel: {
+    backgroundColor: "#FFF9F3",
+    borderRadius: 30,
+    padding: 22,
+    borderWidth: 1,
+    borderColor: "#D8C8B8",
   },
-  homeContainer: {
-    flexGrow: 1,
-    backgroundColor: "#E8DCCF",
-    paddingHorizontal: 18,
-    paddingTop: 34,
-    paddingBottom: 80,
+  title: {
+    fontSize: 28,
+    fontWeight: "900",
+    color: "#111",
+    textAlign: "center",
+    marginBottom: 8,
+  },
+  subtitle: {
+    fontSize: 18,
+    color: "#6B5E55",
+    textAlign: "center",
+    fontWeight: "700",
+    marginBottom: 24,
+  },
+  messageBox: {
+    backgroundColor: "#F7EFE7",
+    borderRadius: 22,
+    padding: 18,
     alignItems: "center",
   },
-  homeTitle: {
-    color: "#111",
-    fontSize: 38,
+  errorTitle: {
+    color: "#B4232B",
     fontWeight: "900",
-    textAlign: "center",
-    marginBottom: 34,
+    fontSize: 18,
+    marginBottom: 6,
   },
-  servicesContainer: {
-    width: "100%",
+  errorText: {
+    color: "#B4232B",
+    fontWeight: "700",
+    fontSize: 15,
+    textAlign: "center",
+  },
+  retryBtn: {
+    backgroundColor: "#111",
+    borderRadius: 24,
+    paddingVertical: 12,
+    paddingHorizontal: 22,
+    marginTop: 14,
+  },
+  retryText: { color: "#FFF", fontWeight: "900", fontSize: 16 },
+  emptyText: { fontSize: 18, fontWeight: "800", color: "#5C5048" },
+  grid: {
     flexDirection: "row",
     flexWrap: "wrap",
     justifyContent: "space-between",
+    rowGap: 28,
   },
   serviceItem: {
-    width: "48%",
+    width: "47%",
     alignItems: "center",
-    marginBottom: 34,
   },
-  serviceCircle: {
-    width: 145,
-    height: 145,
-    borderRadius: 73,
+  circle: {
+    width: 150,
+    height: 150,
+    borderRadius: 75,
     backgroundColor: "#FFF9F3",
     borderWidth: 1,
     borderColor: "#D8C8B8",
     alignItems: "center",
     justifyContent: "center",
     marginBottom: 12,
-    overflow: "hidden",
   },
-  serviceImage: {
-    width: "100%",
-    height: "100%",
-    borderRadius: 73,
-  },
-  fallbackIcon: {
-    fontSize: 48,
-  },
+  image: { width: 105, height: 105 },
+  icon: { fontSize: 42 },
   serviceName: {
-    color: "#111",
-    fontSize: 18,
+    fontSize: 17,
     fontWeight: "900",
+    color: "#111",
     textAlign: "center",
   },
 });
