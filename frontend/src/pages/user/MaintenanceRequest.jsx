@@ -248,8 +248,7 @@ function MaintenanceRequest() {
         });
         return;
       }
-
-      if (!form.scheduled_date || !form.scheduled_time) {
+if (!form.scheduled_date || !form.scheduled_time) {
         setMessage({
           type: "error",
           title: "Unavailable Time",
@@ -257,7 +256,6 @@ function MaintenanceRequest() {
         });
         return;
       }
-
       const stillAvailable = await checkSlotStillAvailable();
 
       if (!stillAvailable) {
@@ -268,7 +266,6 @@ function MaintenanceRequest() {
         });
         return;
       }
-
       if (!form.description.trim()) {
         setMessage({
           type: "error",
