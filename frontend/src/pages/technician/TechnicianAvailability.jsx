@@ -134,7 +134,7 @@ function TechnicianAvailability() {
       <Header />
 
       <div className="container">
-        <div className="panel" style={{ maxWidth: 900, margin: "40px auto" }}>
+        <div className="panel" style={{ maxWidth: 1200, margin: "40px auto" }}>
           <h2>Technician Availability</h2>
 
           {message ? <div className="mini-error">{message}</div> : null}

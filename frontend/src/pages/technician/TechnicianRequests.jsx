@@ -285,12 +285,7 @@ function TechnicianRequests() {
         </div>
 
         <div className="technician-filters-grid">
-          <input
-            className="technician-search-input"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search by user, phone, city, service, status..."
-          />
+          
 
           <select
             value={statusFilter}
@@ -305,11 +300,7 @@ function TechnicianRequests() {
             ))}
           </select>
 
-          <input
-            type="date"
-            value={dateFilter}
-            onChange={(e) => setDateFilter(e.target.value)}
-          />
+          
 
           <select
             value={sortFilter}

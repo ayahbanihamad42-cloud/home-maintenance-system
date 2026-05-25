@@ -76,7 +76,6 @@ function Home() {
 
       <div className="home-container">
         <h1 className="home-title">Welcome to our services:</h1>
-        <p className="home-subtitle">Choose the service you need</p>
 
         {loading ? (
           <div className="home-message">Loading services...</div>

@@ -310,7 +310,7 @@ a {
 
 /* ================= COMMON CONTAINER ================= */
 .container {
-  max-width: 980px;
+  max-width: 1380px;
   margin: 66px auto;
   padding: 34px 36px;
   background: rgba(255, 249, 243, 0.94);
@@ -471,6 +471,8 @@ a {
   padding: 20px;
   box-shadow: var(--shadow-soft);
   border: 1px solid var(--border-color);
+  max-width: 1400px;
+  position: relative;
 }
 
 .dashboard-grid {
@@ -708,11 +710,11 @@ a {
 
 .services-container {
   width: 100%;
-  max-width: 760px;
+  max-width: 1400px;
   margin: 36px auto 0;
   padding: 18px 20px 50px;
   display: grid;
-  grid-template-columns: repeat(2, minmax(220px, 1fr));
+  grid-template-columns: repeat(3, minmax(220px, 1fr));
   gap: 42px 68px;
   justify-items: center;
   align-items: start;
@@ -863,7 +865,7 @@ a {
 
 /* ================= PROFILE / TECHNICIAN PROFILE ================= */
 .profile-container {
-  max-width: 860px;
+  max-width: 1300px;
   margin: 70px auto;
   padding: 0 24px;
   position: relative;
@@ -893,6 +895,7 @@ a {
   align-items: flex-start;
   justify-content: space-between;
   gap: 20px;
+  
 }
 
 .profile-header h2 {
@@ -911,6 +914,7 @@ a {
   display: flex;
   flex-direction: column;
   gap: 8px;
+  max-width: 600px;
 }
 
 .profile-title-block h2 {
@@ -1039,6 +1043,7 @@ a {
     0 20px 44px rgba(0, 0, 0, 0.07),
     0 2px 0 rgba(255, 255, 255, 0.45) inset;
   border: 1px solid var(--border-color);
+  max-width: 1400px;
 }
 
 .tech-card h2 {
@@ -1190,6 +1195,8 @@ a {
 /* ================= CHAT ================= */
 .chat-wrapper {
   min-height: calc(100vh - 40px);
+  max-width: 1200px;
+  margin: 1px auto;
   padding: 26px 28px;
   display: flex;
   justify-content: center;
@@ -1213,7 +1220,7 @@ a {
 }
 
 .chat-message {
-  max-width: 78%;
+  max-width: 100%;
   padding: 12px 14px;
   border-radius: 16px;
   line-height: 1.5;
@@ -1650,7 +1657,8 @@ a {
 
 /* ================= REQUEST FORM REFINEMENT ================= */
 .request-container {
-  max-width: 900px;
+  max-width: 1300px;
+  
 }
 
 .request-grid {
@@ -1698,7 +1706,8 @@ a {
 /* ================= AI ASSISTANT POLISH ================= */
 .chat-shell.ai-shell,
 .ai-shell {
-  width: min(770px, 100%);
+  max-width: 1500px;
+  margin: 0 auto;
 }
 
 .ai-box textarea {
@@ -1707,7 +1716,7 @@ a {
 
 /* ================= CHAT LIST ================= */
 .chat-list-container {
-  max-width: 900px;
+  max-width: 1300px;
 }
 
 .chat-list-grid {
@@ -1784,7 +1793,7 @@ a {
 }
 
 .chat-page-shell {
-  max-width: 1000px;
+  max-width: 1200px;
   margin: 0 auto;
 }
 

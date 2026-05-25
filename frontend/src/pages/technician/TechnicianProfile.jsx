@@ -131,8 +131,7 @@ function TechnicianProfile() {
             >
               Book Now
             </button>
-          </div>
-
+          </div><hr></hr>
           <div className="gallery-soft-divider"></div>
 
           <div className="public-gallery-wrapper">
