@@ -43,6 +43,17 @@ const query = (sql, params = []) =>
 
 const getRole = (req) => String(req.user?.role || "").toLowerCase();
 
+const buildUserLocationUrl = (lat, lng, existingUrl) => {
+  const cleanLat = Number(lat);
+  const cleanLng = Number(lng);
+
+  if (Number.isFinite(cleanLat) && Number.isFinite(cleanLng)) {
+    return `https://www.google.com/maps?q=${cleanLat},${cleanLng}`;
+  }
+
+  return existingUrl || null;
+};
+
 export const createMaintenanceRequest = async (req, res) => {
   try {
     const user_id = req.user?.id;
@@ -60,6 +71,9 @@ export const createMaintenanceRequest = async (req, res) => {
       estimated_hours,
       payment_method,
       total_price,
+      user_location_lat,
+      user_location_lng,
+      user_location_url,
     } = req.body;
 
     const finalTechnicianId = technician_id || technicianId;
@@ -67,6 +81,25 @@ export const createMaintenanceRequest = async (req, res) => {
     const cleanDate = normalizeDate(scheduled_date);
     const cleanTime = normalizeTime(scheduled_time);
     const cleanPaymentMethod = String(payment_method || "cash").toLowerCase();
+
+    const cleanUserLat =
+      user_location_lat !== undefined && user_location_lat !== null
+        ? Number(user_location_lat)
+        : null;
+
+    const cleanUserLng =
+      user_location_lng !== undefined && user_location_lng !== null
+        ? Number(user_location_lng)
+        : null;
+
+    const hasUserLocation =
+      Number.isFinite(cleanUserLat) && Number.isFinite(cleanUserLng);
+
+    const cleanUserLocationUrl = buildUserLocationUrl(
+      cleanUserLat,
+      cleanUserLng,
+      user_location_url
+    );
 
     if (
       !user_id ||
@@ -122,9 +155,12 @@ export const createMaintenanceRequest = async (req, res) => {
         estimated_hours,
         payment_method,
         total_price,
+        user_location_lat,
+        user_location_lng,
+        user_location_url,
         status
       )
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending')
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending')
       `,
       [
         user_id,
@@ -138,6 +174,9 @@ export const createMaintenanceRequest = async (req, res) => {
         Number(estimated_hours || 1),
         cleanPaymentMethod,
         Number(total_price || 0),
+        hasUserLocation ? cleanUserLat : null,
+        hasUserLocation ? cleanUserLng : null,
+        hasUserLocation ? cleanUserLocationUrl : null,
       ]
     );
 

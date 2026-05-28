@@ -1,30 +1,58 @@
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import {
   View,
   Text,
   ScrollView,
   TouchableOpacity,
   StyleSheet,
-  Alert,
 } from "react-native";
-import * as Location from "expo-location";
+import MapView, { Marker } from "react-native-maps";
 import Header from "../../components/Common/Header";
 import API from "../../services/api";
 
 const formatDateOnly = (value) => {
   if (!value) return "-";
+
   const raw = String(value).trim();
+
   const match = raw.match(/^(\d{4}-\d{2}-\d{2})/);
   if (match) return match[1];
+
   return raw.slice(0, 10);
 };
 
 const formatTimeOnly = (value) => {
   if (!value) return "-";
+
   const raw = String(value).trim();
   const match = raw.match(/^(\d{2}:\d{2})(:\d{2})?/);
+
   if (match) return match[0];
+
   return raw.slice(0, 8);
+};
+
+const getUserLocation = (item) => {
+  const lat = Number(item?.user_location_lat);
+  const lng = Number(item?.user_location_lng);
+
+  if (Number.isFinite(lat) && Number.isFinite(lng)) {
+    return { latitude: lat, longitude: lng };
+  }
+
+  const url = String(item?.user_location_url || "");
+  const match = url.match(/q=(-?\d+(\.\d+)?),(-?\d+(\.\d+)?)/);
+
+  if (match) {
+    const parsedLat = Number(match[1]);
+    const parsedLng = Number(match[3]);
+
+    if (Number.isFinite(parsedLat) && Number.isFinite(parsedLng)) {
+      return { latitude: parsedLat, longitude: parsedLng };
+    }
+  }
+
+  return null;
 };
 
 const nextActions = (status) => {
@@ -70,9 +98,6 @@ export default function TechnicianRequests({ navigation }) {
   const [updatingId, setUpdatingId] = useState(null);
   const [error, setError] = useState("");
 
-  const liveLocationSubscriptionRef = useRef(null);
-  const liveRequestIdRef = useRef(null);
-
   const loadRequests = async () => {
     try {
       setRefreshing(true);
@@ -81,7 +106,10 @@ export default function TechnicianRequests({ navigation }) {
       const res = await API.get("/technicians/requests/my");
       setRequests(Array.isArray(res.data) ? res.data : []);
     } catch (err) {
-      console.log("technician requests error:", err?.response?.data || err.message);
+      console.log(
+        "technician requests error:",
+        err?.response?.data || err.message
+      );
       setRequests([]);
       setError(err?.response?.data?.message || "Failed to load requests.");
     } finally {
@@ -89,164 +117,26 @@ export default function TechnicianRequests({ navigation }) {
     }
   };
 
-  const getCurrentTechnicianLocation = async () => {
-    const permission = await Location.requestForegroundPermissionsAsync();
-
-    if (permission.status !== "granted") {
-      throw new Error("Location permission was denied.");
-    }
-
-    const servicesEnabled = await Location.hasServicesEnabledAsync();
-
-    if (!servicesEnabled) {
-      throw new Error("Please turn on location services from phone settings.");
-    }
-
-    let position = await Location.getLastKnownPositionAsync({
-      maxAge: 300000,
-      requiredAccuracy: 10000,
-    });
-
-    if (!position?.coords) {
-      position = await Location.getCurrentPositionAsync({
-        accuracy: Location.Accuracy.Balanced,
-      });
-    }
-
-    if (!position?.coords) {
-      throw new Error("Current location is unavailable.");
-    }
-
-    return {
-      technician_location_lat: position.coords.latitude,
-      technician_location_lng: position.coords.longitude,
-    };
-  };
-
-  const stopLiveLocationSharing = async () => {
-    if (liveLocationSubscriptionRef.current) {
-      liveLocationSubscriptionRef.current.remove();
-      liveLocationSubscriptionRef.current = null;
-      liveRequestIdRef.current = null;
-    }
-  };
-
-  const startLiveLocationSharing = async (requestId) => {
-    const permission = await Location.requestForegroundPermissionsAsync();
-
-    if (permission.status !== "granted") {
-      throw new Error("Location permission was denied.");
-    }
-
-    const servicesEnabled = await Location.hasServicesEnabledAsync();
-
-    if (!servicesEnabled) {
-      throw new Error("Please turn on location services.");
-    }
-
-    if (liveRequestIdRef.current === requestId && liveLocationSubscriptionRef.current) {
-      return;
-    }
-
-    await stopLiveLocationSharing();
-
-    liveRequestIdRef.current = requestId;
-
-    const subscription = await Location.watchPositionAsync(
-      {
-        accuracy: Location.Accuracy.Balanced,
-        timeInterval: 10000,
-        distanceInterval: 5,
-      },
-      async (position) => {
-        try {
-          await API.put(`/technicians/requests/${requestId}/status`, {
-            status: "on_the_way",
-            technician_location_lat: position.coords.latitude,
-            technician_location_lng: position.coords.longitude,
-          });
-        } catch (err) {
-          console.log("live location update error:", err?.message);
-        }
-      }
-    );
-
-    liveLocationSubscriptionRef.current = subscription;
-  };
-
-  useEffect(() => {
-    loadRequests();
-
-    const unsubscribe = navigation.addListener("focus", loadRequests);
-
-    return () => {
-      unsubscribe();
-      stopLiveLocationSharing();
-    };
-  }, [navigation]);
-
   const updateStatus = async (requestId, status) => {
     try {
       setUpdatingId(requestId);
       setError("");
 
-      let payload = { status };
-
-      if (status === "on_the_way") {
-        const locationPayload = await getCurrentTechnicianLocation();
-
-        payload = {
-          status,
-          ...locationPayload,
-        };
-      }
-
-      await API.put(`/technicians/requests/${requestId}/status`, payload);
-
-      if (status === "on_the_way") {
-        await startLiveLocationSharing(requestId);
-      }
-
-      if (
-        status === "completed" ||
-        status === "rejected" ||
-        status === "cancelled"
-      ) {
-        await stopLiveLocationSharing();
-      }
-
+      await API.put(`/technicians/requests/${requestId}/status`, { status });
       await loadRequests();
     } catch (err) {
       console.log("status update error:", err?.response?.data || err.message);
-
-      const msg =
-        err?.response?.data?.message || err?.message || "Failed to update status.";
-
-      setError(msg);
-      Alert.alert("Error", msg);
+      setError(err?.response?.data?.message || "Failed to update status.");
     } finally {
       setUpdatingId(null);
     }
   };
 
-  const confirmUpdateStatus = (requestId, status) => {
-    if (status !== "on_the_way") {
-      updateStatus(requestId, status);
-      return;
-    }
-
-    Alert.alert(
-      "Share Location",
-      "To mark this request as On The Way, your live location will be shared with the user.",
-      [
-        { text: "Cancel", style: "cancel" },
-        {
-          text: "Continue",
-          onPress: () => updateStatus(requestId, status),
-        },
-      ]
-    );
-  };
+  useEffect(() => {
+    loadRequests();
+    const unsubscribe = navigation.addListener("focus", loadRequests);
+    return unsubscribe;
+  }, [navigation]);
 
   const sortedRequests = useMemo(() => {
     return [...requests].sort((a, b) => Number(b.id || 0) - Number(a.id || 0));
@@ -311,6 +201,7 @@ export default function TechnicianRequests({ navigation }) {
         ) : (
           filteredRequests.map((item) => {
             const actions = nextActions(item.status);
+            const userLoc = getUserLocation(item);
 
             return (
               <View key={item.id} style={styles.card}>
@@ -323,7 +214,8 @@ export default function TechnicianRequests({ navigation }) {
                 </Text>
 
                 <Text style={styles.text}>
-                  <Text style={styles.bold}>Phone:</Text> {item.user_phone || "-"}
+                  <Text style={styles.bold}>Phone:</Text>{" "}
+                  {item.user_phone || "-"}
                 </Text>
 
                 <Text style={styles.text}>
@@ -337,9 +229,38 @@ export default function TechnicianRequests({ navigation }) {
                 </Text>
 
                 <Text style={styles.text}>
-                  <Text style={styles.bold}>Location:</Text>{" "}
+                  <Text style={styles.bold}>Location Note:</Text>{" "}
                   {item.location_note || item.city || "-"}
                 </Text>
+
+                {userLoc ? (
+                  <View style={styles.mapSection}>
+                    <Text style={styles.mapTitle}>Customer Location</Text>
+
+                    <MapView
+                      style={styles.map}
+                      initialRegion={{
+                        latitude: userLoc.latitude,
+                        longitude: userLoc.longitude,
+                        latitudeDelta: 0.005,
+                        longitudeDelta: 0.005,
+                      }}
+                    >
+                      <Marker
+                        coordinate={{
+                          latitude: userLoc.latitude,
+                          longitude: userLoc.longitude,
+                        }}
+                        title="Customer Location"
+                        description="Static request location"
+                      />
+                    </MapView>
+
+                    <Text style={styles.mapNote}>
+                      Static location shared when the request was created.
+                    </Text>
+                  </View>
+                ) : null}
 
                 <Text style={styles.description}>{item.description || "-"}</Text>
 
@@ -353,7 +274,7 @@ export default function TechnicianRequests({ navigation }) {
                           styles.statusBtn,
                           action.value === "rejected" && styles.rejectBtn,
                         ]}
-                        onPress={() => confirmUpdateStatus(item.id, action.value)}
+                        onPress={() => updateStatus(item.id, action.value)}
                       >
                         <Text style={styles.statusText}>
                           {updatingId === item.id ? "..." : action.label}
@@ -453,6 +374,27 @@ const styles = StyleSheet.create({
   },
   text: { fontSize: 16, color: "#2F2723", marginBottom: 5, fontWeight: "700" },
   bold: { fontWeight: "900", color: "#111" },
+  mapSection: {
+    marginTop: 14,
+    marginBottom: 14,
+  },
+  mapTitle: {
+    fontSize: 19,
+    fontWeight: "900",
+    color: "#111",
+    marginBottom: 10,
+  },
+  map: {
+    width: "100%",
+    height: 240,
+    borderRadius: 22,
+  },
+  mapNote: {
+    marginTop: 8,
+    color: "#6B5E52",
+    fontSize: 14,
+    fontWeight: "700",
+  },
   description: {
     fontSize: 15,
     color: "#5C5048",

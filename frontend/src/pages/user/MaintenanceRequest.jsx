@@ -27,6 +27,8 @@ function MaintenanceRequest() {
   const [availableDates, setAvailableDates] = useState([]);
   const [availableTimes, setAvailableTimes] = useState([]);
   const [message, setMessage] = useState(null);
+  const [userLocation, setUserLocation] = useState(null);
+  const [locationLoading, setLocationLoading] = useState(false);
 
   const [form, setForm] = useState({
     service: location.state?.service || stateTech.service || "",
@@ -47,6 +49,10 @@ function MaintenanceRequest() {
     ).toFixed(2);
   }, [form.price_per_hour, form.estimated_hours]);
 
+  const userMapSrc = userLocation
+    ? `https://www.google.com/maps?q=${userLocation.lat},${userLocation.lng}&z=17&output=embed`
+    : "";
+
   const isBooked = (item) => {
     return (
       Number(item?.is_booked) === 1 ||
@@ -64,21 +70,6 @@ function MaintenanceRequest() {
       return raw;
     }
 
-    const isoDateMatch = raw.match(/^(\d{4}-\d{2}-\d{2})T/);
-
-    if (isoDateMatch) {
-      const d = new Date(raw);
-
-      if (!Number.isNaN(d.getTime())) {
-        const yyyy = d.getFullYear();
-        const mm = String(d.getMonth() + 1).padStart(2, "0");
-        const dd = String(d.getDate()).padStart(2, "0");
-        return `${yyyy}-${mm}-${dd}`;
-      }
-
-      return isoDateMatch[1];
-    }
-
     const normalMatch = raw.match(/^(\d{4}-\d{2}-\d{2})/);
     if (normalMatch) return normalMatch[1];
 
@@ -94,6 +85,55 @@ function MaintenanceRequest() {
     if (match) return match[0].length === 5 ? `${match[0]}:00` : match[0];
 
     return raw.slice(0, 8);
+  };
+
+  const getCurrentUserLocation = () => {
+    setLocationLoading(true);
+
+    if (!navigator.geolocation) {
+      setLocationLoading(false);
+      setMessage({
+        type: "error",
+        title: "Location Error",
+        body: "Geolocation is not supported by this browser.",
+      });
+      return;
+    }
+
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        const lat = position.coords.latitude;
+        const lng = position.coords.longitude;
+
+        setUserLocation({
+          lat,
+          lng,
+          url: `https://www.google.com/maps?q=${lat},${lng}`,
+        });
+
+        setMessage({
+          type: "success",
+          title: "Location Added",
+          body: "Your location has been added to this request.",
+        });
+
+        setLocationLoading(false);
+      },
+      () => {
+        setMessage({
+          type: "error",
+          title: "Location Error",
+          body: "Please allow location access and try again.",
+        });
+
+        setLocationLoading(false);
+      },
+      {
+        enableHighAccuracy: true,
+        timeout: 10000,
+        maximumAge: 60000,
+      }
+    );
   };
 
   useEffect(() => {
@@ -248,7 +288,8 @@ function MaintenanceRequest() {
         });
         return;
       }
-if (!form.scheduled_date || !form.scheduled_time) {
+
+      if (!form.scheduled_date || !form.scheduled_time) {
         setMessage({
           type: "error",
           title: "Unavailable Time",
@@ -256,6 +297,7 @@ if (!form.scheduled_date || !form.scheduled_time) {
         });
         return;
       }
+
       const stillAvailable = await checkSlotStillAvailable();
 
       if (!stillAvailable) {
@@ -266,6 +308,7 @@ if (!form.scheduled_date || !form.scheduled_time) {
         });
         return;
       }
+
       if (!form.description.trim()) {
         setMessage({
           type: "error",
@@ -293,6 +336,9 @@ if (!form.scheduled_date || !form.scheduled_time) {
         payment_method: form.payment_method,
         price_per_hour: Number(form.price_per_hour || 0),
         total_price: Number(totalPrice),
+        user_location_lat: userLocation?.lat || null,
+        user_location_lng: userLocation?.lng || null,
+        user_location_url: userLocation?.url || null,
       };
 
       const res = await createMaintenanceRequest(payload);
@@ -417,40 +463,89 @@ if (!form.scheduled_date || !form.scheduled_time) {
                 <option value="online">Online</option>
               </select>
             </div>
+          </div>
 
-            <div className="input-group full-width">
-              <label>Price Summary</label>
-              <input
-                readOnly
-                value={`Price / hour: ${Number(form.price_per_hour || 0).toFixed(
-                  2
-                )} JOD | Estimated Hours: ${
-                  form.estimated_hours
-                } | Total: ${totalPrice} JOD`}
-              />
-            </div>
+          <div className="input-group">
+            <label>Price Summary</label>
+            <input
+              readOnly
+              value={`${Number(form.price_per_hour || 0).toFixed(
+                2
+              )} JOD/hour | Hours: ${
+                form.estimated_hours
+              } | Total: ${totalPrice} JOD`}
+            />
+          </div>
 
-            <div className="input-group full-width">
-              <label>Location Note</label>
-              <input
-                value={form.location_note}
-                onChange={(e) =>
-                  setForm({ ...form, location_note: e.target.value })
-                }
-                placeholder="Example: Irbid, near Yarmouk University"
-              />
-            </div>
+          <div className="input-group">
+            <label>Location Note</label>
+            <input
+              value={form.location_note}
+              onChange={(e) =>
+                setForm({ ...form, location_note: e.target.value })
+              }
+              placeholder="Example: Irbid, near Yarmouk University"
+            />
+          </div>
 
-            <div className="input-group full-width">
-              <label>Description</label>
-              <textarea
-                value={form.description}
-                onChange={(e) =>
-                  setForm({ ...form, description: e.target.value })
-                }
-                placeholder="Describe the problem..."
-              />
-            </div>
+          <div style={{ marginTop: 18, marginBottom: 18 }}>
+            <button
+              className="secondary"
+              type="button"
+              onClick={getCurrentUserLocation}
+              disabled={locationLoading}
+            >
+              {locationLoading ? "Getting Location..." : "Use My Location"}
+            </button>
+
+            {userLocation && (
+              <div style={{ marginTop: 16 }}>
+                <h3 style={{ marginBottom: 10 }}>Your Request Location</h3>
+
+                <div
+                  style={{
+                    width: "100%",
+                    height: 320,
+                    borderRadius: 22,
+                    overflow: "hidden",
+                    border: "1px solid #d8c8b8",
+                    background: "#f7efe7",
+                  }}
+                >
+                  <iframe
+                    title="User Request Location"
+                    src={userMapSrc}
+                    width="100%"
+                    height="100%"
+                    style={{ border: 0 }}
+                    loading="lazy"
+                    referrerPolicy="no-referrer-when-downgrade"
+                    allowFullScreen
+                  />
+                </div>
+
+                <p
+                  style={{
+                    marginTop: 8,
+                    fontWeight: 700,
+                    color: "#5c5048",
+                  }}
+                >
+                  This static location will be shared with the technician.
+                </p>
+              </div>
+            )}
+          </div>
+
+          <div className="input-group">
+            <label>Description</label>
+            <textarea
+              value={form.description}
+              onChange={(e) =>
+                setForm({ ...form, description: e.target.value })
+              }
+              placeholder="Describe the problem..."
+            />
           </div>
 
           <button className="primary" type="submit">

@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import Header from "../../components/common/Header";
 import {
   getMyTechnicianRequests,
@@ -25,30 +25,35 @@ function TechnicianRequests() {
   const [dateFilter, setDateFilter] = useState("");
   const [sortFilter, setSortFilter] = useState("newest");
 
-  const watchIdsRef = useRef({});
-
   const normalizeText = (value) => {
     return String(value || "").trim().toLowerCase();
   };
 
   const formatDateOnly = (value) => {
     if (!value) return "-";
+
     const raw = String(value).trim();
+
     const match = raw.match(/^(\d{4}-\d{2}-\d{2})/);
     if (match) return match[1];
+
     return raw.slice(0, 10);
   };
 
   const formatTimeOnly = (value) => {
     if (!value) return "-";
+
     const raw = String(value).trim();
     const match = raw.match(/^(\d{2}:\d{2})(:\d{2})?/);
+
     if (match) return match[0];
+
     return raw.slice(0, 8);
   };
 
   const formatDateTime = (value) => {
     if (!value) return "-";
+
     const raw = String(value).trim();
 
     if (/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}/.test(raw)) {
@@ -64,88 +69,32 @@ function TechnicianRequests() {
     return d.toLocaleString();
   };
 
-  const getCurrentTechnicianLocation = () => {
-    return new Promise((resolve, reject) => {
-      if (!navigator.geolocation) {
-        reject(new Error("Geolocation is not supported."));
-        return;
-      }
+  const getUserLocation = (item) => {
+    const lat = Number(item?.user_location_lat);
+    const lng = Number(item?.user_location_lng);
 
-      navigator.geolocation.getCurrentPosition(
-        (position) => {
-          resolve({
-            technician_location_lat: position.coords.latitude,
-            technician_location_lng: position.coords.longitude,
-          });
-        },
-        () => {
-          reject(
-            new Error(
-              "Current location is unavailable. Please enable location and try again."
-            )
-          );
-        },
-        {
-          enableHighAccuracy: true,
-          timeout: 8000,
-          maximumAge: 0,
-        }
-      );
-    });
-  };
-
-  const stopLiveLocationSharing = (requestId) => {
-    const currentWatchId = watchIdsRef.current[requestId];
-
-    if (currentWatchId !== undefined && navigator.geolocation) {
-      navigator.geolocation.clearWatch(currentWatchId);
-      delete watchIdsRef.current[requestId];
-    }
-  };
-
-  const startLiveLocationSharing = (requestId) => {
-    if (!navigator.geolocation) return;
-
-    if (watchIdsRef.current[requestId] !== undefined) {
-      return;
+    if (Number.isFinite(lat) && Number.isFinite(lng)) {
+      return { lat, lng };
     }
 
-    const watchId = navigator.geolocation.watchPosition(
-      async (position) => {
-        try {
-          await updateTechnicianRequestStatus(requestId, {
-            status: "on_the_way",
-            technician_location_lat: position.coords.latitude,
-            technician_location_lng: position.coords.longitude,
-          });
-        } catch (err) {
-          console.log("live location update error:", err);
-        }
-      },
-      (err) => {
-        console.log("watch location error:", err);
-      },
-      {
-        enableHighAccuracy: true,
-        maximumAge: 0,
-        timeout: 10000,
-      }
-    );
+    const url = String(item?.user_location_url || "");
+    const match = url.match(/q=(-?\d+(\.\d+)?),(-?\d+(\.\d+)?)/);
 
-    watchIdsRef.current[requestId] = watchId;
+    if (match) {
+      const parsedLat = Number(match[1]);
+      const parsedLng = Number(match[3]);
+
+      if (Number.isFinite(parsedLat) && Number.isFinite(parsedLng)) {
+        return { lat: parsedLat, lng: parsedLng };
+      }
+    }
+
+    return null;
   };
 
-  useEffect(() => {
-    return () => {
-      Object.values(watchIdsRef.current).forEach((watchId) => {
-        if (navigator.geolocation) {
-          navigator.geolocation.clearWatch(watchId);
-        }
-      });
-
-      watchIdsRef.current = {};
-    };
-  }, []);
+  const getStaticMapSrc = (loc) => {
+    return `https://www.google.com/maps?q=${loc.lat},${loc.lng}&z=17&output=embed`;
+  };
 
   const loadRequests = async () => {
     try {
@@ -246,44 +195,12 @@ function TechnicianRequests() {
 
   const updateStatus = async (requestId, status) => {
     try {
-      let payload = { status };
-
-      if (status === "on_the_way") {
-        const confirmShare = window.confirm(
-          "To mark this request as On The Way, your current live location will be shared with the user. Continue?"
-        );
-
-        if (!confirmShare) return;
-
-        const locationPayload = await getCurrentTechnicianLocation();
-
-        payload = {
-          status,
-          ...locationPayload,
-        };
-      }
-
-      await updateTechnicianRequestStatus(requestId, payload);
-
-      if (status === "on_the_way") {
-        startLiveLocationSharing(requestId);
-      }
-
-      if (
-        status === "completed" ||
-        status === "rejected" ||
-        status === "cancelled"
-      ) {
-        stopLiveLocationSharing(requestId);
-      }
+      await updateTechnicianRequestStatus(requestId, status);
 
       setMessage({
         type: "success",
         title: "Updated",
-        body:
-          status === "on_the_way"
-            ? "Request status updated and live location sharing started."
-            : "Request status updated successfully.",
+        body: "Request status updated successfully.",
       });
 
       await loadRequests();
@@ -291,10 +208,7 @@ function TechnicianRequests() {
       setMessage({
         type: "error",
         title: "Error",
-        body:
-          err?.response?.data?.message ||
-          err?.message ||
-          "Failed to update status.",
+        body: err?.response?.data?.message || "Failed to update status.",
       });
     }
   };
@@ -389,7 +303,12 @@ function TechnicianRequests() {
         </div>
 
         <div className="technician-filters-grid">
-          
+          <input
+            className="technician-search-input"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Search by user, phone, city, service, status..."
+          />
 
           <select
             value={statusFilter}
@@ -404,7 +323,11 @@ function TechnicianRequests() {
             ))}
           </select>
 
-          
+          <input
+            type="date"
+            value={dateFilter}
+            onChange={(e) => setDateFilter(e.target.value)}
+          />
 
           <select
             value={sortFilter}
@@ -440,54 +363,98 @@ function TechnicianRequests() {
           </div>
         ) : (
           <div className="history-list">
-            {filteredRequests.map((item) => (
-              <div className="history-card" key={item.id}>
-                <div className="history-card-header">
-                  <h3>{item.service || "-"}</h3>
-                  <span className="status-pill">
-                    {String(item.status || "-").replaceAll("_", " ")}
-                  </span>
+            {filteredRequests.map((item) => {
+              const userLoc = getUserLocation(item);
+
+              return (
+                <div className="history-card" key={item.id}>
+                  <div className="history-card-header">
+                    <h3>{item.service || "-"}</h3>
+                    <span className="status-pill">
+                      {String(item.status || "-").replaceAll("_", " ")}
+                    </span>
+                  </div>
+
+                  <div className="history-info-grid">
+                    <p>
+                      <b>User:</b> {item.user_name || item.customer_name || "-"}
+                    </p>
+
+                    <p>
+                      <b>Phone:</b> {item.user_phone || "-"}
+                    </p>
+
+                    <p>
+                      <b>Request Date:</b> {formatDateOnly(item.scheduled_date)}
+                    </p>
+
+                    <p>
+                      <b>Request Time:</b> {formatTimeOnly(item.scheduled_time)}
+                    </p>
+
+                    <p>
+                      <b>Created At:</b> {formatDateTime(item.created_at)}
+                    </p>
+
+                    <p>
+                      <b>Location Note:</b> {item.location_note || item.city || "-"}
+                    </p>
+
+                    <p>
+                      <b>Payment:</b> {item.payment_method || "-"}
+                    </p>
+
+                    <p>
+                      <b>Total:</b> {Number(item.total_price || 0).toFixed(2)} JOD
+                    </p>
+                  </div>
+
+                  {userLoc && (
+                    <div style={{ marginTop: 18, marginBottom: 18 }}>
+                      <h3 style={{ marginBottom: 10 }}>Customer Location</h3>
+
+                      <div
+                        style={{
+                          width: "100%",
+                          height: 300,
+                          borderRadius: 22,
+                          overflow: "hidden",
+                          border: "1px solid #d8c8b8",
+                          background: "#f7efe7",
+                        }}
+                      >
+                        <iframe
+                          title={`Customer Location ${item.id}`}
+                          src={getStaticMapSrc(userLoc)}
+                          width="100%"
+                          height="100%"
+                          style={{ border: 0 }}
+                          loading="lazy"
+                          referrerPolicy="no-referrer-when-downgrade"
+                          allowFullScreen
+                        />
+                      </div>
+
+                      <p
+                        style={{
+                          marginTop: 8,
+                          fontWeight: 700,
+                          color: "#5c5048",
+                        }}
+                      >
+                        Static customer location shared when the request was created.
+                      </p>
+                    </div>
+                  )}
+
+                  <p className="history-description">
+                    {item.description || "-"}
+                  </p>
+
+                  <div className="request-actions">{nextButton(item)}</div>
                 </div>
-
-                <div className="history-info-grid">
-                  <p>
-                    <b>User:</b> {item.user_name || item.customer_name || "-"}
-                  </p>
-
-                  <p>
-                    <b>Phone:</b> {item.user_phone || "-"}
-                  </p>
-
-                  <p>
-                    <b>Request Date:</b> {formatDateOnly(item.scheduled_date)}
-                  </p>
-
-                  <p>
-                    <b>Request Time:</b> {formatTimeOnly(item.scheduled_time)}
-                  </p>
-
-                  <p>
-                    <b>Created At:</b> {formatDateTime(item.created_at)}
-                  </p>
-
-                  <p>
-                    <b>Location:</b> {item.location_note || item.city || "-"}
-                  </p>
-
-                  <p>
-                    <b>Payment:</b> {item.payment_method || "-"}
-                  </p>
-
-                  <p>
-                    <b>Total:</b> {Number(item.total_price || 0).toFixed(2)} JOD
-                  </p>
-                </div>
-
-                <p className="history-description">{item.description || "-"}</p>
-
-                <div className="request-actions">{nextButton(item)}</div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </div>
