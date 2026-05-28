@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import Header from "../../components/common/Header";
 import {
   getMyTechnicianRequests,
@@ -25,58 +25,127 @@ function TechnicianRequests() {
   const [dateFilter, setDateFilter] = useState("");
   const [sortFilter, setSortFilter] = useState("newest");
 
+  const watchIdsRef = useRef({});
+
   const normalizeText = (value) => {
     return String(value || "").trim().toLowerCase();
   };
 
   const formatDateOnly = (value) => {
     if (!value) return "-";
-
     const raw = String(value).trim();
-
-    if (/^\d{4}-\d{2}-\d{2}$/.test(raw)) {
-      return raw;
-    }
-
-    if (raw.includes("T")) {
-      const d = new Date(raw);
-
-      if (!Number.isNaN(d.getTime())) {
-        const yyyy = d.getFullYear();
-        const mm = String(d.getMonth() + 1).padStart(2, "0");
-        const dd = String(d.getDate()).padStart(2, "0");
-        return `${yyyy}-${mm}-${dd}`;
-      }
-    }
-
     const match = raw.match(/^(\d{4}-\d{2}-\d{2})/);
     if (match) return match[1];
-
     return raw.slice(0, 10);
   };
 
   const formatTimeOnly = (value) => {
     if (!value) return "-";
-
     const raw = String(value).trim();
     const match = raw.match(/^(\d{2}:\d{2})(:\d{2})?/);
-
     if (match) return match[0];
-
     return raw.slice(0, 8);
   };
 
   const formatDateTime = (value) => {
     if (!value) return "-";
+    const raw = String(value).trim();
 
-    const d = new Date(value);
+    if (/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}/.test(raw)) {
+      return raw;
+    }
+
+    const d = new Date(raw);
 
     if (Number.isNaN(d.getTime())) {
-      return String(value);
+      return raw;
     }
 
     return d.toLocaleString();
   };
+
+  const getCurrentTechnicianLocation = () => {
+    return new Promise((resolve, reject) => {
+      if (!navigator.geolocation) {
+        reject(new Error("Geolocation is not supported."));
+        return;
+      }
+
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          resolve({
+            technician_location_lat: position.coords.latitude,
+            technician_location_lng: position.coords.longitude,
+          });
+        },
+        () => {
+          reject(
+            new Error(
+              "Current location is unavailable. Please enable location and try again."
+            )
+          );
+        },
+        {
+          enableHighAccuracy: true,
+          timeout: 8000,
+          maximumAge: 0,
+        }
+      );
+    });
+  };
+
+  const stopLiveLocationSharing = (requestId) => {
+    const currentWatchId = watchIdsRef.current[requestId];
+
+    if (currentWatchId !== undefined && navigator.geolocation) {
+      navigator.geolocation.clearWatch(currentWatchId);
+      delete watchIdsRef.current[requestId];
+    }
+  };
+
+  const startLiveLocationSharing = (requestId) => {
+    if (!navigator.geolocation) return;
+
+    if (watchIdsRef.current[requestId] !== undefined) {
+      return;
+    }
+
+    const watchId = navigator.geolocation.watchPosition(
+      async (position) => {
+        try {
+          await updateTechnicianRequestStatus(requestId, {
+            status: "on_the_way",
+            technician_location_lat: position.coords.latitude,
+            technician_location_lng: position.coords.longitude,
+          });
+        } catch (err) {
+          console.log("live location update error:", err);
+        }
+      },
+      (err) => {
+        console.log("watch location error:", err);
+      },
+      {
+        enableHighAccuracy: true,
+        maximumAge: 0,
+        timeout: 10000,
+      }
+    );
+
+    watchIdsRef.current[requestId] = watchId;
+  };
+
+  useEffect(() => {
+    return () => {
+      Object.values(watchIdsRef.current).forEach((watchId) => {
+        if (navigator.geolocation) {
+          navigator.geolocation.clearWatch(watchId);
+        }
+      });
+
+      watchIdsRef.current = {};
+    };
+  }, []);
 
   const loadRequests = async () => {
     try {
@@ -177,12 +246,44 @@ function TechnicianRequests() {
 
   const updateStatus = async (requestId, status) => {
     try {
-      await updateTechnicianRequestStatus(requestId, status);
+      let payload = { status };
+
+      if (status === "on_the_way") {
+        const confirmShare = window.confirm(
+          "To mark this request as On The Way, your current live location will be shared with the user. Continue?"
+        );
+
+        if (!confirmShare) return;
+
+        const locationPayload = await getCurrentTechnicianLocation();
+
+        payload = {
+          status,
+          ...locationPayload,
+        };
+      }
+
+      await updateTechnicianRequestStatus(requestId, payload);
+
+      if (status === "on_the_way") {
+        startLiveLocationSharing(requestId);
+      }
+
+      if (
+        status === "completed" ||
+        status === "rejected" ||
+        status === "cancelled"
+      ) {
+        stopLiveLocationSharing(requestId);
+      }
 
       setMessage({
         type: "success",
         title: "Updated",
-        body: "Request status updated successfully.",
+        body:
+          status === "on_the_way"
+            ? "Request status updated and live location sharing started."
+            : "Request status updated successfully.",
       });
 
       await loadRequests();
@@ -190,7 +291,10 @@ function TechnicianRequests() {
       setMessage({
         type: "error",
         title: "Error",
-        body: err?.response?.data?.message || "Failed to update status.",
+        body:
+          err?.response?.data?.message ||
+          err?.message ||
+          "Failed to update status.",
       });
     }
   };
@@ -220,7 +324,7 @@ function TechnicianRequests() {
       );
     }
 
-    if (status === "accepted") {
+    if (status === "accepted" || status === "confirmed") {
       return (
         <button
           className="primary"
@@ -379,9 +483,7 @@ function TechnicianRequests() {
                   </p>
                 </div>
 
-                <p className="history-description">
-                  {item.description || "-"}
-                </p>
+                <p className="history-description">{item.description || "-"}</p>
 
                 <div className="request-actions">{nextButton(item)}</div>
               </div>

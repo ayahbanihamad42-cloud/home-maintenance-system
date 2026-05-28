@@ -1,37 +1,30 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   View,
   Text,
   ScrollView,
   TouchableOpacity,
   StyleSheet,
+  Alert,
 } from "react-native";
+import * as Location from "expo-location";
 import Header from "../../components/Common/Header";
 import API from "../../services/api";
 
 const formatDateOnly = (value) => {
   if (!value) return "-";
-
   const raw = String(value).trim();
-
-  if (/^\d{4}-\d{2}-\d{2}$/.test(raw)) return raw;
-
-  if (raw.includes("T")) {
-    const date = new Date(raw);
-    if (!Number.isNaN(date.getTime())) {
-      return new Intl.DateTimeFormat("en-CA", {
-        timeZone: "Asia/Amman",
-        year: "numeric",
-        month: "2-digit",
-        day: "2-digit",
-      }).format(date);
-    }
-  }
-
   const match = raw.match(/^(\d{4}-\d{2}-\d{2})/);
   if (match) return match[1];
-
   return raw.slice(0, 10);
+};
+
+const formatTimeOnly = (value) => {
+  if (!value) return "-";
+  const raw = String(value).trim();
+  const match = raw.match(/^(\d{2}:\d{2})(:\d{2})?/);
+  if (match) return match[0];
+  return raw.slice(0, 8);
 };
 
 const nextActions = (status) => {
@@ -77,6 +70,9 @@ export default function TechnicianRequests({ navigation }) {
   const [updatingId, setUpdatingId] = useState(null);
   const [error, setError] = useState("");
 
+  const liveLocationSubscriptionRef = useRef(null);
+  const liveRequestIdRef = useRef(null);
+
   const loadRequests = async () => {
     try {
       setRefreshing(true);
@@ -93,26 +89,164 @@ export default function TechnicianRequests({ navigation }) {
     }
   };
 
+  const getCurrentTechnicianLocation = async () => {
+    const permission = await Location.requestForegroundPermissionsAsync();
+
+    if (permission.status !== "granted") {
+      throw new Error("Location permission was denied.");
+    }
+
+    const servicesEnabled = await Location.hasServicesEnabledAsync();
+
+    if (!servicesEnabled) {
+      throw new Error("Please turn on location services from phone settings.");
+    }
+
+    let position = await Location.getLastKnownPositionAsync({
+      maxAge: 300000,
+      requiredAccuracy: 10000,
+    });
+
+    if (!position?.coords) {
+      position = await Location.getCurrentPositionAsync({
+        accuracy: Location.Accuracy.Balanced,
+      });
+    }
+
+    if (!position?.coords) {
+      throw new Error("Current location is unavailable.");
+    }
+
+    return {
+      technician_location_lat: position.coords.latitude,
+      technician_location_lng: position.coords.longitude,
+    };
+  };
+
+  const stopLiveLocationSharing = async () => {
+    if (liveLocationSubscriptionRef.current) {
+      liveLocationSubscriptionRef.current.remove();
+      liveLocationSubscriptionRef.current = null;
+      liveRequestIdRef.current = null;
+    }
+  };
+
+  const startLiveLocationSharing = async (requestId) => {
+    const permission = await Location.requestForegroundPermissionsAsync();
+
+    if (permission.status !== "granted") {
+      throw new Error("Location permission was denied.");
+    }
+
+    const servicesEnabled = await Location.hasServicesEnabledAsync();
+
+    if (!servicesEnabled) {
+      throw new Error("Please turn on location services.");
+    }
+
+    if (liveRequestIdRef.current === requestId && liveLocationSubscriptionRef.current) {
+      return;
+    }
+
+    await stopLiveLocationSharing();
+
+    liveRequestIdRef.current = requestId;
+
+    const subscription = await Location.watchPositionAsync(
+      {
+        accuracy: Location.Accuracy.Balanced,
+        timeInterval: 10000,
+        distanceInterval: 5,
+      },
+      async (position) => {
+        try {
+          await API.put(`/technicians/requests/${requestId}/status`, {
+            status: "on_the_way",
+            technician_location_lat: position.coords.latitude,
+            technician_location_lng: position.coords.longitude,
+          });
+        } catch (err) {
+          console.log("live location update error:", err?.message);
+        }
+      }
+    );
+
+    liveLocationSubscriptionRef.current = subscription;
+  };
+
+  useEffect(() => {
+    loadRequests();
+
+    const unsubscribe = navigation.addListener("focus", loadRequests);
+
+    return () => {
+      unsubscribe();
+      stopLiveLocationSharing();
+    };
+  }, [navigation]);
+
   const updateStatus = async (requestId, status) => {
     try {
       setUpdatingId(requestId);
       setError("");
 
-      await API.put(`/technicians/requests/${requestId}/status`, { status });
+      let payload = { status };
+
+      if (status === "on_the_way") {
+        const locationPayload = await getCurrentTechnicianLocation();
+
+        payload = {
+          status,
+          ...locationPayload,
+        };
+      }
+
+      await API.put(`/technicians/requests/${requestId}/status`, payload);
+
+      if (status === "on_the_way") {
+        await startLiveLocationSharing(requestId);
+      }
+
+      if (
+        status === "completed" ||
+        status === "rejected" ||
+        status === "cancelled"
+      ) {
+        await stopLiveLocationSharing();
+      }
+
       await loadRequests();
     } catch (err) {
       console.log("status update error:", err?.response?.data || err.message);
-      setError(err?.response?.data?.message || "Failed to update status.");
+
+      const msg =
+        err?.response?.data?.message || err?.message || "Failed to update status.";
+
+      setError(msg);
+      Alert.alert("Error", msg);
     } finally {
       setUpdatingId(null);
     }
   };
 
-  useEffect(() => {
-    loadRequests();
-    const unsubscribe = navigation.addListener("focus", loadRequests);
-    return unsubscribe;
-  }, [navigation]);
+  const confirmUpdateStatus = (requestId, status) => {
+    if (status !== "on_the_way") {
+      updateStatus(requestId, status);
+      return;
+    }
+
+    Alert.alert(
+      "Share Location",
+      "To mark this request as On The Way, your live location will be shared with the user.",
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Continue",
+          onPress: () => updateStatus(requestId, status),
+        },
+      ]
+    );
+  };
 
   const sortedRequests = useMemo(() => {
     return [...requests].sort((a, b) => Number(b.id || 0) - Number(a.id || 0));
@@ -189,13 +323,22 @@ export default function TechnicianRequests({ navigation }) {
                 </Text>
 
                 <Text style={styles.text}>
+                  <Text style={styles.bold}>Phone:</Text> {item.user_phone || "-"}
+                </Text>
+
+                <Text style={styles.text}>
                   <Text style={styles.bold}>Date:</Text>{" "}
                   {formatDateOnly(item.scheduled_date)}
                 </Text>
 
                 <Text style={styles.text}>
                   <Text style={styles.bold}>Time:</Text>{" "}
-                  {item.scheduled_time || "-"}
+                  {formatTimeOnly(item.scheduled_time)}
+                </Text>
+
+                <Text style={styles.text}>
+                  <Text style={styles.bold}>Location:</Text>{" "}
+                  {item.location_note || item.city || "-"}
                 </Text>
 
                 <Text style={styles.description}>{item.description || "-"}</Text>
@@ -210,7 +353,7 @@ export default function TechnicianRequests({ navigation }) {
                           styles.statusBtn,
                           action.value === "rejected" && styles.rejectBtn,
                         ]}
-                        onPress={() => updateStatus(item.id, action.value)}
+                        onPress={() => confirmUpdateStatus(item.id, action.value)}
                       >
                         <Text style={styles.statusText}>
                           {updatingId === item.id ? "..." : action.label}

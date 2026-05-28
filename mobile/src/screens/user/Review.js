@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import {
   View,
   Text,
@@ -6,7 +6,9 @@ import {
   TouchableOpacity,
   TextInput,
   StyleSheet,
+  Alert,
 } from "react-native";
+import MapView, { Marker } from "react-native-maps";
 import Header from "../../components/Common/Header";
 import {
   getRequestById,
@@ -16,49 +18,56 @@ import { addRating, getRatingByRequest } from "../../services/ratingService";
 
 const formatDateOnly = (value) => {
   if (!value) return "-";
-
   const raw = String(value).trim();
-
-  if (/^\d{4}-\d{2}-\d{2}$/.test(raw)) return raw;
-
-  if (raw.includes("T")) {
-    const date = new Date(raw);
-
-    if (!Number.isNaN(date.getTime())) {
-      return new Intl.DateTimeFormat("en-CA", {
-        timeZone: "Asia/Amman",
-        year: "numeric",
-        month: "2-digit",
-        day: "2-digit",
-      }).format(date);
-    }
-  }
-
   const match = raw.match(/^(\d{4}-\d{2}-\d{2})/);
   if (match) return match[1];
-
   return raw.slice(0, 10);
+};
+
+const formatTimeOnly = (value) => {
+  if (!value) return "-";
+  const raw = String(value).trim();
+  const match = raw.match(/^(\d{2}:\d{2})(:\d{2})?/);
+  if (match) return match[0];
+  return raw.slice(0, 8);
 };
 
 const formatDateTime = (value) => {
   if (!value) return "-";
-
   const raw = String(value).trim();
 
-  if (!raw.includes("T")) return raw;
+  if (/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}/.test(raw)) {
+    return raw;
+  }
 
   const date = new Date(raw);
 
   if (Number.isNaN(date.getTime())) return raw;
 
-  return new Intl.DateTimeFormat("en-CA", {
-    timeZone: "Asia/Amman",
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-  }).format(date);
+  return date.toLocaleString();
+};
+
+const getLocationFromRequest = (request) => {
+  const lat = Number(request?.technician_location_lat);
+  const lng = Number(request?.technician_location_lng);
+
+  if (Number.isFinite(lat) && Number.isFinite(lng)) {
+    return { latitude: lat, longitude: lng };
+  }
+
+  const url = String(request?.technician_location_url || "");
+  const match = url.match(/q=(-?\d+(\.\d+)?),(-?\d+(\.\d+)?)/);
+
+  if (match) {
+    const parsedLat = Number(match[1]);
+    const parsedLng = Number(match[3]);
+
+    if (Number.isFinite(parsedLat) && Number.isFinite(parsedLng)) {
+      return { latitude: parsedLat, longitude: parsedLng };
+    }
+  }
+
+  return null;
 };
 
 export default function Review({ navigation, route }) {
@@ -71,7 +80,11 @@ export default function Review({ navigation, route }) {
   const [message, setMessage] = useState(null);
   const [refreshing, setRefreshing] = useState(false);
 
-  const loadRequest = async () => {
+  const technicianLocation = useMemo(() => {
+    return getLocationFromRequest(request);
+  }, [request]);
+
+  const loadRequest = async (silent = false) => {
     if (!requestId) {
       setMessage({
         type: "error",
@@ -83,31 +96,45 @@ export default function Review({ navigation, route }) {
 
     try {
       setRefreshing(true);
-      setMessage(null);
+      if (!silent) setMessage(null);
 
       const data = await getRequestById(requestId);
       setRequest(data || route?.params?.request || null);
 
-      const ratingData = await getRatingByRequest(requestId).catch(() => null);
-      setOldRating(ratingData || null);
+      if (!silent) {
+        const ratingData = await getRatingByRequest(requestId).catch(() => null);
+        setOldRating(ratingData || null);
 
-      if (ratingData) {
-        setRating(ratingData.rating || 5);
-        setComment(ratingData.comment || "");
+        if (ratingData) {
+          setRating(ratingData.rating || 5);
+          setComment(ratingData.comment || "");
+        }
       }
     } catch (err) {
-      setMessage({
-        type: "error",
-        title: "Error",
-        body: err?.response?.data?.message || "Failed to load request.",
-      });
+      if (!silent) {
+        setMessage({
+          type: "error",
+          title: "Error",
+          body: err?.response?.data?.message || "Failed to load request.",
+        });
+      }
     } finally {
       setRefreshing(false);
     }
   };
 
   useEffect(() => {
-    loadRequest();
+    loadRequest(false);
+  }, [requestId]);
+
+  useEffect(() => {
+    if (!requestId) return;
+
+    const interval = setInterval(() => {
+      loadRequest(true);
+    }, 10000);
+
+    return () => clearInterval(interval);
   }, [requestId]);
 
   const status = String(request?.status || "").toLowerCase();
@@ -124,7 +151,7 @@ export default function Review({ navigation, route }) {
         body: "Request cancelled successfully.",
       });
 
-      await loadRequest();
+      await loadRequest(false);
     } catch (err) {
       setMessage({
         type: "error",
@@ -160,7 +187,7 @@ export default function Review({ navigation, route }) {
         body: "Review submitted successfully.",
       });
 
-      await loadRequest();
+      await loadRequest(false);
     } catch (err) {
       setMessage({
         type: "error",
@@ -222,7 +249,7 @@ export default function Review({ navigation, route }) {
 
               <Text style={styles.info}>
                 <Text style={styles.bold}>Time:</Text>{" "}
-                {request.scheduled_time || "-"}
+                {formatTimeOnly(request.scheduled_time)}
               </Text>
 
               <Text style={styles.info}>
@@ -249,6 +276,39 @@ export default function Review({ navigation, route }) {
                 <Text style={styles.bold}>Total:</Text>{" "}
                 {Number(request.total_price || 0).toFixed(2)} JOD
               </Text>
+
+              {technicianLocation ? (
+                <View style={styles.mapSection}>
+                  <Text style={styles.mapTitle}>Technician Location</Text>
+
+                  <MapView
+                    key={`${technicianLocation.latitude}-${technicianLocation.longitude}`}
+                    style={styles.map}
+                    mapType="standard"
+                    showsUserLocation={false}
+                    initialRegion={{
+                      latitude: Number(technicianLocation.latitude),
+                      longitude: Number(technicianLocation.longitude),
+                      latitudeDelta: 0.005,
+                      longitudeDelta: 0.005,
+                    }}
+                  >
+                    <Marker
+                      coordinate={{
+                        latitude: Number(technicianLocation.latitude),
+                        longitude: Number(technicianLocation.longitude),
+                      }}
+                      title="Technician Location"
+                      description="Last shared location"
+                    />
+                  </MapView>
+
+                  <Text style={styles.mapNote}>
+                    Live location updates every 10 seconds while technician is on
+                    the way.
+                  </Text>
+                </View>
+              ) : null}
 
               <View style={styles.actionRow}>
                 {canCancel ? (
@@ -305,6 +365,7 @@ export default function Review({ navigation, route }) {
                 </View>
 
                 <Text style={styles.label}>Comment</Text>
+
                 <TextInput
                   style={[styles.input, styles.textArea]}
                   value={comment}
@@ -380,6 +441,27 @@ const styles = StyleSheet.create({
     lineHeight: 24,
   },
   bold: { color: "#111", fontWeight: "900" },
+  mapSection: {
+    marginTop: 18,
+    marginBottom: 8,
+  },
+  mapTitle: {
+    fontSize: 21,
+    fontWeight: "900",
+    color: "#111",
+    marginBottom: 12,
+  },
+  map: {
+    width: "100%",
+    height: 260,
+    borderRadius: 22,
+  },
+  mapNote: {
+    marginTop: 8,
+    color: "#6B5E52",
+    fontSize: 14,
+    fontWeight: "700",
+  },
   actionRow: {
     flexDirection: "row",
     flexWrap: "wrap",

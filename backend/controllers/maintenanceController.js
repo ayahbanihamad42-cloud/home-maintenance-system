@@ -191,6 +191,9 @@ export const getUserMaintenanceRequests = async (req, res) => {
       `
       SELECT 
         mr.*,
+        DATE_FORMAT(mr.scheduled_date, '%Y-%m-%d') AS scheduled_date,
+        TIME_FORMAT(mr.scheduled_time, '%H:%i:%s') AS scheduled_time,
+        DATE_FORMAT(mr.created_at, '%Y-%m-%d %H:%i:%s') AS created_at,
         u.name AS technician_name,
         u.phone AS technician_phone
       FROM maintenance_requests mr
@@ -225,6 +228,9 @@ export const getMaintenanceRequestById = async (req, res) => {
       `
       SELECT 
         mr.*,
+        DATE_FORMAT(mr.scheduled_date, '%Y-%m-%d') AS scheduled_date,
+        TIME_FORMAT(mr.scheduled_time, '%H:%i:%s') AS scheduled_time,
+        DATE_FORMAT(mr.created_at, '%Y-%m-%d %H:%i:%s') AS created_at,
         tu.name AS technician_name,
         tu.phone AS technician_phone,
         t.user_id AS technician_user_id,

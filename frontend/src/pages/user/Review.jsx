@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import Header from "../../components/common/Header";
 import {
@@ -19,76 +19,96 @@ function Review() {
 
   const formatDateOnly = (value) => {
     if (!value) return "-";
-
     const raw = String(value).trim();
-
-    if (/^\d{4}-\d{2}-\d{2}$/.test(raw)) {
-      return raw;
-    }
-
-    if (raw.includes("T")) {
-      const d = new Date(raw);
-
-      if (!Number.isNaN(d.getTime())) {
-        const yyyy = d.getFullYear();
-        const mm = String(d.getMonth() + 1).padStart(2, "0");
-        const dd = String(d.getDate()).padStart(2, "0");
-        return `${yyyy}-${mm}-${dd}`;
-      }
-    }
-
     const match = raw.match(/^(\d{4}-\d{2}-\d{2})/);
     if (match) return match[1];
-
     return raw.slice(0, 10);
   };
 
   const formatTimeOnly = (value) => {
     if (!value) return "-";
-
     const raw = String(value).trim();
     const match = raw.match(/^(\d{2}:\d{2})(:\d{2})?/);
-
     if (match) return match[0];
-
     return raw.slice(0, 8);
   };
 
   const formatDateTime = (value) => {
     if (!value) return "-";
+    const raw = String(value).trim();
 
-    const d = new Date(value);
+    if (/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}/.test(raw)) {
+      return raw;
+    }
 
-    if (Number.isNaN(d.getTime())) return String(value);
+    const d = new Date(raw);
+    if (Number.isNaN(d.getTime())) return raw;
 
     return d.toLocaleString();
   };
 
-  const loadRequest = async () => {
+  const technicianLocation = useMemo(() => {
+    const lat = Number(request?.technician_location_lat);
+    const lng = Number(request?.technician_location_lng);
+
+    if (Number.isFinite(lat) && Number.isFinite(lng)) {
+      return { lat, lng };
+    }
+
+    const url = String(request?.technician_location_url || "");
+    const match = url.match(/q=(-?\d+(\.\d+)?),(-?\d+(\.\d+)?)/);
+
+    if (match) {
+      const parsedLat = Number(match[1]);
+      const parsedLng = Number(match[3]);
+
+      if (Number.isFinite(parsedLat) && Number.isFinite(parsedLng)) {
+        return { lat: parsedLat, lng: parsedLng };
+      }
+    }
+
+    return null;
+  }, [request]);
+
+  const loadRequest = async (silent = false) => {
     try {
-      setMessage(null);
+      if (!silent) setMessage(null);
 
       const data = await getRequestById(requestId);
       setRequest(data);
 
-      const ratingData = await getRatingByRequest(requestId).catch(() => null);
-      setOldRating(ratingData || null);
+      if (!silent) {
+        const ratingData = await getRatingByRequest(requestId).catch(() => null);
+        setOldRating(ratingData || null);
 
-      if (ratingData) {
-        setRating(ratingData.rating || 5);
-        setComment(ratingData.comment || "");
+        if (ratingData) {
+          setRating(ratingData.rating || 5);
+          setComment(ratingData.comment || "");
+        }
       }
     } catch (err) {
-      setMessage({
-        type: "error",
-        title: "Error",
-        body: err?.response?.data?.message || "Failed to load request.",
-      });
+      if (!silent) {
+        setMessage({
+          type: "error",
+          title: "Error",
+          body: err?.response?.data?.message || "Failed to load request.",
+        });
+      }
     }
   };
 
   useEffect(() => {
-    if (requestId) loadRequest();
+    if (requestId) loadRequest(false);
+  }, [requestId]);
+
+  useEffect(() => {
+    if (!requestId) return;
+
+    const interval = setInterval(() => {
+      loadRequest(true);
+    }, 10000);
+
+    return () => clearInterval(interval);
   }, [requestId]);
 
   const handleCancel = async () => {
@@ -101,7 +121,7 @@ function Review() {
         body: "Request cancelled successfully.",
       });
 
-      await loadRequest();
+      await loadRequest(false);
     } catch (err) {
       setMessage({
         type: "error",
@@ -137,7 +157,7 @@ function Review() {
         body: "Review submitted successfully.",
       });
 
-      await loadRequest();
+      await loadRequest(false);
     } catch (err) {
       setMessage({
         type: "error",
@@ -168,6 +188,10 @@ function Review() {
   const status = String(request.status || "").toLowerCase();
   const canCancel = status === "pending";
   const canReview = status === "completed";
+
+  const mapSrc = technicianLocation
+    ? `https://www.google.com/maps?q=${technicianLocation.lat},${technicianLocation.lng}&z=17&output=embed`
+    : "";
 
   return (
     <>
@@ -222,6 +246,54 @@ function Review() {
               <b>Total:</b> {Number(request.total_price || 0).toFixed(2)} JOD
             </p>
           </div>
+
+          {technicianLocation && (
+            <div style={{ marginTop: "28px", width: "100%" }}>
+              <h3
+                style={{
+                  marginBottom: "12px",
+                  fontSize: "22px",
+                  fontWeight: "900",
+                }}
+              >
+                Technician Location
+              </h3>
+
+              <div
+                style={{
+                  width: "100%",
+                  height: "360px",
+                  borderRadius: "24px",
+                  overflow: "hidden",
+                  border: "1px solid #d8c8b8",
+                  background: "#f7efe7",
+                }}
+              >
+                <iframe
+                  key={`${technicianLocation.lat}-${technicianLocation.lng}`}
+                  title="Technician Location"
+                  src={mapSrc}
+                  width="100%"
+                  height="100%"
+                  style={{ border: 0 }}
+                  loading="lazy"
+                  referrerPolicy="no-referrer-when-downgrade"
+                  allowFullScreen
+                />
+              </div>
+
+              <p
+                style={{
+                  marginTop: "10px",
+                  color: "#5c5048",
+                  fontSize: "14px",
+                  fontWeight: "700",
+                }}
+              >
+                Live location updates every 10 seconds while technician is on the way.
+              </p>
+            </div>
+          )}
 
           {canCancel && (
             <button className="secondary" type="button" onClick={handleCancel}>

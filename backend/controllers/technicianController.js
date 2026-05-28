@@ -766,6 +766,9 @@ export const getMyRequests = (req, res) => {
       `
       SELECT 
         mr.*,
+        DATE_FORMAT(mr.scheduled_date, '%Y-%m-%d') AS scheduled_date,
+        TIME_FORMAT(mr.scheduled_time, '%H:%i:%s') AS scheduled_time,
+        DATE_FORMAT(mr.created_at, '%Y-%m-%d %H:%i:%s') AS created_at,
         u.name AS user_name,
         u.phone AS user_phone
       FROM maintenance_requests mr
@@ -784,7 +787,9 @@ export const getMyRequests = (req, res) => {
 
 export const updateRequestStatus = (req, res) => {
   const { requestId } = req.params;
-  const { status } = req.body;
+  const { status, technician_location_lat, technician_location_lng } = req.body;
+
+  const cleanStatus = String(status || "").trim().toLowerCase();
 
   const allowed = [
     "pending",
@@ -797,27 +802,78 @@ export const updateRequestStatus = (req, res) => {
     "cancelled",
   ];
 
-  if (!allowed.includes(status)) {
+  if (!allowed.includes(cleanStatus)) {
     return res.status(400).json({ message: "Invalid status" });
   }
 
+  const lat = Number(technician_location_lat);
+  const lng = Number(technician_location_lng);
+
+  if (
+    cleanStatus === "on_the_way" &&
+    (!Number.isFinite(lat) || !Number.isFinite(lng))
+  ) {
+    return res.status(400).json({
+      message: "Location is required before changing status to On The Way.",
+    });
+  }
+
+  const mapsUrl =
+    cleanStatus === "on_the_way"
+      ? `https://www.google.com/maps?q=${lat},${lng}`
+      : null;
+
   findMyTechnicianId(req.user.id, (lookupErr, technicianId) => {
     if (lookupErr) return res.status(500).json({ message: "Server error" });
-    if (!technicianId) return res.status(404).json({ message: "Technician not found" });
 
-    db.query(
-      `
-      UPDATE maintenance_requests
-      SET status = ?
-      WHERE id = ? AND technician_id = ?
-      `,
-      [status, requestId, technicianId],
-      (err, result) => {
-        if (err) return res.status(500).json({ message: err.sqlMessage || err.message });
-        if (!result.affectedRows) return res.status(404).json({ message: "Request not found" });
-        res.json({ message: "Status updated" });
+    if (!technicianId) {
+      return res.status(404).json({ message: "Technician not found" });
+    }
+
+    const sql =
+      cleanStatus === "on_the_way"
+        ? `
+          UPDATE maintenance_requests
+          SET
+            status = ?,
+            technician_location_lat = ?,
+            technician_location_lng = ?,
+            technician_location_url = ?,
+            technician_location_updated_at = NOW()
+          WHERE id = ? AND technician_id = ?
+        `
+        : `
+          UPDATE maintenance_requests
+          SET status = ?
+          WHERE id = ? AND technician_id = ?
+        `;
+
+    const params =
+      cleanStatus === "on_the_way"
+        ? [cleanStatus, lat, lng, mapsUrl, requestId, technicianId]
+        : [cleanStatus, requestId, technicianId];
+
+    db.query(sql, params, (err, result) => {
+      if (err) {
+        return res.status(500).json({
+          message: err.sqlMessage || err.message,
+        });
       }
-    );
+
+      if (!result.affectedRows) {
+        return res.status(404).json({ message: "Request not found" });
+      }
+
+      return res.json({
+        message:
+          cleanStatus === "on_the_way"
+            ? "Status updated and location shared."
+            : "Status updated",
+        technician_location_lat: cleanStatus === "on_the_way" ? lat : null,
+        technician_location_lng: cleanStatus === "on_the_way" ? lng : null,
+        technician_location_url: mapsUrl,
+      });
+    });
   });
 };
 
