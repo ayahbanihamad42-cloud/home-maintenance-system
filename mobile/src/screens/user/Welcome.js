@@ -1,103 +1,32 @@
 import React from "react";
-import {
-  SafeAreaView,
-  ScrollView,
-  Text,
-  TouchableOpacity,
-  View,
-  Image,
-  StyleSheet,
-} from "react-native";
-import { useNavigation } from "@react-navigation/native";
+import { SafeAreaView, View, Text, TouchableOpacity } from "react-native";
+import appStyles, { colors } from "../../styles/mobileStyles";
 
-import welcomeimage from "../../assets/home.png";
-
-function Welcome() {
-  const navigation = useNavigation();
-
+const WelcomeScreen = ({ navigation }) => {
   return (
-    <SafeAreaView style={styles.container}>
-      <ScrollView contentContainerStyle={styles.scrollContent}>
-        <Text style={styles.welcomeTitle}>
-          Welcome to Home Maintenance System
+    <SafeAreaView style={appStyles.safe}>
+      <View style={[appStyles.pageContent, { flex: 1, justifyContent: "center" }]}>
+        <Text style={{ fontSize: 64, fontWeight: "900", color: colors.primary, textAlign: "center" }}>
+          خدمة
         </Text>
 
-        <Text style={styles.welcomeSubtitle}>
-          Your trusted hub for home maintenance services.{"\n"}
-          Book reliable technicians, manage requests, and keep your home in great shape.
-        </Text>
-
-        <Image
-          source={welcomeimage}
-          style={styles.welcomeImage}
-          resizeMode="contain"
-        />
-
-        <View style={styles.welcomeButtons}>
-          <TouchableOpacity
-            style={styles.primaryButton}
-            onPress={() => navigation.navigate("Register")}
-          >
-            <Text style={styles.buttonText}>Register</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={styles.primaryButton}
-            onPress={() => navigation.navigate("Login")}
-          >
-            <Text style={styles.buttonText}>Login</Text>
-          </TouchableOpacity>
+        <View style={[appStyles.hero, { marginTop: 26 }]}>
+          <Text style={appStyles.heroTitle}>Home services made simple</Text>
+          <Text style={appStyles.heroSubtitle}>
+            Book technicians, manage requests, chat, pay online, and track your service.
+          </Text>
         </View>
-      </ScrollView>
+
+        <TouchableOpacity style={appStyles.primaryBtn} onPress={() => navigation.navigate("Register")}>
+          <Text style={appStyles.primaryBtnText}>Create Account</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity style={appStyles.secondaryBtn} onPress={() => navigation.navigate("Login")}>
+          <Text style={appStyles.secondaryBtnText}>Login</Text>
+        </TouchableOpacity>
+      </View>
     </SafeAreaView>
   );
-}
+};
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: "#E8DCCF",
-  },
-  scrollContent: {
-    alignItems: "center",
-    padding: 20,
-    justifyContent: "center",
-    flexGrow: 1,
-  },
-  welcomeTitle: {
-    fontSize: 24,
-    fontWeight: "bold",
-    textAlign: "center",
-    color: "#111",
-    marginBottom: 15,
-  },
-  welcomeSubtitle: {
-    fontSize: 16,
-    textAlign: "center",
-    color: "#555",
-    lineHeight: 22,
-    marginBottom: 30,
-  },
-  welcomeImage: {
-    width: "100%",
-    height: 250,
-    marginBottom: 40,
-  },
-  welcomeButtons: {
-    width: "100%",
-  },
-  primaryButton: {
-    backgroundColor: "#111",
-    paddingVertical: 15,
-    borderRadius: 10,
-    alignItems: "center",
-    marginBottom: 10,
-  },
-  buttonText: {
-    color: "#fff",
-    fontSize: 18,
-    fontWeight: "bold",
-  },
-});
-
-export default Welcome;
+export default WelcomeScreen;

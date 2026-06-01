@@ -133,62 +133,67 @@ function TechnicianAvailability() {
     <>
       <Header />
 
-      <div className="container">
-        <div className="panel" style={{ maxWidth: 1200, margin: "40px auto" }}>
-          <h2>Technician Availability</h2>
+      <main className="availability-container">
+        <section className="page-hero">
+          <h1>Technician Availability</h1>
+          <p>Set your working hours and manage available booking times.</p>
+        </section>
 
-          {message ? <div className="mini-error">{message}</div> : null}
-
-          <div style={{ display: "flex", gap: 12, marginBottom: 22 }}>
-            <button
-              type="button"
-              className={mode === "one-time" ? "primary" : "btn-outline"}
-              onClick={() => {
-                setMode("one-time");
-                resetForm();
-                setMessage("");
-              }}
-            >
-              One-Time Availability
-            </button>
-
-            <button
-              type="button"
-              className={mode === "regular" ? "primary" : "btn-outline"}
-              onClick={() => {
-                setMode("regular");
-                resetForm();
-                setMessage("");
-              }}
-            >
-              Regular Monthly Schedule
-            </button>
+        {message ? (
+          <div className={message.toLowerCase().includes("failed") ? "auth-error" : "auth-success"}>
+            {message}
           </div>
+        ) : null}
 
-          <form onSubmit={saveAvailability}>
+        <section className="availability-tabs">
+          <button
+            type="button"
+            className={mode === "one-time" ? "primary" : "secondary-btn"}
+            onClick={() => {
+              setMode("one-time");
+              resetForm();
+              setMessage("");
+            }}
+          >
+            One-Time Availability
+          </button>
+
+          <button
+            type="button"
+            className={mode === "regular" ? "primary" : "secondary-btn"}
+            onClick={() => {
+              setMode("regular");
+              resetForm();
+              setMessage("");
+            }}
+          >
+            Regular Monthly Schedule
+          </button>
+        </section>
+
+        <section className="form-card">
+          <form className="availability-form" onSubmit={saveAvailability}>
             {mode === "regular" ? (
               <>
-                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
-                  <div className="input-group">
-                    <label>Month Start</label>
-                    <input
-                      type="date"
-                      value={monthStart}
-                      onChange={(e) => setMonthStart(e.target.value)}
-                    />
-                  </div>
-
-                  <div className="input-group">
-                    <label>Month End</label>
-                    <input
-                      type="date"
-                      value={monthEnd}
-                      onChange={(e) => setMonthEnd(e.target.value)}
-                    />
-                  </div>
+                <div>
+                  <label>Month Start</label>
+                  <input
+                    type="date"
+                    value={monthStart}
+                    onChange={(e) => setMonthStart(e.target.value)}
+                  />
                 </div>
 
-                <div className="input-group">
+                <div>
+                  <label>Month End</label>
+                  <input
+                    type="date"
+                    value={monthEnd}
+                    onChange={(e) => setMonthEnd(e.target.value)}
+                  />
+                </div>
+
+                <div>
                   <label>Day Of Week</label>
                   <select
                     value={dayOfWeek}
@@ -203,7 +208,7 @@ function TechnicianAvailability() {
                 </div>
               </>
             ) : (
-              <div className="input-group">
+              <div>
                 <label>Date</label>
                 <input
                   type="date"
@@ -213,28 +218,26 @@ function TechnicianAvailability() {
               </div>
             )}
 
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
-              <div className="input-group">
-                <label>Start Time</label>
-                <input
-                  type="time"
-                  value={startTime}
-                  onChange={(e) => setStartTime(e.target.value)}
-                />
-              </div>
+            <div>
+              <label>Start Time</label>
+              <input
+                type="time"
+                value={startTime}
+                onChange={(e) => setStartTime(e.target.value)}
+              />
+            </div>
 
-              <div className="input-group">
-                <label>End Time</label>
-                <input
-                  type="time"
-                  value={endTime}
-                  onChange={(e) => setEndTime(e.target.value)}
-                />
-              </div>
+            <div>
+              <label>End Time</label>
+              <input
+                type="time"
+                value={endTime}
+                onChange={(e) => setEndTime(e.target.value)}
+              />
             </div>
 
             {mode === "regular" && (
-              <div className="input-group">
+              <div>
                 <label>Each Request Duration</label>
                 <select
                   value={slotMinutes}
@@ -253,56 +256,85 @@ function TechnicianAvailability() {
               {saving ? "Saving..." : "Save Availability"}
             </button>
           </form>
+        </section>
 
-          <hr style={{ margin: "28px 0", borderColor: "#d8c8b8" }} />
-
+        <section className="availability-list">
           {mode === "one-time" ? (
             <>
-              <h3>One-Time Availability</h3>
+              <h2 className="section-title">One-Time Availability</h2>
 
               {availability.length === 0 ? (
-                <div className="empty-gallery-card">No availability added.</div>
+                <article className="availability-card">
+                  <h3>No availability added.</h3>
+                  <p>Your saved one-time availability will appear here.</p>
+                </article>
               ) : (
-                <div className="history-list">
-                  {availability.map((item) => (
-                    <div className="history-card" key={item.id}>
-                      <p><b>Date:</b> {String(item.available_date || "").slice(0, 10)}</p>
-                      <p><b>Time:</b> {item.start_time} - {item.end_time}</p>
-
-                      <button className="btn-outline" onClick={() => deleteOneTime(item.id)}>
-                        Delete
-                      </button>
+                availability.map((item) => (
+                  <article className="availability-card" key={item.id}>
+                    <div className="request-details-grid">
+                      <p>
+                        <strong>Date:</strong>{" "}
+                        {String(item.available_date || "").slice(0, 10)}
+                      </p>
+                      <p>
+                        <strong>Time:</strong> {item.start_time} - {item.end_time}
+                      </p>
                     </div>
-                  ))}
-                </div>
+
+                    <button
+                      className="danger-btn"
+                      type="button"
+                      onClick={() => deleteOneTime(item.id)}
+                    >
+                      Delete
+                    </button>
+                  </article>
+                ))
               )}
             </>
           ) : (
             <>
-              <h3>Regular Monthly Schedule</h3>
+              <h2 className="section-title">Regular Monthly Schedule</h2>
 
               {regularAvailability.length === 0 ? (
-                <div className="empty-gallery-card">No regular schedule added.</div>
+                <article className="availability-card">
+                  <h3>No regular schedule added.</h3>
+                  <p>Your saved regular schedule will appear here.</p>
+                </article>
               ) : (
-                <div className="history-list">
-                  {regularAvailability.map((item) => (
-                    <div className="history-card" key={item.id}>
-                      <p><b>Month:</b> {String(item.month_start).slice(0, 10)} → {String(item.month_end).slice(0, 10)}</p>
-                      <p><b>Day:</b> {item.day_of_week}</p>
-                      <p><b>Time:</b> {item.start_time} - {item.end_time}</p>
-                      <p><b>Each Request:</b> {item.slot_minutes} minutes</p>
-
-                      <button className="btn-outline" onClick={() => deleteRegular(item.id)}>
-                        Delete
-                      </button>
+                regularAvailability.map((item) => (
+                  <article className="availability-card" key={item.id}>
+                    <div className="request-details-grid">
+                      <p>
+                        <strong>Month:</strong>{" "}
+                        {String(item.month_start).slice(0, 10)} →{" "}
+                        {String(item.month_end).slice(0, 10)}
+                      </p>
+                      <p>
+                        <strong>Day:</strong> {item.day_of_week}
+                      </p>
+                      <p>
+                        <strong>Time:</strong> {item.start_time} - {item.end_time}
+                      </p>
+                      <p>
+                        <strong>Each Request:</strong> {item.slot_minutes} minutes
+                      </p>
                     </div>
-                  ))}
-                </div>
+
+                    <button
+                      className="danger-btn"
+                      type="button"
+                      onClick={() => deleteRegular(item.id)}
+                    >
+                      Delete
+                    </button>
+                  </article>
+                ))
               )}
             </>
           )}
-        </div>
-      </div>
+        </section>
+      </main>
     </>
   );
 }

@@ -1,357 +1,186 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { useNavigate, useParams } from "react-router-dom";
 import Header from "../../components/common/Header";
-import {
-  getRequestById,
-  cancelMaintenanceRequest,
-} from "../../services/maintenanceService";
-import { addRating, getRatingByRequest } from "../../services/ratingService";
+import API from "../../services/api";
+import { useNavigate, useParams } from "react-router-dom";
 
 function Review() {
   const { requestId } = useParams();
   const navigate = useNavigate();
 
   const [request, setRequest] = useState(null);
-  const [oldRating, setOldRating] = useState(null);
-  const [rating, setRating] = useState(5);
-  const [comment, setComment] = useState("");
-  const [message, setMessage] = useState(null);
+  const [existingReview, setExistingReview] = useState(null);
+  const [technician, setTechnician] = useState(null);
+  const [form, setForm] = useState({ rating: 5, comment: "" });
+  const [message, setMessage] = useState("");
+  const [error, setError] = useState("");
 
-  const formatDateOnly = (value) => {
-    if (!value) return "-";
-    const raw = String(value).trim();
-    const match = raw.match(/^(\d{4}-\d{2}-\d{2})/);
-    if (match) return match[1];
-    return raw.slice(0, 10);
-  };
+  const formatDate = (value) => (value ? String(value).slice(0, 10) : "-");
+  const formatTime = (value) => (value ? String(value).slice(0, 8) : "-");
+  const formatMoney = (value) => `${Number(value || 0).toFixed(2)} JOD`;
 
-  const formatTimeOnly = (value) => {
-    if (!value) return "-";
-    const raw = String(value).trim();
-    const match = raw.match(/^(\d{2}:\d{2})(:\d{2})?/);
-    if (match) return match[0];
-    return raw.slice(0, 8);
-  };
-
-  const formatDateTime = (value) => {
-    if (!value) return "-";
-    const raw = String(value).trim();
-
-    if (/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}/.test(raw)) {
-      return raw;
-    }
-
-    const d = new Date(raw);
-    if (Number.isNaN(d.getTime())) return raw;
-
-    return d.toLocaleString();
-  };
-
-  const technicianLocation = useMemo(() => {
-    const lat = Number(request?.technician_location_lat);
-    const lng = Number(request?.technician_location_lng);
-
-    if (Number.isFinite(lat) && Number.isFinite(lng)) {
-      return { lat, lng };
-    }
-
-    const url = String(request?.technician_location_url || "");
-    const match = url.match(/q=(-?\d+(\.\d+)?),(-?\d+(\.\d+)?)/);
-
-    if (match) {
-      const parsedLat = Number(match[1]);
-      const parsedLng = Number(match[3]);
-
-      if (Number.isFinite(parsedLat) && Number.isFinite(parsedLng)) {
-        return { lat: parsedLat, lng: parsedLng };
-      }
-    }
-
-    return null;
+  const isCompleted = useMemo(() => {
+    return String(request?.status || "").toLowerCase() === "completed";
   }, [request]);
 
-  const loadRequest = async (silent = false) => {
-    try {
-      if (!silent) setMessage(null);
+  const canReview = isCompleted && !existingReview;
 
-      const data = await getRequestById(requestId);
-      setRequest(data);
+  const getMapSrc = (lat, lng) => `https://www.google.com/maps?q=${lat},${lng}&z=16&output=embed`;
 
-      if (!silent) {
-        const ratingData = await getRatingByRequest(requestId).catch(() => null);
-        setOldRating(ratingData || null);
+  useEffect(() => {
+    const load = async () => {
+      try {
+        setError("");
 
-        if (ratingData) {
-          setRating(ratingData.rating || 5);
-          setComment(ratingData.comment || "");
+        const res = await API.get(`/maintenance/${requestId}`);
+        const data = res.data || null;
+        setRequest(data);
+
+        const techId = data?.technician_id || data?.technicianId;
+        if (techId) {
+          try {
+            const techRes = await API.get(`/technicians/${techId}`);
+            setTechnician(techRes.data || null);
+          } catch {
+            setTechnician(null);
+          }
         }
-      }
-    } catch (err) {
-      if (!silent) {
-        setMessage({
-          type: "error",
-          title: "Error",
-          body: err?.response?.data?.message || "Failed to load request.",
-        });
-      }
-    }
-  };
 
-  useEffect(() => {
-    if (requestId) loadRequest(false);
+        try {
+          const reviewRes = await API.get(`/ratings/request/${requestId}`);
+          setExistingReview(reviewRes.data || null);
+        } catch {
+          setExistingReview(null);
+        }
+      } catch (err) {
+        setError(err.response?.data?.message || "Failed to load request.");
+      }
+    };
+
+    if (requestId) load();
   }, [requestId]);
 
-  useEffect(() => {
-    if (!requestId) return;
+  const submitReview = async (e) => {
+    e.preventDefault();
 
-    const interval = setInterval(() => {
-      loadRequest(true);
-    }, 10000);
+    if (!isCompleted) {
+      setMessage("Review is available only after the request is completed.");
+      return;
+    }
 
-    return () => clearInterval(interval);
-  }, [requestId]);
+    if (existingReview) {
+      setMessage("You already reviewed this request.");
+      return;
+    }
 
-  const handleCancel = async () => {
     try {
-      await cancelMaintenanceRequest(requestId);
-
-      setMessage({
-        type: "success",
-        title: "Cancelled",
-        body: "Request cancelled successfully.",
+      await API.post("/ratings", {
+        request_id: Number(requestId),
+        technician_id: request?.technician_id,
+        rating: Number(form.rating),
+        comment: form.comment,
       });
 
-      await loadRequest(false);
+      setExistingReview({ rating: form.rating, comment: form.comment });
+      setMessage("Review submitted successfully.");
+      setTimeout(() => navigate("/history"), 900);
     } catch (err) {
-      setMessage({
-        type: "error",
-        title: "Error",
-        body:
-          err?.response?.data?.message ||
-          "This request cannot be cancelled now.",
-      });
+      setError(err.response?.data?.message || "Failed to submit review.");
     }
   };
 
-  const submitRating = async () => {
-    try {
-      if (!request?.technician_id) {
-        setMessage({
-          type: "error",
-          title: "Error",
-          body: "Technician id is missing.",
-        });
-        return;
-      }
+  const techLat =
+    request?.technician_location_lat ||
+    request?.technician_lat ||
+    request?.current_lat ||
+    technician?.technician_location_lat ||
+    technician?.technician_lat ||
+    technician?.current_lat ||
+    technician?.latitude ||
+    technician?.location_lat;
 
-      await addRating({
-        technician_id: request.technician_id,
-        request_id: request.id,
-        rating,
-        comment,
-      });
-
-      setMessage({
-        type: "success",
-        title: "Saved",
-        body: "Review submitted successfully.",
-      });
-
-      await loadRequest(false);
-    } catch (err) {
-      setMessage({
-        type: "error",
-        title: "Error",
-        body: err?.response?.data?.message || "Failed to submit review.",
-      });
-    }
-  };
-
-  if (!request) {
-    return (
-      <>
-        <Header />
-        <div className="container">
-          {message ? (
-            <div className={`message-box-card ${message.type}`}>
-              <div className="message-box-title">{message.title}</div>
-              <div className="message-box-body">{message.body}</div>
-            </div>
-          ) : (
-            <p>Loading...</p>
-          )}
-        </div>
-      </>
-    );
-  }
-
-  const status = String(request.status || "").toLowerCase();
-  const canCancel = status === "pending";
-  const canReview = status === "completed";
-
-  const mapSrc = technicianLocation
-    ? `https://www.google.com/maps?q=${technicianLocation.lat},${technicianLocation.lng}&z=17&output=embed`
-    : "";
+  const techLng =
+    request?.technician_location_lng ||
+    request?.technician_lng ||
+    request?.current_lng ||
+    technician?.technician_location_lng ||
+    technician?.technician_lng ||
+    technician?.current_lng ||
+    technician?.longitude ||
+    technician?.location_lng;
 
   return (
     <>
       <Header />
 
-      <div className="container request-container">
-        <h2>Request Review</h2>
+      <main className="review-container">
+        <section className="page-hero">
+          <h1>Request Details</h1>
+          <p>View request information and submit a review after completion.</p>
+        </section>
 
-        {message && (
-          <div className={`message-box-card ${message.type}`}>
-            <div className="message-box-title">{message.title}</div>
-            <div className="message-box-body">{message.body}</div>
-          </div>
-        )}
+        {message && <div className="auth-success">{message}</div>}
+        {error && <div className="auth-error">{error}</div>}
 
-        <div className="history-card">
-          <div className="history-card-header">
-            <h3>{request.service || "-"}</h3>
-            <span className="status-pill">
-              {String(request.status || "-").replaceAll("_", " ")}
-            </span>
-          </div>
-
-          <p className="history-description">{request.description || "-"}</p>
-
-          <div className="history-info-grid">
-            <p>
-              <b>Request Date:</b> {formatDateOnly(request.scheduled_date)}
-            </p>
-
-            <p>
-              <b>Request Time:</b> {formatTimeOnly(request.scheduled_time)}
-            </p>
-
-            <p>
-              <b>Created At:</b> {formatDateTime(request.created_at)}
-            </p>
-
-            <p>
-              <b>Technician:</b> {request.technician_name || "-"}
-            </p>
-
-            <p>
-              <b>Location:</b> {request.location_note || request.city || "-"}
-            </p>
-
-            <p>
-              <b>Payment:</b> {request.payment_method || "-"}
-            </p>
-
-            <p>
-              <b>Total:</b> {Number(request.total_price || 0).toFixed(2)} JOD
-            </p>
-          </div>
-
-          {technicianLocation && (
-            <div style={{ marginTop: "28px", width: "100%" }}>
-              <h3
-                style={{
-                  marginBottom: "12px",
-                  fontSize: "22px",
-                  fontWeight: "900",
-                }}
-              >
-                Technician Location
-              </h3>
-
-              <div
-                style={{
-                  width: "100%",
-                  height: "360px",
-                  borderRadius: "24px",
-                  overflow: "hidden",
-                  border: "1px solid #d8c8b8",
-                  background: "#f7efe7",
-                }}
-              >
-                <iframe
-                  key={`${technicianLocation.lat}-${technicianLocation.lng}`}
-                  title="Technician Location"
-                  src={mapSrc}
-                  width="100%"
-                  height="100%"
-                  style={{ border: 0 }}
-                  loading="lazy"
-                  referrerPolicy="no-referrer-when-downgrade"
-                  allowFullScreen
-                />
-              </div>
-
-              <p
-                style={{
-                  marginTop: "10px",
-                  color: "#5c5048",
-                  fontSize: "14px",
-                  fontWeight: "700",
-                }}
-              >
-                Live location updates every 10 seconds while technician is on the way.
-              </p>
-            </div>
-          )}
-
-          {canCancel && (
-            <button className="secondary" type="button" onClick={handleCancel}>
-              Cancel Request
-            </button>
-          )}
-        </div>
-
-        {!canReview ? (
-          <>
-            <p style={{ marginTop: 20 }}>
-              Review is available only after the request is completed.
-            </p>
-
-            <button className="secondary" onClick={() => navigate("/history")}>
-              Back to History
-            </button>
-          </>
-        ) : oldRating ? (
-          <div className="message-box-card success">
-            <div className="message-box-title">Already Reviewed</div>
-            <div className="message-box-body">
-              Your rating: {oldRating.rating} ⭐
-              <br />
-              {oldRating.comment || "No comment."}
-            </div>
-          </div>
+        {!request ? (
+          <section className="card">
+            <h3>No request found</h3>
+          </section>
         ) : (
-          <div className="card">
-            <h3>Rate Technician</h3>
-
-            <div className="rating-stars">
-              {[1, 2, 3, 4, 5].map((star) => (
-                <span
-                  key={star}
-                  className={star <= rating ? "star active" : "star"}
-                  onClick={() => setRating(star)}
-                >
-                  ★
-                </span>
-              ))}
+          <section className="review-card">
+            <div className="request-card-header">
+              <h2>{request.service || "Maintenance Request"}</h2>
+              <span className="status-badge">{String(request.status || "-").replaceAll("_", " ")}</span>
             </div>
 
-            <div className="input-group">
-              <label>Comment</label>
-              <textarea
-                value={comment}
-                onChange={(e) => setComment(e.target.value)}
-                placeholder="Write your review..."
-              />
+            <div className="request-details-grid">
+              <p><strong>Description:</strong> {request.description || "-"}</p>
+              <p><strong>Technician:</strong> {request.technician_name || technician?.name || "-"}</p>
+              <p><strong>Request Date:</strong> {formatDate(request.scheduled_date)}</p>
+              <p><strong>Request Time:</strong> {formatTime(request.scheduled_time)}</p>
+              <p><strong>Created At:</strong> {request.created_at ? new Date(request.created_at).toLocaleString() : "-"}</p>
+              <p><strong>Payment Method:</strong> {request.payment_method || "-"}</p>
+              <p><strong>Amount:</strong> {formatMoney(request.total_price || request.amount)}</p>
+              <p><strong>City:</strong> {request.city || "-"}</p>
+              <p><strong>Location Note:</strong> {request.location_note || "-"}</p>
             </div>
 
-            <button className="primary" type="button" onClick={submitRating}>
-              Submit Review
-            </button>
-          </div>
+            {techLat && techLng && (
+              <div className="map-card">
+                <h3>Technician Live Location</h3>
+                <iframe title="technician-live-location" src={getMapSrc(techLat, techLng)} width="100%" height="260" style={{ border: 0 }} loading="lazy" />
+              </div>
+            )}
+
+            {!isCompleted && <div className="auth-error">Rating appears only after the request status becomes completed.</div>}
+
+            {existingReview && (
+              <div className="auth-success">
+                <strong>Already reviewed.</strong>
+                <div>Rating: {existingReview.rating}</div>
+                <div>Comment: {existingReview.comment || "-"}</div>
+              </div>
+            )}
+
+            {canReview && (
+              <form className="form-container" onSubmit={submitReview}>
+                <label>Rating</label>
+                <select value={form.rating} onChange={(e) => setForm({ ...form, rating: e.target.value })}>
+                  <option value="5">5 - Excellent</option>
+                  <option value="4">4 - Very Good</option>
+                  <option value="3">3 - Good</option>
+                  <option value="2">2 - Fair</option>
+                  <option value="1">1 - Poor</option>
+                </select>
+
+                <label>Comment</label>
+                <textarea value={form.comment} onChange={(e) => setForm({ ...form, comment: e.target.value })} rows="5" required />
+
+                <button className="primary" type="submit">Submit Review</button>
+              </form>
+            )}
+          </section>
         )}
-      </div>
+      </main>
     </>
   );
 }

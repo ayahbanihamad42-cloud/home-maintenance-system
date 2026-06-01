@@ -1,134 +1,106 @@
 import React, { useState } from "react";
-// React and useState hook
+import { Link, useNavigate } from "react-router-dom";
+import API from "../../services/api";
+import welcomeimage from "../../images/home.png";
 
-import { useNavigate, Link } from "react-router-dom";
-// Navigation and link components from React Router
-
-import { login } from "../../services/auth.service.jsx";
-// Login service function
-
-import welomeimage from "../../images/home.png";
-// Illustration image
-
-// Login page component
 function Login() {
-
-  // Email input state
-  const [email, setEmail] = useState("");
-
-  // Password input state
-  const [password, setPassword] = useState("");
-
-  // Success message state
-  const [successMessage, setSuccessMessage] = useState("");
-
-  // Navigation hook
   const navigate = useNavigate();
 
-  // Handle form submission
-  const handleSubmit = async (e) => {
+  const [form, setForm] = useState({
+    email: "",
+    password: "",
+  });
 
-    // Prevent page reload
+  const [error, setError] = useState("");
+
+  const handleChange = (e) => {
+    setForm({
+      ...form,
+      [e.target.name]: e.target.value,
+    });
+  };
+
+  const handleSubmit = async (e) => {
     e.preventDefault();
 
     try {
-      // Call login API
-      await login({ email, password });
+      setError("");
 
-      // Show success message
-      setSuccessMessage("Login successful. Redirecting...");
+      const res = await API.post("/auth/login", form);
 
-      // Redirect user to home page after delay
-      setTimeout(() => {
-        navigate("/home");
-      }, 900);
+      localStorage.setItem("token", res.data.token);
+      localStorage.setItem("user", JSON.stringify(res.data.user));
 
+      const role = String(res.data.user?.role || "").toLowerCase();
+
+      if (role === "admin") navigate("/admin");
+      else if (role === "technician") navigate("/technician-dashboard");
+      else navigate("/home");
     } catch (err) {
-      // Get error message from response or fallback
-      const msg =
-        err.response?.data?.message ||
-        "Login failed. Check your credentials.";
-
-      // Log error for debugging
-      console.error(msg);
-
-      // Show error alert
-      alert(msg);
+      setError(err.response?.data?.message || "Login failed.");
     }
   };
 
   return (
-    <div className="auth-page">
-      <div className="auth-card">
+    <div className="auth-shell">
+      <div className="split-card">
+        <section className="brand-panel">
+          <h1 className="brand-logo-text">خدمة</h1>
 
-        {/* Page title */}
-        <h2 className="auth-title">Welcome back</h2>
+          <h2>Welcome back.</h2>
 
-        {/* Page subtitle */}
-        <p className="auth-subtitle">
-          Sign in to manage your maintenance requests.
-        </p>
+          <p>
+            Sign in to manage your maintenance requests, chat with technicians,
+            review services, and continue your bookings.
+          </p>
 
-        {/* Success message */}
-        {successMessage ? (
-          <p className="auth-success">{successMessage}</p>
-        ) : null}
+          <img className="brand-icon" src={welcomeimage} alt="Khidma" />
+        </section>
 
-        {/* Login form */}
-        <form onSubmit={handleSubmit}>
+        <section className="form-panel">
+          <h1>Login</h1>
+          <p>Enter your account information to continue.</p>
 
-          {/* Email input */}
-          <div className="input-group">
-            <label>Email</label>
-            <input
-              type="email"
-              value={email}
-              onChange={e => setEmail(e.target.value)}
-              placeholder="name@example.com"
-            />
+          {error && <div className="auth-error">{error}</div>}
+
+          <form className="auth-form" onSubmit={handleSubmit}>
+            <div className="auth-field">
+              <label>Email</label>
+              <input
+                type="email"
+                name="email"
+                value={form.email}
+                onChange={handleChange}
+                placeholder="example@email.com"
+                required
+              />
+            </div>
+
+            <div className="auth-field">
+              <label>Password</label>
+              <input
+                type="password"
+                name="password"
+                value={form.password}
+                onChange={handleChange}
+                placeholder="Enter password"
+                required
+              />
+            </div>
+
+            <button className="primary" type="submit">
+              Login
+            </button>
+          </form>
+
+          <div className="auth-links">
+            <Link to="/register">Don&apos;t have an account? Register</Link>
+            <Link to="/forgot-password">Forgot password?</Link>
           </div>
-
-          {/* Password input */}
-          <div className="input-group">
-            <label>Password</label>
-            <input
-              type="password"
-              value={password}
-              onChange={e => setPassword(e.target.value)}
-              placeholder="Enter your password"
-            />
-          </div>
-
-          {/* Submit button */}
-          <button className="primary">Login</button>
-        </form>
-
-        {/* Illustration image */}
-        <img width={250} height={200}
-          className="auth-illustration"
-          src={welomeimage}
-          alt="Home maintenance"
-        />
-
-        {/* Additional message */}
-        <p className="auth-message">
-          We’re ready to help you keep your home running smoothly.
-        </p>
-
-        {/* Register link */}
-        <div>
-          <Link to="/register">Don't have an account? Register</Link>
-        </div>
-
-        {/* Forgot password link */}
-        <div>
-          <Link to="/forgot-password">Forgot password?</Link>
-        </div>
-
+        </section>
       </div>
     </div>
   );
 }
 
-// Export component
 export default Login;

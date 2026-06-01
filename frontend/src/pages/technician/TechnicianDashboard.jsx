@@ -6,46 +6,47 @@ function TechnicianDashboard() {
     <>
       <Header />
 
-      <div className="container">
-        <h2 className="section-title">Technician Dashboard</h2>
+      <main className="dashboard-container technician-dashboard">
+        <section className="page-hero">
+          <h1>Technician Dashboard</h1>
+          <p>Manage requests, availability, and work gallery from one place.</p>
+        </section>
 
-        <div className="panel dashboard-panel">
-          <div className="dashboard-grid">
-            <div className="dashboard-card">
-              <h4>Assigned Requests</h4>
-              <p>Track and manage current requests.</p>
-
-              <div className="dashboard-actions">
-                <Link className="primary" to="/technician/requests">
-                  View Requests
-                </Link>
-              </div>
+        <section className="dashboard-grid">
+          <article className="dashboard-card">
+            <div className="dashboard-icon">📋</div>
+            <div>
+              <h3>Assigned Requests</h3>
+              <p>Track and manage current maintenance requests.</p>
+              <Link className="primary dashboard-link" to="/technician/requests">
+                View Requests
+              </Link>
             </div>
+          </article>
 
-            <div className="dashboard-card">
-              <h4>Availability</h4>
-              <p>Set your working hours for new bookings.</p>
-
-              <div className="dashboard-actions">
-                <Link className="primary" to="/technician/availability">
-                  Set Availability
-                </Link>
-              </div>
+          <article className="dashboard-card">
+            <div className="dashboard-icon">🕒</div>
+            <div>
+              <h3>Availability</h3>
+              <p>Set one-time availability and regular monthly schedules.</p>
+              <Link className="primary dashboard-link" to="/technician/availability">
+                Set Availability
+              </Link>
             </div>
+          </article>
 
-            <div className="dashboard-card">
-              <h4>Work Gallery</h4>
-              <p>Add posts with multiple images and details about completed work.</p>
-
-              <div className="dashboard-actions">
-                <Link className="primary" to="/profile">
-                  Manage Gallery
-                </Link>
-              </div>
+          <article className="dashboard-card">
+            <div className="dashboard-icon">🖼️</div>
+            <div>
+              <h3>Work Gallery</h3>
+              <p>Add work posts and show completed jobs to customers.</p>
+              <Link className="primary dashboard-link" to="/profile">
+                Manage Gallery
+              </Link>
             </div>
-          </div>
-        </div>
-      </div>
+          </article>
+        </section>
+      </main>
     </>
   );
 }

@@ -1,122 +1,52 @@
 import React, { useState } from "react";
+import { SafeAreaView, View, Text, TextInput, TouchableOpacity } from "react-native";
 import API from "../../services/api";
+import appStyles from "../../styles/mobileStyles";
 
-import {
-  View,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  StyleSheet,
-} from "react-native";
-
-function ForgotPassword() {
+const ForgotPasswordScreen = ({ navigation }) => {
   const [email, setEmail] = useState("");
   const [message, setMessage] = useState("");
-  const [loading, setLoading] = useState(false);
 
-  const submit = async () => {
-    if (!email) {
-      setMessage("Please enter your email.");
-      return;
-    }
-
+  const send = async () => {
     try {
-      setLoading(true);
       const res = await API.post("/auth/forgotPassword", { email });
-      setMessage(res?.data?.message || "Reset link sent to your email.");
-      setEmail("");
-    } catch (error) {
-      setMessage(error.response?.data?.message || "Failed to send reset link.");
-    } finally {
-      setLoading(false);
+      setMessage(res.data?.message || "Reset link sent successfully.");
+    } catch (err) {
+      setMessage(err.response?.data?.message || "Failed to send reset link.");
     }
   };
 
   return (
-    <View style={styles.page}>
-      <View style={styles.card}>
-        <Text style={styles.title}>Forgot Password</Text>
-
-        <Text style={styles.subtitle}>
-          Enter your email to receive a password reset link.
-        </Text>
-
-        <View style={styles.inputGroup}>
-          <Text>Email</Text>
-          <TextInput
-            style={styles.input}
-            placeholder="name@example.com"
-            value={email}
-            onChangeText={setEmail}
-            autoCapitalize="none"
-          />
+    <SafeAreaView style={appStyles.safe}>
+      <View style={[appStyles.pageContent, { flex: 1, justifyContent: "center" }]}>
+        <View style={appStyles.hero}>
+          <Text style={appStyles.heroTitle}>Forgot Password</Text>
+          <Text style={appStyles.heroSubtitle}>Enter your email to receive a reset link.</Text>
         </View>
 
-        {message ? <Text style={styles.message}>{message}</Text> : null}
+        <View style={appStyles.card}>
+          {message ? <Text style={appStyles.mutedText}>{message}</Text> : null}
 
-        <TouchableOpacity
-          style={[styles.button, loading && { opacity: 0.6 }]}
-          onPress={submit}
-          disabled={loading}
-        >
-          <Text style={styles.buttonText}>
-            {loading ? "Sending..." : "Send Reset Link"}
-          </Text>
-        </TouchableOpacity>
+          <Text style={appStyles.label}>Email</Text>
+          <TextInput
+            style={appStyles.input}
+            value={email}
+            onChangeText={setEmail}
+            placeholder="example@email.com"
+            autoCapitalize="none"
+          />
+
+          <TouchableOpacity style={appStyles.primaryBtn} onPress={send}>
+            <Text style={appStyles.primaryBtnText}>Send Reset Link</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity style={appStyles.secondaryBtn} onPress={() => navigation.navigate("Login")}>
+            <Text style={appStyles.secondaryBtnText}>Back to Login</Text>
+          </TouchableOpacity>
+        </View>
       </View>
-    </View>
+    </SafeAreaView>
   );
-}
+};
 
-const styles = StyleSheet.create({
-  page: {
-    flex: 1,
-    justifyContent: "center",
-    padding: 20,
-    backgroundColor: "#E8DCCF",
-  },
-  card: {
-    backgroundColor: "#FFF9F3",
-    padding: 20,
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: "#D8C8B8",
-  },
-  title: {
-    fontSize: 20,
-    fontWeight: "bold",
-    marginBottom: 10,
-    color: "#111",
-  },
-  subtitle: {
-    marginBottom: 15,
-    color: "#666",
-  },
-  inputGroup: {
-    marginBottom: 15,
-  },
-  input: {
-    borderWidth: 1,
-    borderColor: "#ccc",
-    padding: 10,
-    marginTop: 5,
-    borderRadius: 10,
-    backgroundColor: "#fff",
-  },
-  message: {
-    marginBottom: 10,
-    color: "#333",
-  },
-  button: {
-    backgroundColor: "#111",
-    padding: 12,
-    borderRadius: 10,
-  },
-  buttonText: {
-    color: "#fff",
-    textAlign: "center",
-    fontWeight: "700",
-  },
-});
-
-export default ForgotPassword;
+export default ForgotPasswordScreen;

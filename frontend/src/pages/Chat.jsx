@@ -1,76 +1,56 @@
-import React, { useCallback, useEffect, useRef, useState } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import React, { useEffect, useRef, useState } from "react";
 import Header from "../components/common/Header";
-import { getChatMessages, sendChatMessage } from "../services/chatService";
+import API from "../services/api";
+import { useParams } from "react-router-dom";
 
 function Chat() {
   const { userId } = useParams();
-  const navigate = useNavigate();
+  const currentUser = JSON.parse(localStorage.getItem("user") || "{}");
 
-  const user = JSON.parse(localStorage.getItem("user") || "{}");
+  const fileRef = useRef(null);
+  const messagesEndRef = useRef(null);
 
   const [messages, setMessages] = useState([]);
+  const [receiver, setReceiver] = useState(null);
   const [text, setText] = useState("");
-  const [notice, setNotice] = useState("");
-  const [sending, setSending] = useState(false);
+  const [error, setError] = useState("");
 
-  const bottomRef = useRef(null);
-
-  const loadMessages = useCallback(async () => {
+  const loadMessages = async () => {
     if (!userId) return;
 
     try {
-      const data = await getChatMessages(userId);
-      setMessages(Array.isArray(data) ? data : []);
+      setError("");
+      const res = await API.get(`/chat/${userId}`);
+      setMessages(Array.isArray(res.data) ? res.data : []);
     } catch (err) {
-      console.error("load chat error:", err?.response?.data || err.message);
+      console.error("chat messages error:", err);
+      setError(err.response?.data?.message || "Failed to load messages.");
+      setMessages([]);
     }
+  };
+
+  const loadReceiver = async () => {
+    if (!userId) return;
+
+    try {
+      const res = await API.get(`/users/${userId}`);
+      setReceiver(res.data || null);
+    } catch {
+      setReceiver(null);
+    }
+  };
+
+  useEffect(() => {
+    loadReceiver();
+    loadMessages();
+
+    const timer = setInterval(loadMessages, 3000);
+    return () => clearInterval(timer);
   }, [userId]);
 
   useEffect(() => {
-    loadMessages();
-    const interval = setInterval(loadMessages, 3000);
-    return () => clearInterval(interval);
-  }, [loadMessages]);
-
-  useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
-
-  const showNotice = (msg) => {
-    setNotice(msg);
-    setTimeout(() => setNotice(""), 2500);
-  };
-
-  const handleSend = async (content = null, type = "text") => {
-    const messageValue = String(content ?? text ?? "");
-
-    if (!userId) {
-      showNotice("Chat user is missing.");
-      return;
-    }
-
-    if (type === "text" && !messageValue.trim()) return;
-    if (type !== "text" && !messageValue) return;
-
-    try {
-      setSending(true);
-
-      await sendChatMessage({
-        receiver_id: Number(userId),
-        message: messageValue,
-        type,
-      });
-
-      if (type === "text") setText("");
-      await loadMessages();
-    } catch (err) {
-      console.error("send chat error:", err?.response?.data || err.message);
-      showNotice("Failed to send message.");
-    } finally {
-      setSending(false);
-    }
-  };
 
   const compressImage = (file) => {
     return new Promise((resolve, reject) => {
@@ -101,22 +81,46 @@ function Chat() {
     });
   };
 
-  const handleImage = async (e) => {
+  const sendMessage = async (messageValue = null, type = "text") => {
+    const value = String(messageValue ?? text ?? "");
+
+    if (type === "text" && !value.trim()) return;
+    if (type !== "text" && !value) return;
+
+    try {
+      setError("");
+
+      await API.post("/chat/send", {
+        receiver_id: Number(userId),
+        message: value,
+        type,
+      });
+
+      if (type === "text") setText("");
+
+      await loadMessages();
+    } catch (err) {
+      console.error("send message error:", err);
+      setError(err.response?.data?.message || "Failed to send message.");
+    }
+  };
+
+  const sendImage = async (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
     try {
-      const image = await compressImage(file);
-      await handleSend(image, "image");
+      const compressed = await compressImage(file);
+      await sendMessage(compressed, "image");
       e.target.value = "";
     } catch {
-      showNotice("Failed to send image.");
+      setError("Failed to send image.");
     }
   };
 
-  const handleLocation = () => {
+  const sendLocation = () => {
     if (!navigator.geolocation) {
-      showNotice("Location is not supported.");
+      setError("Location is not supported by this browser.");
       return;
     }
 
@@ -124,21 +128,32 @@ function Chat() {
       async (pos) => {
         const { latitude, longitude } = pos.coords;
         const url = `https://www.google.com/maps?q=${latitude},${longitude}`;
-        await handleSend(url, "location");
+        await sendMessage(url, "location");
       },
-      () => showNotice("Failed to get location.")
+      () => {
+        setError("Failed to get location.");
+      }
     );
   };
 
-  const renderMessage = (msg) => {
-    if (msg.type === "image") {
-      return <img src={msg.message} alt="sent" />;
+  const renderMessageContent = (msg) => {
+    if (msg.type === "image" || String(msg.message || "").startsWith("data:image/")) {
+      return (
+        <img
+          className="chat-message-image"
+          src={msg.message}
+          alt="sent"
+        />
+      );
     }
 
-    if (msg.type === "location") {
+    if (
+      msg.type === "location" ||
+      String(msg.message || "").includes("google.com/maps")
+    ) {
       return (
         <a href={msg.message} target="_blank" rel="noreferrer">
-          📍 Open Location
+          📍 Open shared location
         </a>
       );
     }
@@ -150,88 +165,75 @@ function Chat() {
     <>
       <Header />
 
-      <div className="chat-wrapper">
-        <div className="chat-page-shell">
-          <div className="chat-page-topbar">
-            <button className="icon-btn" onClick={() => navigate("/chat")}>
-              ← Back to Chats
-            </button>
-          </div>
-
-          <div className="chat-shell">
-            <div className="chat-header-bar">
-              <div className="chat-avatar">💬</div>
-
-              <div className="chat-title-block">
-                <h3>Conversation</h3>
-                <span>Messages update automatically</span>
-              </div>
-            </div>
-
-            {notice ? <div className="mini-error">{notice}</div> : null}
-
-            <div className="messages-container">
-              {messages.length === 0 ? (
-                <div className="empty-gallery-card">
-                  <h3>No messages yet</h3>
-                  <p>Start the conversation by sending the first message.</p>
-                </div>
-              ) : (
-                messages.map((msg, index) => {
-                  const mine = Number(msg.sender_id) === Number(user.id);
-
-                  return (
-                    <div
-                      key={msg.id || index}
-                      className={`message-bubble ${
-                        mine ? "my-message" : "other-message"
-                      }`}
-                    >
-                      {renderMessage(msg)}
-                    </div>
-                  );
-                })
-              )}
-
-              <div ref={bottomRef}></div>
-            </div>
-
-            <div className="chat-input-area">
-              <label className="icon-btn">
-                📷
-                <input
-                  type="file"
-                  accept="image/*"
-                  onChange={handleImage}
-                  style={{ display: "none" }}
-                />
-              </label>
-
-              <button className="icon-btn" type="button" onClick={handleLocation}>
-                📍
-              </button>
-
-              <input
-                value={text}
-                onChange={(e) => setText(e.target.value)}
-                placeholder="Type a message..."
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") handleSend();
-                }}
-              />
-
-              <button
-                className="send-btn"
-                type="button"
-                disabled={sending}
-                onClick={() => handleSend()}
-              >
-                Send
-              </button>
-            </div>
-          </div>
+      <main className="chat-container">
+        <div className="chat-header">
+          Chat with {receiver?.name || "User"}
         </div>
-      </div>
+
+        {error && <div className="auth-error">{error}</div>}
+
+        <section className="chat-messages">
+          {messages.length === 0 ? (
+            <div className="notification-empty">No messages yet.</div>
+          ) : (
+            messages.map((msg, index) => {
+              const mine = Number(msg.sender_id) === Number(currentUser.id);
+
+              return (
+                <div
+                  key={msg.id || index}
+                  className={`chat-message ${mine ? "my-message" : ""}`}
+                >
+                  {renderMessageContent(msg)}
+                </div>
+              );
+            })
+          )}
+
+          <div ref={messagesEndRef} />
+        </section>
+
+        <input
+          ref={fileRef}
+          type="file"
+          accept="image/*"
+          hidden
+          onChange={sendImage}
+        />
+
+        <div className="chat-tools">
+          <button
+            className="chat-tool-btn"
+            type="button"
+            onClick={() => fileRef.current?.click()}
+          >
+            📷 Image
+          </button>
+
+          <button
+            className="chat-tool-btn"
+            type="button"
+            onClick={sendLocation}
+          >
+            📍 Location
+          </button>
+        </div>
+
+        <div className="chat-input">
+          <input
+            value={text}
+            onChange={(e) => setText(e.target.value)}
+            placeholder="Type a message..."
+            onKeyDown={(e) => {
+              if (e.key === "Enter") sendMessage();
+            }}
+          />
+
+          <button className="primary" onClick={() => sendMessage()}>
+            Send
+          </button>
+        </div>
+      </main>
     </>
   );
 }

@@ -1,113 +1,110 @@
-// React hook for managing state
-import { useState } from "react";
-
-// Router utilities
-import { useParams, useNavigate, Link } from "react-router-dom";
-
-// Axios API instance
+import React, { useState } from "react";
+import { Link, useNavigate, useParams } from "react-router-dom";
 import API from "../../services/api";
+import welcomeimage from "../../images/home.png";
 
-// Reset password page component
 function ResetPassword() {
-  // Get reset token from URL
+  const navigate = useNavigate();
   const { token } = useParams();
 
-  // Navigation hook
-  const navigate = useNavigate();
+  const [form, setForm] = useState({
+    password: "",
+    confirmPassword: "",
+  });
 
-  // Password input state
-  const [password, setPassword] = useState("");
-
-  // Confirm password input state
-  const [confirmPassword, setConfirmPassword] = useState("");
-
-  // Feedback message state
   const [message, setMessage] = useState("");
+  const [error, setError] = useState("");
 
-  // Loading state
-  const [loading, setLoading] = useState(false);
+  const handleChange = (e) => {
+    setForm({
+      ...form,
+      [e.target.name]: e.target.value,
+    });
+  };
 
-  // Submit new password
-  const submit = async () => {
-    setMessage("");
+  const handleSubmit = async (e) => {
+    e.preventDefault();
 
-    if (!password || !confirmPassword) {
-      setMessage("Please fill in both password fields.");
-      return;
-    }
-
-    if (password.length < 6) {
-      setMessage("Password must be at least 6 characters.");
-      return;
-    }
-
-    if (password !== confirmPassword) {
-      setMessage("Passwords do not match.");
+    if (form.password !== form.confirmPassword) {
+      setError("Passwords do not match.");
       return;
     }
 
     try {
-      setLoading(true);
+      setError("");
+      setMessage("");
 
-      // Call backend reset endpoint
-      const res = await API.post(`/auth/reset-password/${token}`, { password });
+      const res = await API.post(`/auth/reset-password/${token}`, {
+        password: form.password,
+      });
 
-      setMessage(res?.data?.message || "Password updated successfully.");
+      setMessage(res.data?.message || "Password reset successfully.");
 
-      // Redirect to login after short delay
-      setTimeout(() => navigate("/login"), 900);
-    } catch (error) {
-      setMessage(error.response?.data?.message || "Failed to reset password.");
-    } finally {
-      setLoading(false);
+      setTimeout(() => {
+        navigate("/login");
+      }, 1200);
+    } catch (err) {
+      setError(err.response?.data?.message || "Failed to reset password.");
     }
   };
 
   return (
-    <div className="auth-page">
-      <div className="auth-card">
-        {/* Page title */}
-        <h2>Reset Password</h2>
+    <div className="auth-shell">
+      <div className="split-card">
+        <section className="brand-panel">
+          <h1 className="brand-logo-text">خدمة</h1>
 
-        {/* Page description */}
-        <p className="auth-subtitle">
-          Enter a new password for your account.
-        </p>
+          <h2>Create a new password.</h2>
 
-        {/* New password input */}
-        <div className="input-group">
-          <label>New Password</label>
-          <input
-            type="password"
-            placeholder="New password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-          />
-        </div>
+          <p>
+            Choose a new secure password to protect your account and continue
+            using your home maintenance services safely.
+          </p>
 
-        {/* Confirm password input */}
-        <div className="input-group">
-          <label>Confirm Password</label>
-          <input
-            type="password"
-            placeholder="Confirm password"
-            value={confirmPassword}
-            onChange={(e) => setConfirmPassword(e.target.value)}
-          />
-        </div>
+          <img className="brand-icon" src={welcomeimage} alt="Khidma" />
+        </section>
 
-        {/* Feedback message */}
-        {message ? <p className="helper-text">{message}</p> : null}
+        <section className="form-panel">
+          <h1>Reset Password</h1>
+          <p>Enter and confirm your new password.</p>
 
-        {/* Submit button */}
-        <button className="primary" onClick={submit} disabled={loading}>
-          {loading ? "Updating..." : "Update Password"}
-        </button>
+          {error && <div className="auth-error">{error}</div>}
+          {message && <div className="auth-success">{message}</div>}
 
-        {/* Back to login */}
-        <div style={{ marginTop: "10px" }}>
-          <Link to="/login">Back to Login</Link>
-        </div>
+          <form className="auth-form" onSubmit={handleSubmit}>
+            <div className="auth-field">
+              <label>New Password</label>
+              <input
+                type="password"
+                name="password"
+                value={form.password}
+                onChange={handleChange}
+                placeholder="Enter new password"
+                required
+              />
+            </div>
+
+            <div className="auth-field">
+              <label>Confirm Password</label>
+              <input
+                type="password"
+                name="confirmPassword"
+                value={form.confirmPassword}
+                onChange={handleChange}
+                placeholder="Confirm new password"
+                required
+              />
+            </div>
+
+            <button className="primary" type="submit">
+              Reset Password
+            </button>
+          </form>
+
+          <div className="auth-links">
+            <Link to="/login">Back to Login</Link>
+          </div>
+        </section>
       </div>
     </div>
   );

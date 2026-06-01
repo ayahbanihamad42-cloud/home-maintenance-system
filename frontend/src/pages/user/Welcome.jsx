@@ -1,34 +1,44 @@
 import React from "react";
 import { useNavigate } from "react-router-dom";
-import welcomeimage from "../../images/home.png"; // عدلي المسار حسب مشروعك
+import welcomeimage from "../../images/home.png";
 
 function Welcome() {
   const navigate = useNavigate();
 
   return (
-    <div className="welcome-container">
-      {/* Main welcome title */}
-      <h1 className="welcome-title">Welcome to Home Maintenance System</h1>
+    <div className="welcome-shell">
+      <div className="split-card">
+        <section className="brand-panel">
+          <h1 className="brand-logo-text">خدمة</h1>
 
-      {/* Subtitle and description text */}
-      <p className="welcome-subtitle">
-        Your trusted hub for home maintenance services.
-        <br />
-        Book reliable technicians, manage requests, and keep your home in great shape.
-      </p>
+          <h2>Home services made simple.</h2>
 
-      {/* Welcome illustration image */}
-      <img className="welcome-image" src={welcomeimage} alt="Welcome" />
+          <p>
+            Book trusted technicians, manage requests, chat instantly, use AI
+            assistance, and track your maintenance service from one modern platform.
+          </p>
 
-      {/* Container for navigation buttons */}
-      <div className="welcome-buttons">
-        <button className="primary" onClick={() => navigate("/register")}>
-          Register
-        </button>
+          <div className="welcome-actions">
+            <button className="primary" onClick={() => navigate("/register")}>
+              Register
+            </button>
 
-        <button className="primary" onClick={() => navigate("/login")}>
-          Login
-        </button>
+            <button className="outline-btn" onClick={() => navigate("/login")}>
+              Login
+            </button>
+          </div>
+        </section>
+
+        <section className="form-panel welcome-right-panel">
+          <img className="brand-icon" src={welcomeimage} alt="Khidma" />
+
+          <h1>خدمة بيتك بسهولة وموثوقية</h1>
+
+          <p>
+            A smart web and mobile platform for booking reliable home maintenance
+            technicians in a simple and modern way.
+          </p>
+        </section>
       </div>
     </div>
   );

@@ -1,7 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams, useLocation } from "react-router-dom";
 import Header from "../../components/common/Header";
-
 import { createMaintenanceRequest } from "../../services/maintenanceService";
 import {
   getTechnicianById,
@@ -14,6 +13,7 @@ function MaintenanceRequest() {
   const location = useLocation();
 
   const stateTech = location.state?.technician || location.state?.tech || {};
+
   const selectedTechnicianId =
     params.technicianId ||
     location.state?.technicianId ||
@@ -39,8 +39,7 @@ function MaintenanceRequest() {
     payment_method: "cash",
     location_note: "",
     description: "",
-    price_per_hour:
-      location.state?.price_per_hour || stateTech.price_per_hour || 0,
+    price_per_hour: location.state?.price_per_hour || stateTech.price_per_hour || 0,
   });
 
   const totalPrice = useMemo(() => {
@@ -63,12 +62,9 @@ function MaintenanceRequest() {
 
   const normalizeDate = (value) => {
     if (!value) return "";
-
     const raw = String(value).trim();
 
-    if (/^\d{4}-\d{2}-\d{2}$/.test(raw)) {
-      return raw;
-    }
+    if (/^\d{4}-\d{2}-\d{2}$/.test(raw)) return raw;
 
     const normalMatch = raw.match(/^(\d{4}-\d{2}-\d{2})/);
     if (normalMatch) return normalMatch[1];
@@ -78,10 +74,9 @@ function MaintenanceRequest() {
 
   const normalizeTime = (value) => {
     if (!value) return "";
-
     const raw = String(value).trim();
-
     const match = raw.match(/^(\d{2}:\d{2})(:\d{2})?/);
+
     if (match) return match[0].length === 5 ? `${match[0]}:00` : match[0];
 
     return raw.slice(0, 8);
@@ -225,11 +220,7 @@ function MaintenanceRequest() {
           return;
         }
 
-        const data = await getAvailability(
-          selectedTechnicianId,
-          form.scheduled_date
-        );
-
+        const data = await getAvailability(selectedTechnicianId, form.scheduled_date);
         const list = Array.isArray(data) ? data : [];
 
         const times = list
@@ -238,9 +229,7 @@ function MaintenanceRequest() {
           .map((x) => ({
             id: x.id,
             value: normalizeTime(x.start_time),
-            label: `${normalizeTime(x.start_time)} - ${normalizeTime(
-              x.end_time
-            )}`,
+            label: `${normalizeTime(x.start_time)} - ${normalizeTime(x.end_time)}`,
           }))
           .filter((x) => x.value);
 
@@ -358,7 +347,6 @@ function MaintenanceRequest() {
       }
     } catch (err) {
       console.error("submit request error:", err);
-
       setMessage({
         type: "error",
         title: "Error",
@@ -373,124 +361,119 @@ function MaintenanceRequest() {
     <>
       <Header />
 
-      <div className="container request-container">
-        <h2>Maintenance Request</h2>
+      <main className="request-container">
+        <section className="page-hero">
+          <h1>Maintenance Request</h1>
+          <p>Choose an available time, share your location, and submit your request.</p>
+        </section>
 
-        {message && (
-          <div className={`message-box-card ${message.type}`}>
-            <div className="message-box-title">{message.title}</div>
-            <div className="message-box-body">{message.body}</div>
-          </div>
-        )}
+        <section className="form-card">
+          {message && (
+            <div className={message.type === "error" ? "auth-error" : "auth-success"}>
+              <strong>{message.title}</strong>
+              <div>{message.body}</div>
+            </div>
+          )}
 
-        <form onSubmit={handleSubmit}>
-          <div className="request-grid">
-            <div className="input-group">
-              <label>Service</label>
-              <input value={form.service} readOnly />
+          <form className="form-container" onSubmit={handleSubmit}>
+            <div className="form-row">
+              <div>
+                <label>Service</label>
+                <input value={form.service} readOnly />
+              </div>
+
+              <div>
+                <label>Technician</label>
+                <input value={form.technician_name} readOnly />
+              </div>
             </div>
 
-            <div className="input-group">
-              <label>Technician</label>
-              <input value={form.technician_name} readOnly />
+            <div className="form-row">
+              <div>
+                <label>Date</label>
+                <select
+                  value={form.scheduled_date}
+                  onChange={(e) =>
+                    setForm({
+                      ...form,
+                      scheduled_date: e.target.value,
+                      scheduled_time: "",
+                    })
+                  }
+                >
+                  {availableDates.length === 0 ? (
+                    <option value="">No available dates</option>
+                  ) : (
+                    availableDates.map((date) => (
+                      <option key={date} value={date}>
+                        {date}
+                      </option>
+                    ))
+                  )}
+                </select>
+              </div>
+
+              <div>
+                <label>Time Slot</label>
+                <select
+                  value={form.scheduled_time}
+                  onChange={(e) => setForm({ ...form, scheduled_time: e.target.value })}
+                >
+                  {availableTimes.length === 0 ? (
+                    <option value="">No available times</option>
+                  ) : (
+                    availableTimes.map((time) => (
+                      <option key={time.id || time.value} value={time.value}>
+                        {time.label}
+                      </option>
+                    ))
+                  )}
+                </select>
+              </div>
+
+              <div>
+                <label>Estimated Hours</label>
+                <input
+                  type="number"
+                  min="1"
+                  value={form.estimated_hours}
+                  onChange={(e) => setForm({ ...form, estimated_hours: e.target.value })}
+                />
+              </div>
             </div>
 
-            <div className="input-group">
-              <label>Date</label>
-              <select
-                value={form.scheduled_date}
-                onChange={(e) =>
-                  setForm({
-                    ...form,
-                    scheduled_date: e.target.value,
-                    scheduled_time: "",
-                  })
-                }
-              >
-                {availableDates.length === 0 ? (
-                  <option value="">No available dates</option>
-                ) : (
-                  availableDates.map((date) => (
-                    <option key={date} value={date}>
-                      {date}
-                    </option>
-                  ))
-                )}
-              </select>
+            <div className="form-row">
+              <div>
+                <label>Payment Method</label>
+                <select
+                  value={form.payment_method}
+                  onChange={(e) => setForm({ ...form, payment_method: e.target.value })}
+                >
+                  <option value="cash">Cash</option>
+                  <option value="online">Online</option>
+                </select>
+              </div>
+
+              <div>
+                <label>Price Summary</label>
+                <input
+                  value={`${Number(form.price_per_hour || 0).toFixed(2)} JOD/hour | Hours: ${
+                    form.estimated_hours
+                  } | Total: ${totalPrice} JOD`}
+                  readOnly
+                />
+              </div>
             </div>
 
-            <div className="input-group">
-              <label>Time Slot</label>
-              <select
-                value={form.scheduled_time}
-                onChange={(e) =>
-                  setForm({ ...form, scheduled_time: e.target.value })
-                }
-              >
-                {availableTimes.length === 0 ? (
-                  <option value="">No available times</option>
-                ) : (
-                  availableTimes.map((time) => (
-                    <option key={time.id || time.value} value={time.value}>
-                      {time.label}
-                    </option>
-                  ))
-                )}
-              </select>
-            </div>
-
-            <div className="input-group">
-              <label>Estimated Hours</label>
-              <input
-                type="number"
-                min="1"
-                value={form.estimated_hours}
-                onChange={(e) =>
-                  setForm({ ...form, estimated_hours: e.target.value })
-                }
-              />
-            </div>
-
-            <div className="input-group">
-              <label>Payment Method</label>
-              <select
-                value={form.payment_method}
-                onChange={(e) =>
-                  setForm({ ...form, payment_method: e.target.value })
-                }
-              >
-                <option value="cash">Cash</option>
-                <option value="online">Online</option>
-              </select>
-            </div>
-          </div>
-
-          <div className="input-group">
-            <label>Price Summary</label>
-            <input
-              readOnly
-              value={`${Number(form.price_per_hour || 0).toFixed(
-                2
-              )} JOD/hour | Hours: ${
-                form.estimated_hours
-              } | Total: ${totalPrice} JOD`}
-            />
-          </div>
-
-          <div className="input-group">
             <label>Location Note</label>
             <input
               value={form.location_note}
-              onChange={(e) =>
-                setForm({ ...form, location_note: e.target.value })
-              }
+              onChange={(e) => setForm({ ...form, location_note: e.target.value })}
               placeholder="Example: Irbid, near Yarmouk University"
             />
-          </div>
 
-          <div style={{ marginTop: 18, marginBottom: 18 }}>
             <button
-              className="secondary"
+              className="secondary-btn"
               type="button"
               onClick={getCurrentUserLocation}
               disabled={locationLoading}
@@ -499,62 +482,34 @@ function MaintenanceRequest() {
             </button>
 
             {userLocation && (
-              <div style={{ marginTop: 16 }}>
-                <h3 style={{ marginBottom: 10 }}>Your Request Location</h3>
-
-                <div
-                  style={{
-                    width: "100%",
-                    height: 320,
-                    borderRadius: 22,
-                    overflow: "hidden",
-                    border: "1px solid #d8c8b8",
-                    background: "#f7efe7",
-                  }}
-                >
-                  <iframe
-                    title="User Request Location"
-                    src={userMapSrc}
-                    width="100%"
-                    height="100%"
-                    style={{ border: 0 }}
-                    loading="lazy"
-                    referrerPolicy="no-referrer-when-downgrade"
-                    allowFullScreen
-                  />
-                </div>
-
-                <p
-                  style={{
-                    marginTop: 8,
-                    fontWeight: 700,
-                    color: "#5c5048",
-                  }}
-                >
-                  This static location will be shared with the technician.
-                </p>
+              <div className="map-card">
+                <h3>Your Request Location</h3>
+                <iframe
+                  title="user-location"
+                  src={userMapSrc}
+                  width="100%"
+                  height="230"
+                  style={{ border: 0 }}
+                  loading="lazy"
+                />
+                <p>This static location will be shared with the technician.</p>
               </div>
             )}
-          </div>
 
-          <div className="input-group">
             <label>Description</label>
             <textarea
               value={form.description}
-              onChange={(e) =>
-                setForm({ ...form, description: e.target.value })
-              }
+              onChange={(e) => setForm({ ...form, description: e.target.value })}
               placeholder="Describe the problem..."
+              rows="5"
             />
-          </div>
 
-          <button className="primary" type="submit">
-            {form.payment_method === "online"
-              ? "Continue to Payment"
-              : "Submit Request"}
-          </button>
-        </form>
-      </div>
+            <button className="primary" type="submit">
+              {form.payment_method === "online" ? "Continue to Payment" : "Submit Request"}
+            </button>
+          </form>
+        </section>
+      </main>
     </>
   );
 }

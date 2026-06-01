@@ -1,84 +1,76 @@
 import React, { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
 import Header from "../components/common/Header";
-import { getChatConversations } from "../services/chatService.jsx";
-import "../index.css";
+import API from "../services/api";
+import { useNavigate } from "react-router-dom";
 
 function ChatList() {
   const navigate = useNavigate();
   const [conversations, setConversations] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+
+  const loadConversations = async () => {
+    try {
+      setError("");
+      const res = await API.get("/chat/conversations");
+      setConversations(Array.isArray(res.data) ? res.data : []);
+    } catch (err) {
+      console.error("chat conversations error:", err);
+      setError(err.response?.data?.message || "Failed to load conversations.");
+      setConversations([]);
+    }
+  };
 
   useEffect(() => {
-    getChatConversations()
-      .then((data) => {
-        setConversations(data || []);
-      })
-      .catch(() => {
-        setConversations([]);
-      })
-      .finally(() => {
-        setLoading(false);
-      });
+    loadConversations();
   }, []);
-
-  const renderLastMessage = (item) => {
-    if (item.lastMessageType === "image") return "📷 Image";
-    if (item.lastMessageType === "location") return "📍 Location";
-    return item.lastMessage || "No messages yet";
-  };
 
   return (
     <>
       <Header />
 
-      <div className="container chat-list-container">
-        <h2>Chats</h2>
+      <main className="chat-list-container">
+        <section className="page-hero">
+          <h1>Messages</h1>
+          <p>Continue your conversations with users and technicians.</p>
+        </section>
 
-        {loading ? (
-          <div className="message-box-card">
-            <div className="message-box-title">Notice</div>
-            <div className="message-box-body">Loading conversations...</div>
-          </div>
-        ) : conversations.length === 0 ? (
-          <div className="message-box-card">
-            <div className="message-box-title">No chats yet</div>
-            <div className="message-box-body">
-              Your conversations will appear here when you start chatting.
-            </div>
-          </div>
+        {error && <div className="auth-error">{error}</div>}
+
+        {conversations.length === 0 ? (
+          <section className="card">
+            <h3>No conversations yet</h3>
+            <p>Your messages will appear here once you start chatting.</p>
+          </section>
         ) : (
-          <div className="chat-list-grid">
+          <section className="chat-list-grid">
             {conversations.map((item) => (
-              <button
-                key={item.userId}
-                type="button"
+              <article
                 className="chat-list-card"
-                onClick={() => navigate(`/chat/${item.userId}`)}
+                key={item.userId || item.id}
+                onClick={() => navigate(`/chat/${item.userId || item.id}`)}
               >
-                <div className="chat-list-avatar">
-                  {(item.name || "?").charAt(0).toUpperCase()}
+                <div className="chat-avatar">
+                  {String(item.name || "U").charAt(0).toUpperCase()}
                 </div>
 
-                <div className="chat-list-content">
-                  <div className="chat-list-top">
-                    <div className="chat-list-name">{item.name}</div>
-                    <div className="chat-list-time">
-                      {item.lastMessageAt
-                        ? new Date(item.lastMessageAt).toLocaleString()
-                        : ""}
-                    </div>
-                  </div>
+                <div className="chat-list-info">
+                  <h3>{item.name || "User"}</h3>
 
-                  <div className="chat-list-last-message">
-                    {renderLastMessage(item)}
-                  </div>
+                  <p>
+                    {item.lastMessageType === "image"
+                      ? "📷 Image"
+                      : item.lastMessageType === "location"
+                      ? "📍 Location"
+                      : item.lastMessage || "No messages yet"}
+                  </p>
                 </div>
-              </button>
+
+                <span className="status-badge">Open</span>
+              </article>
             ))}
-          </div>
+          </section>
         )}
-      </div>
+      </main>
     </>
   );
 }

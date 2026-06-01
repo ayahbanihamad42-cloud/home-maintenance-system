@@ -41,7 +41,7 @@ function normalizeText(value) {
 }
 
 function getRating(tech) {
-  return Number(tech.rating || tech.average_rating || 0);
+  return Number(tech.rating || tech.average_rating || tech.avg_rating || 0);
 }
 
 function getPrice(tech) {
@@ -78,25 +78,22 @@ function CommentsBox({ technicianId }) {
   };
 
   return (
-    <div className="technician-comments-section">
-      <button type="button" className="comments-link" onClick={loadComments}>
+    <div className="comments-box">
+      <button className="secondary-btn" type="button" onClick={loadComments}>
         {open ? "Hide comments" : "View comments"}
       </button>
 
       {open && (
-        <div className="comments-list-box">
+        <div className="comments-list">
           {loading ? (
-            <div className="comment-row">Loading comments...</div>
+            <p>Loading comments...</p>
           ) : comments.length === 0 ? (
-            <div className="comment-row">No comments yet.</div>
+            <p>No comments yet.</p>
           ) : (
-            comments.map((item) => (
-              <div className="comment-row" key={item.id}>
-                <div className="comment-top">
-                  <b>{item.user_name || "User"}</b>
-                  <span>⭐ {item.rating}</span>
-                </div>
-                <div className="comment-text">{item.comment || "-"}</div>
+            comments.map((item, index) => (
+              <div className="comment-card" key={item.id || index}>
+                <strong>{item.user_name || "User"} ⭐ {item.rating}</strong>
+                <p>{item.comment || "-"}</p>
               </div>
             ))
           )}
@@ -115,10 +112,8 @@ export default function TechniciansByService() {
 
   const [technicians, setTechnicians] = useState([]);
   const [smartResults, setSmartResults] = useState(null);
-
   const [loading, setLoading] = useState(true);
   const [smartLoading, setSmartLoading] = useState(false);
-
   const [search, setSearch] = useState("");
   const [resultType, setResultType] = useState("technicians");
   const [priceFilter, setPriceFilter] = useState("all");
@@ -130,7 +125,6 @@ export default function TechniciansByService() {
     try {
       setLoading(true);
       setSmartResults(null);
-
       const data = await getTechnicians(decodedService);
       setTechnicians(Array.isArray(data) ? data : []);
     } catch (err) {
@@ -250,174 +244,159 @@ export default function TechniciansByService() {
     <>
       <Header />
 
-      <div className="technicians-page">
-        <div className="technicians-panel">
-          <div className="technicians-page-header">
-            <div>
-              <h1>{decodedService} Technicians</h1>
-              <p className="page-subtitle">
-                Choose a technician, filter by city, rating, price, or experience.
-              </p>
-            </div>
+      <main className="technicians-container">
+        <section className="page-hero">
+          <h1>{decodedService} Technicians</h1>
+          <p>Choose a technician, filter by city, rating, price, or experience.</p>
+        </section>
 
-            <button className="secondary" type="button" onClick={clearFilters}>
-              Clear Filters
-            </button>
-          </div>
-
+        <section className="request-filters">
           <input
-            className="technician-search-input"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Search: name, city, cheapest, best technician..."
           />
 
-          <div className="technician-filters-grid">
-            <select
-              value={resultType}
-              onChange={(e) => setResultType(e.target.value)}
-            >
-              <option value="technicians">Technicians</option>
-              <option value="stores">Stores</option>
-            </select>
+          <select value={resultType} onChange={(e) => setResultType(e.target.value)}>
+            <option value="technicians">Technicians</option>
+            <option value="stores">Stores</option>
+          </select>
 
-            <select
-              value={locationFilter}
-              onChange={(e) => setLocationFilter(e.target.value)}
-            >
-              <option value="all">All Jordan cities</option>
-              {jordanCities.map((city) => (
-                <option key={city} value={city}>
-                  {city}
-                </option>
-              ))}
-            </select>
+          <select
+            value={locationFilter}
+            onChange={(e) => setLocationFilter(e.target.value)}
+          >
+            <option value="all">All Jordan cities</option>
+            {jordanCities.map((city) => (
+              <option key={city} value={city}>
+                {city}
+              </option>
+            ))}
+          </select>
 
-            <select
-              value={priceFilter}
-              onChange={(e) => setPriceFilter(e.target.value)}
-            >
-              <option value="all">All prices</option>
-              <option value="low">Low: 10 JOD or less</option>
-              <option value="mid">Medium: 11 - 25 JOD</option>
-              <option value="high">High: more than 25 JOD</option>
-            </select>
+          <select value={priceFilter} onChange={(e) => setPriceFilter(e.target.value)}>
+            <option value="all">All prices</option>
+            <option value="low">Low: 10 JOD or less</option>
+            <option value="mid">Medium: 11 - 25 JOD</option>
+            <option value="high">High: more than 25 JOD</option>
+          </select>
 
-            <select
-              value={ratingFilter}
-              onChange={(e) => setRatingFilter(e.target.value)}
-            >
-              <option value="all">All ratings</option>
-              <option value="5">5+</option>
-              <option value="4">4+</option>
-              <option value="3">3+</option>
-            </select>
+          <select
+            value={ratingFilter}
+            onChange={(e) => setRatingFilter(e.target.value)}
+          >
+            <option value="all">All ratings</option>
+            <option value="5">5+</option>
+            <option value="4">4+</option>
+            <option value="3">3+</option>
+          </select>
 
-            
+          <select value={sortFilter} onChange={(e) => setSortFilter(e.target.value)}>
+            <option value="recommended">Recommended</option>
+            <option value="rating">Best rating</option>
+            <option value="experience">Most experience</option>
+            <option value="price_low">Lowest price</option>
+            <option value="price_high">Highest price</option>
+          </select>
+
+          <button className="clear-filter-btn" type="button" onClick={clearFilters}>
+            Clear Filters
+          </button>
+        </section>
+
+        {search.trim() && (
+          <div className="auth-success">
+            Assistant search: {search} {smartLoading ? "..." : ""}
           </div>
+        )}
 
-          {search.trim() ? (
-            <div className="smart-search-hint">
-              Assistant search: <b>{search}</b>
-              {smartLoading ? " ..." : ""}
-            </div>
-          ) : null}
+        {loading ? (
+          <section className="card">
+            <h3>Loading</h3>
+            <p>Loading technicians...</p>
+          </section>
+        ) : resultType === "stores" ? (
+          <section className="card">
+            <h3>Stores</h3>
+            <p>Store results will be connected later.</p>
+          </section>
+        ) : smartLoading ? (
+          <section className="card">
+            <h3>Assistant Search</h3>
+            <p>Searching...</p>
+          </section>
+        ) : filteredTechnicians.length === 0 ? (
+          <section className="card">
+            <h3>No results</h3>
+            <p>No technicians found.</p>
+          </section>
+        ) : (
+          <section className="technicians-grid">
+            {filteredTechnicians.map((tech) => {
+              const technicianId = getTechnicianId(tech);
 
-          {loading ? (
-            <div className="message-box-card">
-              <div className="message-box-title">Loading</div>
-              <div className="message-box-body">Loading technicians...</div>
-            </div>
-          ) : resultType === "stores" ? (
-            <div className="message-box-card">
-              <div className="message-box-title">Stores</div>
-              <div className="message-box-body">
-                Store results will be connected later.
-              </div>
-            </div>
-          ) : smartLoading ? (
-            <div className="message-box-card">
-              <div className="message-box-title">Assistant Search</div>
-              <div className="message-box-body">Searching...</div>
-            </div>
-          ) : filteredTechnicians.length === 0 ? (
-            <div className="message-box-card">
-              <div className="message-box-title">No results</div>
-              <div className="message-box-body">No technicians found.</div>
-            </div>
-          ) : (
-            <div className="technician-list">
-              {filteredTechnicians.map((tech) => {
-                const technicianId = getTechnicianId(tech);
+              return (
+                <article className="technician-card" key={technicianId}>
+                  <div className="technician-card-header">
+                    <div className="avatar-placeholder">
+                      {String(tech.name || "T").charAt(0).toUpperCase()}
+                    </div>
 
-                return (
-                  <div className="technician-card" key={technicianId}>
-                    <div className="technician-card-top">
-                      <div>
-                        <h2>{tech.name || "Technician"}</h2>
-                        <p className="technician-service">
-                          {tech.service || decodedService}
-                        </p>
-                      </div>
-
-                      <span className="status-pill">
-                        ⭐ {getRating(tech).toFixed(1)}
+                    <div>
+                      <h2>{tech.name || "Technician"}</h2>
+                      <span className="status-badge">
+                        {tech.service || decodedService}
                       </span>
                     </div>
+                  </div>
 
+                  <div className="request-details-grid">
+                    <p><strong>Rating:</strong> ⭐ {getRating(tech).toFixed(1)}</p>
+                    <p><strong>City:</strong> {tech.city || "-"}</p>
+                    <p><strong>Phone:</strong> {tech.phone || "-"}</p>
+                    <p><strong>Experience:</strong> {tech.experience || 0} years</p>
+                    <p><strong>Price:</strong> {getPrice(tech).toFixed(2)} JOD/hour</p>
                     <p>
-                      <b>City:</b> {tech.city || "-"}
-                    </p>
-                    <p>
-                      <b>Phone:</b> {tech.phone || "-"}
-                    </p>
-                    <p>
-                      <b>Experience:</b> {tech.experience || 0} years
-                    </p>
-                    <p>
-                      <b>Price:</b> {getPrice(tech).toFixed(2)} JOD/hour
-                    </p>
-                    <p>
-                      <b>Reviews:</b>{" "}
+                      <strong>Reviews:</strong>{" "}
                       {tech.review_count ? `${tech.review_count} reviews` : "No reviews yet"}
                     </p>
-
-                    <CommentsBox technicianId={technicianId} />
-
-                    <div className="technician-card-actions">
-                      <button
-                        className="primary"
-                        type="button"
-                        onClick={() => navigate(`/technician/${technicianId}`)}
-                      >
-                        View Profile
-                      </button>
-
-                      <button
-                        className="primary"
-                        type="button"
-                        onClick={() =>
-                          navigate("/request", {
-                            state: {
-                              technicianId,
-                              technician: tech,
-                              service: tech.service || decodedService,
-                              technicianName: tech.name || "",
-                              price_per_hour: tech.price_per_hour || 0,
-                            },
-                          })
-                        }
-                      >
-                        Book Now
-                      </button>
-                    </div>
                   </div>
-                );
-              })}
-            </div>
-          )}
-        </div>
-      </div>
+
+                  <div className="request-actions">
+                    <button
+                      className="primary"
+                      type="button"
+                      onClick={() => navigate(`/technician/${technicianId}`)}
+                    >
+                      View Profile
+                    </button>
+
+                    <button
+                      className="secondary-btn"
+                      type="button"
+                      onClick={() =>
+                        navigate(`/request/${technicianId}`, {
+                          state: {
+                            technicianId,
+                            technician: tech,
+                            service: tech.service || decodedService,
+                            technicianName: tech.name || "",
+                            price_per_hour: tech.price_per_hour || 0,
+                          },
+                        })
+                      }
+                    >
+                      Book Now
+                    </button>
+                  </div>
+
+                  <CommentsBox technicianId={technicianId} />
+                </article>
+              );
+            })}
+          </section>
+        )}
+      </main>
     </>
   );
 }

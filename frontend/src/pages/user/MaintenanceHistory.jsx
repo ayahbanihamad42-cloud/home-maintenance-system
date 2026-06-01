@@ -9,17 +9,27 @@ function MaintenanceHistory() {
 
   const [requests, setRequests] = useState([]);
   const [statusFilter, setStatusFilter] = useState("all");
+  const [search, setSearch] = useState("");
+  const [dateFilter, setDateFilter] = useState("");
   const [error, setError] = useState("");
+
+  const formatDateOnly = (value) => {
+    if (!value) return "-";
+    return String(value).slice(0, 10);
+  };
+
+  const formatTimeOnly = (value) => {
+    if (!value) return "-";
+    return String(value).slice(0, 8);
+  };
 
   useEffect(() => {
     const loadHistory = async () => {
       try {
         setError("");
-
         const res = await API.get(`/maintenance/user/${user.id}`);
         setRequests(Array.isArray(res.data) ? res.data : []);
       } catch (err) {
-        console.error("history error:", err);
         setError(err.response?.data?.message || "Failed to load history.");
         setRequests([]);
       }
@@ -29,121 +39,145 @@ function MaintenanceHistory() {
   }, [user?.id]);
 
   const filteredRequests = useMemo(() => {
-    if (statusFilter === "all") return requests;
+    let result = [...requests];
 
-    return requests.filter(
-      (req) =>
-        String(req.status || "").toLowerCase() ===
-        String(statusFilter).toLowerCase()
-    );
-  }, [requests, statusFilter]);
-
-  const formatDate = (value) => {
-  if (!value) return "-";
-
-  const raw = String(value).trim();
-
-  if (raw.includes("T")) {
-    const d = new Date(raw);
-    if (!Number.isNaN(d.getTime())) {
-      d.setUTCDate(d.getUTCDate() + 1);
-      return d.toISOString().slice(0, 10);
+    if (statusFilter !== "all") {
+      result = result.filter(
+        (r) => String(r.status || "").toLowerCase() === statusFilter
+      );
     }
-  }
 
-  const match = raw.match(/^(\d{4}-\d{2}-\d{2})/);
-  if (match) return match[1];
+    if (dateFilter) {
+      result = result.filter((r) => formatDateOnly(r.scheduled_date) === dateFilter);
+    }
 
-  return raw.slice(0, 10);
-};
+    if (search.trim()) {
+      const q = search.toLowerCase();
+      result = result.filter((r) =>
+        [
+          r.service,
+          r.description,
+          r.status,
+          r.city,
+          r.technician_name,
+          r.location_note,
+          r.payment_method,
+        ]
+          .join(" ")
+          .toLowerCase()
+          .includes(q)
+      );
+    }
 
-  const statusText = (status) => {
-    const value = String(status || "pending").toLowerCase();
-
-    if (value === "on_the_way") return "On The Way";
-    if (value === "in_progress") return "In Progress";
-
-    return value.charAt(0).toUpperCase() + value.slice(1);
-  };
+    return result.sort((a, b) => Number(b.id || 0) - Number(a.id || 0));
+  }, [requests, statusFilter, search, dateFilter]);
 
   return (
     <>
       <Header />
 
-      <div className="container">
-        <h2 className="section-title">Maintenance History</h2>
+      <main className="history-container">
+        <section className="page-hero">
+          <h1>Maintenance History</h1>
+          <p>Track your previous and current maintenance requests.</p>
+        </section>
 
-        {error && <div className="error-box">{error}</div>}
-
-        <div className="input-group">
-          <label>Filter By Request Status</label>
-
+        <section className="request-filters">
+          
           <select
             value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value)}
           >
-            <option value="all">All requests</option>
+            <option value="all">All statuses</option>
             <option value="pending">Pending</option>
             <option value="accepted">Accepted</option>
-            <option value="on_the_way">On The Way</option>
-            <option value="in_progress">In Progress</option>
+            <option value="on_the_way">On the way</option>
+            <option value="in_progress">In progress</option>
             <option value="completed">Completed</option>
-            <option value="rejected">Rejected</option>
             <option value="cancelled">Cancelled</option>
+            <option value="rejected">Rejected</option>
           </select>
-        </div>
+
+          <input
+            type="date"
+            value={dateFilter}
+            onChange={(e) => setDateFilter(e.target.value)}
+          />
+
+          <button
+            className="clear-filter-btn"
+            onClick={() => {
+              setSearch("");
+              setStatusFilter("all");
+              setDateFilter("");
+            }}
+          >
+            Clear Filters
+          </button>
+        </section>
+
+        {error && <div className="auth-error">{error}</div>}
 
         {filteredRequests.length === 0 ? (
-          <div className="empty-gallery-card">No requests found.</div>
+          <section className="card">
+            <h3>No requests found</h3>
+            <p>Your maintenance requests will appear here.</p>
+          </section>
         ) : (
-          <div className="history-list">
-            {filteredRequests.map((req) => (
-              <div key={req.id} className="history-card">
-                <div className="history-card-header">
-                  <h3>{req.service || req.service_type || "Maintenance"}</h3>
-
-                  <span className="status-pill">{statusText(req.status)}</span>
+          <section className="request-list">
+            {filteredRequests.map((request) => (
+              <article className="history-card" key={request.id}>
+                <div className="request-card-header">
+                  <h3>{request.service}</h3>
+                  <span className="status-badge">
+                    {String(request.status || "-").replaceAll("_", " ")}
+                  </span>
                 </div>
 
-                <p className="history-description">
-                  {req.description || "No description"}
-                </p>
-
-                <div className="history-info-grid">
-                  <div>
-                    <b>Date:</b> {formatDate(req.scheduled_date)}
-                  </div>
-
-                  <div>
-                    <b>Time:</b> {req.scheduled_time || "-"}
-                  </div>
-
-                  <div>
-                    <b>Technician:</b>{" "}
-                    {req.technician_name ||
-                      req.technicianId ||
-                      req.technician_id ||
-                      "-"}
-                  </div>
-
-                  <div>
-                    <b>Location:</b>{" "}
-                    {req.location_note || req.location || req.city || "-"}
-                  </div>
+                <div className="request-details-grid">
+                  <p>
+                    <strong>Description:</strong> {request.description || "-"}
+                  </p>
+                  <p>
+                    <strong>Technician:</strong> {request.technician_name || "-"}
+                  </p>
+                  <p>
+                    <strong>Date:</strong> {formatDateOnly(request.scheduled_date)}
+                  </p>
+                  <p>
+                    <strong>Time:</strong> {formatTimeOnly(request.scheduled_time)}
+                  </p>
+                  <p>
+                    <strong>City:</strong> {request.city || "-"}
+                  </p>
+                  <p>
+                    <strong>Payment:</strong> {request.payment_method || "-"}
+                  </p>
+                  <p>
+                    <strong>Amount:</strong>{" "}
+                    {Number(request.total_price || request.amount || 0).toFixed(2)} JOD
+                  </p>
+                  <p>
+                    <strong>Created:</strong>{" "}
+                    {request.created_at
+                      ? new Date(request.created_at).toLocaleString()
+                      : "-"}
+                  </p>
                 </div>
 
-                <button
-                  type="button"
-                  className="primary-btn review-btn"
-                  onClick={() => navigate(`/review/${req.id}`)}
-                >
-                  Review
-                </button>
-              </div>
+                <div className="request-actions">
+                  <button
+                    className="primary"
+                    onClick={() => navigate(`/review/${request.id}`)}
+                  >
+                    View Details
+                  </button>
+                </div>
+              </article>
             ))}
-          </div>
+          </section>
         )}
-      </div>
+      </main>
     </>
   );
 }

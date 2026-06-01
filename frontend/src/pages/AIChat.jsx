@@ -1,74 +1,61 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { useRef, useState } from "react";
 import Header from "../components/common/Header";
-import { chatWithAI, getAIResponses } from "../services/aiService";
+import { chatWithAI } from "../services/aiService";
 
 function AIChat() {
-  const user = JSON.parse(localStorage.getItem("user") || "{}");
+  const fileRef = useRef(null);
 
   const [messages, setMessages] = useState([
     {
       role: "ai",
-      text: "Hello! I'm your ServiceHub AI assistant. Send text or image.",
+      text: "Hello! I'm your خدمة AI assistant. You can ask about repairs, decoration ideas, services, or send an image.",
     },
   ]);
 
-  const [text, setText] = useState("");
-  const [selectedImage, setSelectedImage] = useState(null);
+  const [input, setInput] = useState("");
+  const [image, setImage] = useState(null);
   const [loading, setLoading] = useState(false);
 
-  const fileRef = useRef(null);
-  const bottomRef = useRef(null);
-
-  useEffect(() => {
-    getAIResponses(user.id)
-      .then((data) => {
-        if (Array.isArray(data) && data.length > 0) {
-          setMessages(data);
-        }
-      })
-      .catch(() => {});
-  }, [user.id]);
-
-  useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages, loading]);
-
-  const handleImageChange = (e) => {
+  const handleImage = (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
     const reader = new FileReader();
 
     reader.onloadend = () => {
-      setSelectedImage(reader.result);
+      setImage(reader.result);
     };
 
     reader.readAsDataURL(file);
   };
 
-  const handleSend = async () => {
-    const cleanText = text.trim();
+  const send = async () => {
+    const cleanInput = input.trim();
 
-    if (!cleanText && !selectedImage) return;
+    if (!cleanInput && !image) return;
 
     const userMessage = {
       role: "user",
-      text: cleanText || "Sent an image",
-      image: selectedImage,
+      text: cleanInput || "Sent an image",
+      image,
     };
 
     setMessages((prev) => [...prev, userMessage]);
 
-    const imageToSend = selectedImage;
+    const textToSend = cleanInput;
+    const imageToSend = image;
 
-    setText("");
-    setSelectedImage(null);
-    if (fileRef.current) fileRef.current.value = "";
+    setInput("");
+    setImage(null);
+
+    if (fileRef.current) {
+      fileRef.current.value = "";
+    }
 
     try {
       setLoading(true);
 
-      const res = await chatWithAI(cleanText, imageToSend);
+      const res = await chatWithAI(textToSend, imageToSend);
 
       setMessages((prev) => [
         ...prev,
@@ -85,7 +72,7 @@ function AIChat() {
           role: "ai",
           text:
             err.response?.data?.reply ||
-            "صار خطأ بالمساعد. جرّبي مرة ثانية.",
+            "Sorry, something went wrong. Please try again.",
         },
       ]);
     } finally {
@@ -97,106 +84,73 @@ function AIChat() {
     <>
       <Header />
 
-      <div className="chat-wrapper">
-        <div className="chat-shell ai-shell">
-          <div className="chat-header-bar">
-            <div className="chat-avatar">🤖</div>
+      <main className="ai-chat-container">
+        <div className="ai-chat-header">AI Assistant</div>
 
-            <div className="chat-title-block">
-              <h3>AI Assistant</h3>
-              <span>Send text or image</span>
-            </div>
-          </div>
-
-          <div className="messages-container">
-            {messages.map((msg, index) => (
-              <div
-                key={index}
-                className={`message-bubble ${
-                  msg.role === "user" ? "my-message" : "other-message"
-                }`}
-              >
-                {msg.image && (
-                  <img src={msg.image} alt="uploaded" />
-                )}
-
-                <div>{msg.text}</div>
-              </div>
-            ))}
-
-            {loading && (
-              <div className="message-bubble other-message">
-                Thinking...
-              </div>
-            )}
-
-            <div ref={bottomRef} />
-          </div>
-
-          {selectedImage && (
-            <div className="message-box-card compact-message-card">
-              <div className="message-box-title">Selected Image</div>
-              <img
-                src={selectedImage}
-                alt="preview"
-                style={{
-                  width: "120px",
-                  borderRadius: "12px",
-                  display: "block",
-                  marginBottom: "10px",
-                }}
-              />
-
-              <button
-                className="secondary"
-                type="button"
-                onClick={() => {
-                  setSelectedImage(null);
-                  if (fileRef.current) fileRef.current.value = "";
-                }}
-              >
-                Remove
-              </button>
-            </div>
-          )}
-
-          <div className="chat-input-area">
-            <button
-              type="button"
-              className="btn-outline"
-              onClick={() => fileRef.current?.click()}
+        <section className="ai-chat-messages">
+          {messages.map((msg, index) => (
+            <div
+              key={index}
+              className={`ai-message ${msg.role === "user" ? "user-message" : ""}`}
             >
-              📷
-            </button>
+              {msg.image && (
+                <img
+                  className="chat-message-image"
+                  src={msg.image}
+                  alt="AI upload"
+                />
+              )}
 
-            <input
-              ref={fileRef}
-              type="file"
-              accept="image/*"
-              hidden
-              onChange={handleImageChange}
-            />
+              <div>{msg.text}</div>
+            </div>
+          ))}
 
-            <input
-              value={text}
-              onChange={(e) => setText(e.target.value)}
-              placeholder="Ask anything..."
-              onKeyDown={(e) => {
-                if (e.key === "Enter") handleSend();
-              }}
-            />
+          {loading && <div className="ai-message">Thinking...</div>}
+        </section>
 
-            <button
-              type="button"
-              className="send-btn"
-              onClick={handleSend}
-              disabled={loading}
-            >
-              Send
+        {image && (
+          <div className="selected-image-preview">
+            <img src={image} alt="selected" />
+
+            <button className="secondary-btn" onClick={() => setImage(null)}>
+              Remove
             </button>
           </div>
+        )}
+
+        <input
+          ref={fileRef}
+          type="file"
+          accept="image/*"
+          hidden
+          onChange={handleImage}
+        />
+
+        <div className="chat-tools">
+          <button
+            className="chat-tool-btn"
+            type="button"
+            onClick={() => fileRef.current?.click()}
+          >
+            📷 Image
+          </button>
         </div>
-      </div>
+
+        <div className="ai-chat-input">
+          <input
+            value={input}
+            onChange={(e) => setInput(e.target.value)}
+            placeholder="Ask anything..."
+            onKeyDown={(e) => {
+              if (e.key === "Enter") send();
+            }}
+          />
+
+          <button className="primary" onClick={send}>
+            Send
+          </button>
+        </div>
+      </main>
     </>
   );
 }

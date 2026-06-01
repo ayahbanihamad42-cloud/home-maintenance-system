@@ -107,12 +107,20 @@ function TechnicianProfile() {
 
           <div className="actions">
             <button
-              className="primary-btn"
-              onClick={() => navigate(`/chat/${tech.user_id}`)}
-            >
-              Send Message
-            </button>
-
+  className="primary-btn"
+  onClick={() => {
+    window.dispatchEvent(
+      new CustomEvent("openChatPopup", {
+        detail: {
+          receiverId: tech.user_id,
+          receiverName: tech.name,
+        },
+      })
+    );
+  }}
+>
+  Send Message
+</button>
             <button
               className="primary-btn"
               onClick={() =>

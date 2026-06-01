@@ -1,15 +1,7 @@
- // React library
 import React from "react";
 
-// Footer component
 function Footer() {
-  return (
-    <footer className="footer">
-   {/* Copyright text */}
-      © 2025 Maintenance System. 
-    </footer>
-  );
+  return <footer className="footer">© 2025 خدمة.</footer>;
 }
-  // Export component
-export default Footer;
 
+export default Footer;

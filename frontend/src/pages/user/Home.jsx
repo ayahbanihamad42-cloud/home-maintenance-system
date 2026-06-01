@@ -2,6 +2,7 @@ import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import Header from "../../components/common/Header";
 import API from "../../services/api.jsx";
+import Footer from "../../components/common/Footer";
 
 function getApiHost() {
   return String(API.defaults.baseURL || "http://localhost:5000/api").replace(
@@ -41,7 +42,6 @@ function getBackendImageUrl(imageUrl, serviceName = "") {
 
 function Home() {
   const navigate = useNavigate();
-
   const [services, setServices] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -50,12 +50,8 @@ function Home() {
     try {
       setLoading(true);
       setError("");
-
       const res = await API.get("/services");
       const data = Array.isArray(res.data) ? res.data : [];
-
-      console.log("SERVICES FROM API:", data);
-
       setServices(data);
     } catch (err) {
       console.error("load services error:", err);
@@ -74,22 +70,41 @@ function Home() {
     <>
       <Header />
 
-      <div className="home-container">
-        <h1 className="home-title">Welcome to our services:</h1>
+      <main className="home-container">
+        <section className="page-hero">
+          <div>
+            <h1>Book trusted home services</h1>
+            <p>خدمة بيتك بسهولة وموثوقية</p>
+          </div>
+        </section>
+
+        <section className="home-message card">
+          <h2>Welcome to خدمة</h2>
+          <p>
+            Find skilled technicians, book maintenance requests, chat instantly,
+            use AI assistance, and track your service from one modern platform.
+          </p>
+
+          <button className="primary" onClick={() => navigate("/history")}>
+            View My Requests
+          </button>
+        </section>
+
+        <h2 className="section-title">Available Services</h2>
 
         {loading ? (
-          <div className="home-message">Loading services...</div>
+          <section className="card">Loading services...</section>
         ) : error ? (
-          <div className="home-message error">
+          <section className="card">
             <p>{error}</p>
-            <button type="button" onClick={loadServices}>
+            <button className="primary" onClick={loadServices}>
               Try Again
             </button>
-          </div>
+          </section>
         ) : services.length === 0 ? (
-          <div className="home-message">No services available yet.</div>
+          <section className="card">No services available yet.</section>
         ) : (
-          <div className="services-container">
+          <section className="services-container">
             {services.map((service) => {
               const imageSrc = getBackendImageUrl(
                 service.image_url,
@@ -97,14 +112,11 @@ function Home() {
               );
 
               return (
-                <div className="service-item" key={service.id}>
+                <article className="service-item" key={service.id || service.name}>
                   <button
-                    type="button"
                     className="service-circle"
                     onClick={() =>
-                      navigate(
-                        `/technicians/${encodeURIComponent(service.name)}`
-                      )
+                      navigate(`/technicians/${encodeURIComponent(service.name)}`)
                     }
                   >
                     {service.image_url ? (
@@ -112,31 +124,30 @@ function Home() {
                         src={imageSrc}
                         alt={service.name}
                         onError={(e) => {
-                          console.log("Image failed:", e.currentTarget.src);
-
                           const fallback = `${getApiHost()}/images/services/${String(
                             service.name || ""
                           )
                             .trim()
                             .toLowerCase()}.png`;
-
                           if (e.currentTarget.src !== fallback) {
                             e.currentTarget.src = fallback;
                           }
                         }}
                       />
                     ) : (
-                      <span className="service-fallback-icon">🛠️</span>
+                      <span style={{ fontSize: 42 }}>🛠️</span>
                     )}
                   </button>
 
                   <div className="service-name">{service.name}</div>
-                </div>
+                </article>
               );
             })}
-          </div>
+          </section>
         )}
-      </div>
+      </main>
+
+      <Footer />
     </>
   );
 }

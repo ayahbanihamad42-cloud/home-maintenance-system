@@ -1,71 +1,76 @@
-// React hook for managing state
-import { useState } from "react";
-
-// Axios API instance
+import React, { useState } from "react";
+import { Link } from "react-router-dom";
 import API from "../../services/api";
+import welcomeimage from "../../images/home.png";
 
-// Forgot password page component
 function ForgotPassword() {
-  // Email input state
   const [email, setEmail] = useState("");
-
-  // Message feedback state
   const [message, setMessage] = useState("");
+  const [error, setError] = useState("");
 
-  // Loading state for submit action
-  const [loading, setLoading] = useState(false);
-
-  // Handle submit action
-  const submit = async () => {
-    if (!email) {
-      setMessage("Please enter your email.");
-      return;
-    }
+  const handleSubmit = async (e) => {
+    e.preventDefault();
 
     try {
-      setLoading(true);
+      setError("");
+      setMessage("");
 
-      // Send forgot password request (email only)
       const res = await API.post("/auth/forgotPassword", { email });
 
-      setMessage(res?.data?.message || "Reset link sent to your email.");
-      setEmail("");
-    } catch (error) {
-      setMessage(error.response?.data?.message || "Failed to send reset link.");
-    } finally {
-      setLoading(false);
+      setMessage(
+        res.data?.message ||
+          "If this email exists, a password reset link will be sent."
+      );
+    } catch (err) {
+      setError(err.response?.data?.message || "Failed to send reset link.");
     }
   };
 
   return (
-    <div className="auth-page">
-      <div className="auth-card">
-        {/* Page title */}
-        <h2>Forgot Password</h2>
+    <div className="auth-shell">
+      <div className="split-card">
+        <section className="brand-panel">
+          <h1 className="brand-logo-text">خدمة</h1>
 
-        {/* Page description */}
-        <p className="auth-subtitle">
-          Enter your email to receive a password reset link.
-        </p>
+          <h2>Reset access safely.</h2>
 
-        {/* Email input */}
-        <div className="input-group">
-          <label>Email</label>
-          <input
-            type="email"
-            placeholder="name@example.com"
-            value={email}
-            onChange={(event) => setEmail(event.target.value)}
-          />
-        </div>
+          <p>
+            Enter your email address and we will help you recover your account
+            securely so you can continue managing your maintenance requests.
+          </p>
 
-        {/* Feedback message */}
-        {message ? <p className="helper-text">{message}</p> : null}
+          <img className="brand-icon" src={welcomeimage} alt="Khidma" />
+        </section>
 
-        {/* Submit button */}
-        <button className="primary" onClick={submit} disabled={loading}>
-          {loading ? "Sending..." : "Send Reset Link"}
-        </button>
+        <section className="form-panel">
+          <h1>Forgot Password</h1>
+          <p>Enter your email address to receive a reset link.</p>
+
+          {error && <div className="auth-error">{error}</div>}
+          {message && <div className="auth-success">{message}</div>}
+
+          <form className="auth-form" onSubmit={handleSubmit}>
+            <div className="auth-field">
+              <label>Email</label>
+              <input
+                type="email"
+                name="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="example@email.com"
+                required
+              />
+            </div>
+
+            <button className="primary" type="submit">
+              Send Reset Link
+            </button>
+          </form>
+
+          <div className="auth-links">
+            <Link to="/login">Back to Login</Link>
+          </div>
+        </section>
       </div>
     </div>
   );
