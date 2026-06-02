@@ -1,504 +1,357 @@
 import React, { useEffect, useMemo, useState } from "react";
 import {
+  SafeAreaView,
+  ScrollView,
   View,
   Text,
-  TextInput,
-  ScrollView,
   TouchableOpacity,
+  TextInput,
   Image,
-  StyleSheet,
-  Alert,
-  ActivityIndicator,
+  Modal,
 } from "react-native";
 import * as ImagePicker from "expo-image-picker";
 import Header from "../../components/Common/Header";
+import FloatingActions from "../../components/Common/FloatingActions";
 import {
   getMyTechnicianGallery,
   createTechnicianGalleryPost,
-  updateTechnicianGalleryPost,
   deleteTechnicianGalleryPost,
 } from "../../services/technicianService";
+import appStyles from "../../styles/mobileStyles";
 
-function TechnicianGalleryManager({ route, navigation }) {
-  const editPostFromRoute = route?.params?.post || null;
-
+function TechnicianGalleryManager({ navigation }) {
   const [posts, setPosts] = useState([]);
-  const [description, setDescription] = useState("");
-  const [locationNote, setLocationNote] = useState("");
-  const [images, setImages] = useState([]);
-  const [editingPostId, setEditingPostId] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
+  const [message, setMessage] = useState(null);
+  const [modalOpen, setModalOpen] = useState(false);
 
-  const isEditing = useMemo(() => Boolean(editingPostId), [editingPostId]);
+  const [form, setForm] = useState({
+    description: "",
+    location: "",
+    image: "",
+  });
 
-  const parseImages = (value) => {
-    if (!value) return [];
+  const normalizeImages = (post) => {
+    if (!post) return [];
 
-    if (Array.isArray(value)) return value.filter(Boolean);
+    if (Array.isArray(post.images)) return post.images.filter(Boolean);
 
-    try {
-      const parsed = JSON.parse(value);
-      return Array.isArray(parsed) ? parsed.filter(Boolean) : [];
-    } catch {
-      return [];
+    if (typeof post.images === "string") {
+      try {
+        const parsed = JSON.parse(post.images);
+        if (Array.isArray(parsed)) return parsed.filter(Boolean);
+      } catch {
+        return post.images
+          .split(",")
+          .map((img) => img.trim())
+          .filter(Boolean);
+      }
     }
+
+    if (post.image_url) return [post.image_url];
+    if (post.image) return [post.image];
+
+    return [];
   };
 
-  const loadPosts = async () => {
+  const fixedPosts = useMemo(() => {
+    return posts.map((post) => ({
+      ...post,
+      images: normalizeImages(post),
+    }));
+  }, [posts]);
+
+  const load = async () => {
     try {
-      setLoading(true);
+      setMessage(null);
+
       const data = await getMyTechnicianGallery();
       setPosts(Array.isArray(data) ? data : []);
     } catch (err) {
-      console.log(
-        "MOBILE gallery load error:",
-        err?.response?.data || err?.message
-      );
       setPosts([]);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    loadPosts();
-  }, []);
-
-  useEffect(() => {
-    if (editPostFromRoute?.id) {
-      startEdit(editPostFromRoute);
-    }
-  }, [editPostFromRoute?.id]);
-
-  const resetForm = () => {
-    setDescription("");
-    setLocationNote("");
-    setImages([]);
-    setEditingPostId(null);
-  };
-
-  const pickImages = async () => {
-    const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
-
-    if (!permission.granted) {
-      Alert.alert("Notice", "Please allow image access.");
-      return;
-    }
-
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      allowsMultipleSelection: true,
-      base64: true,
-      quality: 0.22,
-    });
-
-    if (result.canceled) return;
-
-    const selected = (result.assets || [])
-      .filter((asset) => asset?.base64)
-      .map((asset) => {
-        const mimeType = asset.mimeType || "image/jpeg";
-        return `data:${mimeType};base64,${asset.base64}`;
+      setMessage({
+        type: "error",
+        text: err.response?.data?.message || "Failed to load gallery.",
       });
-
-    if (!selected.length) return;
-
-    setImages((prev) => [...prev, ...selected].slice(0, 6));
-  };
-
-  const removeImage = (index) => {
-    setImages((prev) => prev.filter((_, i) => i !== index));
-  };
-
-  const startEdit = (post) => {
-    setEditingPostId(post.id);
-    setDescription(post.description || "");
-    setLocationNote(post.location_note || post.location || "");
-    setImages(parseImages(post.images));
-  };
-
-  const handleSave = async () => {
-    if (!description.trim()) {
-      Alert.alert("Notice", "Caption is required.");
-      return;
     }
+  };
 
-    if (!images.length) {
-      Alert.alert("Notice", "At least one image is required.");
-      return;
-    }
+  useEffect(() => {
+    const unsubscribe = navigation.addListener("focus", load);
+    load();
 
+    return unsubscribe;
+  }, [navigation]);
+
+  const chooseImage = async () => {
     try {
-      setSaving(true);
+      const permission =
+        await ImagePicker.requestMediaLibraryPermissionsAsync();
 
-      const payload = {
-        description: description.trim(),
-        location_note: locationNote.trim(),
-        images,
-      };
-
-      if (isEditing) {
-        await updateTechnicianGalleryPost(editingPostId, payload);
-      } else {
-        await createTechnicianGalleryPost(payload);
+      if (!permission.granted) {
+        setMessage({
+          type: "error",
+          text: "Please allow gallery access.",
+        });
+        return;
       }
 
-      resetForm();
-      await loadPosts();
-      Alert.alert("Success", isEditing ? "Post updated." : "Post added.");
-    } catch (err) {
-      console.log(
-        "MOBILE gallery save error:",
-        err?.response?.data || err?.message
-      );
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ["images"],
+        allowsEditing: true,
+        quality: 0.55,
+        base64: true,
+      });
 
-      Alert.alert(
-        "Error",
-        err?.response?.data?.message || "Failed to save post."
-      );
-    } finally {
-      setSaving(false);
+      if (result.canceled) return;
+
+      const asset = result.assets?.[0];
+
+      if (!asset?.base64) {
+        setMessage({
+          type: "error",
+          text: "Failed to read selected image.",
+        });
+        return;
+      }
+
+      setForm((prev) => ({
+        ...prev,
+        image: `data:image/jpeg;base64,${asset.base64}`,
+      }));
+    } catch {
+      setMessage({
+        type: "error",
+        text: "Failed to choose image.",
+      });
     }
   };
 
-  const handleDelete = (postId) => {
-    Alert.alert("Delete Post", "Are you sure you want to delete this post?", [
-      { text: "Cancel", style: "cancel" },
-      {
-        text: "Delete",
-        style: "destructive",
-        onPress: async () => {
-          try {
-            await deleteTechnicianGalleryPost(postId);
-            await loadPosts();
+  const createPost = async () => {
+    try {
+      setMessage(null);
 
-            if (editingPostId === postId) {
-              resetForm();
-            }
-          } catch (err) {
-            Alert.alert(
-              "Error",
-              err?.response?.data?.message || "Failed to delete post."
-            );
-          }
-        },
-      },
-    ]);
+      if (!form.description.trim()) {
+        setMessage({
+          type: "error",
+          text: "Please enter description.",
+        });
+        return;
+      }
+
+      if (!form.image) {
+        setMessage({
+          type: "error",
+          text: "Please choose an image.",
+        });
+        return;
+      }
+
+      await createTechnicianGalleryPost({
+        description: form.description.trim(),
+        caption: form.description.trim(),
+        location: form.location.trim(),
+        location_note: form.location.trim(),
+        images: [form.image],
+        image_url: form.image,
+      });
+
+      setMessage({
+        type: "success",
+        text: "Gallery post added successfully.",
+      });
+
+      setForm({
+        description: "",
+        location: "",
+        image: "",
+      });
+
+      setModalOpen(false);
+
+      await load();
+    } catch (err) {
+      setMessage({
+        type: "error",
+        text: err.response?.data?.message || "Failed to create gallery post.",
+      });
+    }
+  };
+
+  const deletePost = async (postId) => {
+    try {
+      setMessage(null);
+
+      await deleteTechnicianGalleryPost(postId);
+
+      setMessage({
+        type: "success",
+        text: "Gallery post deleted successfully.",
+      });
+
+      await load();
+    } catch (err) {
+      setMessage({
+        type: "error",
+        text: err.response?.data?.message || "Failed to delete post.",
+      });
+    }
   };
 
   return (
-    <>
-      <Header />
+    <SafeAreaView style={appStyles.safe}>
+      <Header navigation={navigation} title="Gallery" />
 
-      <ScrollView contentContainerStyle={styles.container}>
-        <TouchableOpacity
-          style={styles.backBtn}
-          onPress={() => navigation.navigate("TechnicianDashboard")}
-        >
-          <Text style={styles.backText}>← Back</Text>
-        </TouchableOpacity>
-
-        <Text style={styles.title}>Work Gallery</Text>
-
-        <View style={styles.formCard}>
-          <Text style={styles.formTitle}>
-            {isEditing ? "Edit Post" : "Add New Post"}
+      <ScrollView
+        contentContainerStyle={appStyles.pageContent}
+        showsVerticalScrollIndicator={false}
+      >
+        <View style={appStyles.hero}>
+          <Text style={appStyles.heroTitle}>Work Gallery</Text>
+          <Text style={appStyles.heroSubtitle}>
+            Add and manage your completed work posts.
           </Text>
-
-          <TextInput
-            style={styles.input}
-            placeholder="Caption / description"
-            value={description}
-            onChangeText={setDescription}
-            multiline
-          />
-
-          <TextInput
-            style={styles.input}
-            placeholder="Location"
-            value={locationNote}
-            onChangeText={setLocationNote}
-          />
-
-          <TouchableOpacity style={styles.secondaryBtn} onPress={pickImages}>
-            <Text style={styles.secondaryText}>Choose Images</Text>
-          </TouchableOpacity>
-
-          {images.length ? (
-            <ScrollView horizontal style={styles.previewRow}>
-              {images.map((img, index) => (
-                <View key={`${index}-${img.slice(0, 20)}`} style={styles.previewBox}>
-                  <Image source={{ uri: img }} style={styles.previewImage} />
-
-                  <TouchableOpacity
-                    style={styles.removeBtn}
-                    onPress={() => removeImage(index)}
-                  >
-                    <Text style={styles.removeText}>×</Text>
-                  </TouchableOpacity>
-                </View>
-              ))}
-            </ScrollView>
-          ) : null}
-
-          <View style={styles.formActions}>
-            <TouchableOpacity
-              style={[styles.primaryBtn, saving && { opacity: 0.6 }]}
-              disabled={saving}
-              onPress={handleSave}
-            >
-              <Text style={styles.primaryText}>
-                {saving ? "Saving..." : isEditing ? "Update Post" : "Add Post"}
-              </Text>
-            </TouchableOpacity>
-
-            {isEditing ? (
-              <TouchableOpacity style={styles.cancelBtn} onPress={resetForm}>
-                <Text style={styles.cancelText}>Cancel</Text>
-              </TouchableOpacity>
-            ) : null}
-          </View>
         </View>
 
-        <Text style={styles.sectionTitle}>My Posts</Text>
+        {message ? (
+          <View
+            style={
+              message.type === "success"
+                ? appStyles.successBox
+                : appStyles.errorBox
+            }
+          >
+            <Text
+              style={
+                message.type === "success"
+                  ? appStyles.successText
+                  : appStyles.errorText
+              }
+            >
+              {message.text}
+            </Text>
+          </View>
+        ) : null}
 
-        {loading ? (
-          <ActivityIndicator size="large" color="#111" />
-        ) : posts.length === 0 ? (
-          <Text style={styles.empty}>No posts yet.</Text>
+        <TouchableOpacity
+          style={appStyles.primaryBtn}
+          onPress={() => setModalOpen(true)}
+        >
+          <Text style={appStyles.primaryBtnText}>Add New Post</Text>
+        </TouchableOpacity>
+
+        {fixedPosts.length === 0 ? (
+          <View style={appStyles.card}>
+            <Text style={appStyles.sectionTitle}>No posts yet</Text>
+            <Text style={appStyles.mutedText}>
+              Your work gallery posts will appear here.
+            </Text>
+          </View>
         ) : (
-          posts.map((post) => {
-            const postImages = parseImages(post.images);
+          fixedPosts.map((post) => {
+            const image = post.images?.[0];
 
             return (
-              <View key={post.id} style={styles.postCard}>
-                <View style={styles.postTop}>
-                  <View style={{ flex: 1 }}>
-                    <Text style={styles.postCaption}>
-                      {post.description || "No caption"}
-                    </Text>
+              <View style={appStyles.card} key={post.id}>
+                {image ? (
+                  <Image
+                    source={{ uri: image }}
+                    style={{
+                      width: "100%",
+                      height: 220,
+                      borderRadius: 22,
+                      marginBottom: 14,
+                    }}
+                    resizeMode="cover"
+                  />
+                ) : null}
 
-                    {post.location_note ? (
-                      <Text style={styles.postLocation}>
-                        📍 {post.location_note}
-                      </Text>
-                    ) : null}
-                  </View>
+                <Text style={appStyles.text}>
+                  {post.description || post.caption || "No description"}
+                </Text>
 
-                  <View style={styles.dotsBox}>
-                    <TouchableOpacity
-                      style={styles.smallBtn}
-                      onPress={() => startEdit(post)}
-                    >
-                      <Text style={styles.smallBtnText}>Edit</Text>
-                    </TouchableOpacity>
+                <Text style={appStyles.mutedText}>
+                  Location: {post.location_note || post.location || "-"}
+                </Text>
 
-                    <TouchableOpacity
-                      style={styles.deleteBtn}
-                      onPress={() => handleDelete(post.id)}
-                    >
-                      <Text style={styles.deleteBtnText}>Delete</Text>
-                    </TouchableOpacity>
-                  </View>
-                </View>
+                <TouchableOpacity
+                  style={appStyles.secondaryBtn}
+                  onPress={() =>
+                    navigation.navigate("GalleryPostDetails", { post })
+                  }
+                >
+                  <Text style={appStyles.secondaryBtnText}>View Details</Text>
+                </TouchableOpacity>
 
-                <ScrollView horizontal>
-                  {postImages.map((img, index) => (
-                    <Image
-                      key={`${post.id}-${index}`}
-                      source={{ uri: img }}
-                      style={styles.postImage}
-                    />
-                  ))}
-                </ScrollView>
+                <TouchableOpacity
+                  style={appStyles.dangerBtn}
+                  onPress={() => deletePost(post.id)}
+                >
+                  <Text style={appStyles.dangerBtnText}>Delete</Text>
+                </TouchableOpacity>
               </View>
             );
           })
         )}
       </ScrollView>
-    </>
+
+      <Modal transparent visible={modalOpen} animationType="fade">
+        <View style={appStyles.modalOverlay}>
+          <View style={appStyles.modalBox}>
+            <Text style={appStyles.modalTitle}>Add Work Post</Text>
+
+            <Text style={appStyles.label}>Description</Text>
+            <TextInput
+              style={[appStyles.input, appStyles.textArea]}
+              value={form.description}
+              onChangeText={(v) => setForm({ ...form, description: v })}
+              placeholder="Describe the work..."
+              multiline
+            />
+
+            <Text style={appStyles.label}>Location</Text>
+            <TextInput
+              style={appStyles.input}
+              value={form.location}
+              onChangeText={(v) => setForm({ ...form, location: v })}
+              placeholder="Example: Irbid"
+            />
+
+            <TouchableOpacity style={appStyles.secondaryBtn} onPress={chooseImage}>
+              <Text style={appStyles.secondaryBtnText}>
+                {form.image ? "Change Image" : "Choose Image"}
+              </Text>
+            </TouchableOpacity>
+
+            {form.image ? (
+              <Image
+                source={{ uri: form.image }}
+                style={{
+                  width: "100%",
+                  height: 180,
+                  borderRadius: 22,
+                  marginTop: 14,
+                }}
+                resizeMode="cover"
+              />
+            ) : null}
+
+            <TouchableOpacity style={appStyles.primaryBtn} onPress={createPost}>
+              <Text style={appStyles.primaryBtnText}>Save Post</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={appStyles.secondaryBtn}
+              onPress={() => setModalOpen(false)}
+            >
+              <Text style={appStyles.secondaryBtnText}>Cancel</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
+      <FloatingActions navigation={navigation} />
+    </SafeAreaView>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    backgroundColor: "#E8DCCF",
-    flexGrow: 1,
-    padding: 16,
-  },
-  backBtn: {
-    backgroundColor: "#111",
-    borderRadius: 999,
-    paddingVertical: 10,
-    paddingHorizontal: 18,
-    alignSelf: "flex-start",
-    marginBottom: 12,
-  },
-  backText: {
-    color: "#FFF",
-    fontWeight: "900",
-  },
-  title: {
-    fontSize: 32,
-    fontWeight: "900",
-    color: "#111",
-    marginBottom: 14,
-  },
-  formCard: {
-    backgroundColor: "#FFF9F3",
-    borderWidth: 1,
-    borderColor: "#D8C8B8",
-    borderRadius: 20,
-    padding: 16,
-    marginBottom: 20,
-  },
-  formTitle: {
-    fontSize: 22,
-    fontWeight: "900",
-    color: "#111",
-    marginBottom: 12,
-  },
-  input: {
-    backgroundColor: "#F6EDE2",
-    borderWidth: 1,
-    borderColor: "#D8C8B8",
-    borderRadius: 14,
-    padding: 12,
-    marginBottom: 10,
-    color: "#111",
-    minHeight: 48,
-  },
-  secondaryBtn: {
-    backgroundColor: "#F6EDE2",
-    borderWidth: 1,
-    borderColor: "#111",
-    borderRadius: 999,
-    paddingVertical: 12,
-    alignItems: "center",
-    marginBottom: 10,
-  },
-  secondaryText: {
-    color: "#111",
-    fontWeight: "900",
-  },
-  previewRow: {
-    marginVertical: 10,
-  },
-  previewBox: {
-    position: "relative",
-    marginRight: 10,
-  },
-  previewImage: {
-    width: 90,
-    height: 80,
-    borderRadius: 12,
-  },
-  removeBtn: {
-    position: "absolute",
-    top: -7,
-    right: -7,
-    backgroundColor: "#B00020",
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  removeText: {
-    color: "#FFF",
-    fontSize: 18,
-    fontWeight: "900",
-  },
-  formActions: {
-    flexDirection: "row",
-    gap: 10,
-  },
-  primaryBtn: {
-    backgroundColor: "#111",
-    borderRadius: 999,
-    paddingVertical: 12,
-    paddingHorizontal: 18,
-  },
-  primaryText: {
-    color: "#FFF",
-    fontWeight: "900",
-  },
-  cancelBtn: {
-    backgroundColor: "#D8C8B8",
-    borderRadius: 999,
-    paddingVertical: 12,
-    paddingHorizontal: 18,
-  },
-  cancelText: {
-    color: "#111",
-    fontWeight: "900",
-  },
-  sectionTitle: {
-    fontSize: 24,
-    fontWeight: "900",
-    color: "#111",
-    marginBottom: 12,
-  },
-  empty: {
-    textAlign: "center",
-    color: "#3A3028",
-    marginTop: 20,
-    fontSize: 16,
-  },
-  postCard: {
-    backgroundColor: "#FFF9F3",
-    borderWidth: 1,
-    borderColor: "#D8C8B8",
-    borderRadius: 18,
-    padding: 14,
-    marginBottom: 14,
-  },
-  postTop: {
-    flexDirection: "row",
-    gap: 10,
-    alignItems: "flex-start",
-    marginBottom: 10,
-  },
-  postCaption: {
-    color: "#111",
-    fontWeight: "900",
-    fontSize: 16,
-  },
-  postLocation: {
-    color: "#3A3028",
-    marginTop: 4,
-  },
-  dotsBox: {
-    gap: 6,
-  },
-  smallBtn: {
-    backgroundColor: "#111",
-    borderRadius: 999,
-    paddingVertical: 7,
-    paddingHorizontal: 12,
-  },
-  smallBtnText: {
-    color: "#FFF",
-    fontWeight: "900",
-  },
-  deleteBtn: {
-    backgroundColor: "#B00020",
-    borderRadius: 999,
-    paddingVertical: 7,
-    paddingHorizontal: 12,
-  },
-  deleteBtnText: {
-    color: "#FFF",
-    fontWeight: "900",
-  },
-  postImage: {
-    width: 120,
-    height: 95,
-    borderRadius: 12,
-    marginRight: 8,
-    backgroundColor: "#111",
-  },
-});
 
 export default TechnicianGalleryManager;

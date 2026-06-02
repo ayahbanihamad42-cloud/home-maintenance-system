@@ -1,206 +1,256 @@
-import React, { useState } from "react";
+import React, { useMemo, useState } from "react";
 import {
+  SafeAreaView,
+  ScrollView,
   View,
   Text,
   TextInput,
-  ScrollView,
   TouchableOpacity,
-  StyleSheet,
-  Alert,
 } from "react-native";
 import Header from "../../components/Common/Header";
-import {
-  createPaymentIntent,
-  confirmOnlinePayment,
-} from "../../services/paymentservice";
+import FloatingActions from "../../components/Common/FloatingActions";
+import API from "../../services/api";
+import appStyles from "../../styles/mobileStyles";
 
 function PaymentForm({ route, navigation }) {
-  const paymentData = route?.params || {};
+  const requestId = route?.params?.requestId || "";
+  const amount = Number(route?.params?.amount || route?.params?.total_price || 0);
 
-  const [cardName, setCardName] = useState("");
-  const [cardNumber, setCardNumber] = useState("");
-  const [expiry, setExpiry] = useState("");
-  const [cvv, setCvv] = useState("");
-  const [saving, setSaving] = useState(false);
+  const [form, setForm] = useState({
+    nameOnCard: "",
+    cardNumber: "",
+    expiry: "",
+    cvv: "",
+  });
 
-  const requestId = paymentData.requestId;
-  const amount = Number(paymentData.amount || paymentData.total_price || 0);
+  const [message, setMessage] = useState(null);
+  const [loading, setLoading] = useState(false);
 
-  const submitPayment = async () => {
-    if (!cardName.trim() || !cardNumber.trim() || !expiry.trim() || !cvv.trim()) {
-      Alert.alert("Notice", "Please fill all payment fields.");
+  const totalAmount = useMemo(() => Number(amount || 0).toFixed(2), [amount]);
+
+  const onlyNumbers = (value) => String(value || "").replace(/\D/g, "");
+  const onlyLettersSpaces = (value) =>
+    String(value || "").replace(/[^a-zA-Z\s]/g, "");
+
+  const formatCardNumber = (value) => {
+    const digits = onlyNumbers(value).slice(0, 16);
+    return digits.replace(/(.{4})/g, "$1 ").trim();
+  };
+
+  const formatExpiry = (value) => {
+    let cleaned = String(value || "").replace(/[^\d/]/g, "");
+
+    if (cleaned.startsWith("/")) cleaned = "";
+
+    const digits = cleaned.replace(/\D/g, "").slice(0, 4);
+
+    if (cleaned.includes("/")) {
+      const month = digits.slice(0, 2);
+      const year = digits.slice(2, 4);
+
+      if (digits.length <= 2) return month ? `${month}/` : "";
+      return `${month}/${year}`;
+    }
+
+    if (digits.length <= 2) return digits;
+
+    return `${digits.slice(0, 2)}/${digits.slice(2, 4)}`;
+  };
+
+  const setField = (key, value) => {
+    setMessage(null);
+
+    if (key === "nameOnCard") {
+      setForm((prev) => ({ ...prev, nameOnCard: onlyLettersSpaces(value) }));
       return;
     }
 
-    if (!requestId) {
-      Alert.alert("Error", "Request id is missing.");
+    if (key === "cardNumber") {
+      setForm((prev) => ({ ...prev, cardNumber: formatCardNumber(value) }));
       return;
     }
 
+    if (key === "expiry") {
+      setForm((prev) => ({ ...prev, expiry: formatExpiry(value) }));
+      return;
+    }
+
+    if (key === "cvv") {
+      setForm((prev) => ({ ...prev, cvv: onlyNumbers(value).slice(0, 4) }));
+    }
+  };
+
+  const validate = () => {
+    const name = form.nameOnCard.trim();
+    const cardDigits = onlyNumbers(form.cardNumber);
+    const expiry = form.expiry.trim();
+    const cvv = form.cvv.trim();
+
+    if (!requestId) return "Missing request ID.";
+    if (!amount || amount <= 0) return "Invalid payment amount.";
+
+    if (!name) return "Please enter the name on card.";
+    if (!/^[a-zA-Z\s]{3,}$/.test(name)) {
+      return "Name on card must contain letters only and at least 3 characters.";
+    }
+
+    if (cardDigits.length !== 16) {
+      return "Card number must contain exactly 16 digits.";
+    }
+
+    if (!/^\d{2}\/\d{2}$/.test(expiry)) {
+      return "Expiry date must be in MM/YY format, for example 12/29.";
+    }
+
+    const [monthText, yearText] = expiry.split("/");
+    const month = Number(monthText);
+    const year = Number(`20${yearText}`);
+
+    if (month < 1 || month > 12) {
+      return "Expiry month must be between 01 and 12.";
+    }
+
+    const now = new Date();
+    const currentMonth = now.getMonth() + 1;
+    const currentYear = now.getFullYear();
+
+    if (year < currentYear || (year === currentYear && month < currentMonth)) {
+      return "Card expiry date cannot be in the past.";
+    }
+
+    if (!/^\d{3,4}$/.test(cvv)) {
+      return "CVV must contain 3 or 4 digits only.";
+    }
+
+    return "";
+  };
+
+  const pay = async () => {
     try {
-      setSaving(true);
+      const error = validate();
 
-      await createPaymentIntent({
-        amount,
-        requestId,
-        technicianId: paymentData.technicianId,
-        estimated_hours: paymentData.estimated_hours,
-      }).catch(() => null);
+      if (error) {
+        setMessage({ type: "error", text: error });
+        return;
+      }
 
-      const confirmed = await confirmOnlinePayment(requestId, {
-        amount,
+      setLoading(true);
+      setMessage(null);
+
+      const res = await API.post(`/maintenance/${requestId}/online-payment`, {
+        amount: Number(totalAmount),
+        card_last_four: onlyNumbers(form.cardNumber).slice(-4),
       });
+
+      const transactionId = res.data?.transactionId || `mock_txn_${Date.now()}`;
 
       navigation.navigate("PaymentSuccess", {
         requestId,
-        transactionId: confirmed.transactionId,
-        totalPrice: confirmed.amount || amount,
-        message:
-          "Payment completed. The technician received a mock deposit notification.",
+        amount: totalAmount,
+        transactionId,
       });
     } catch (err) {
-      Alert.alert("Error", err?.response?.data?.message || "Payment failed.");
+      setMessage({
+        type: "error",
+        text:
+          err.response?.data?.message ||
+          "Payment failed. Please check the information and try again.",
+      });
     } finally {
-      setSaving(false);
+      setLoading(false);
     }
   };
 
   return (
-    <>
-      <Header />
+    <SafeAreaView style={appStyles.safe}>
+      <Header navigation={navigation} title="Payment" />
 
-      <ScrollView contentContainerStyle={styles.container}>
-        <View style={styles.card}>
-          <Text style={styles.title}>Payment Details</Text>
-          <Text style={styles.subtitle}>Mock payment form for testing.</Text>
+      <ScrollView
+        contentContainerStyle={appStyles.pageContent}
+        showsVerticalScrollIndicator={false}
+      >
+        <View style={appStyles.hero}>
+          <Text style={appStyles.heroTitle}>Payment Details</Text>
+          <Text style={appStyles.heroSubtitle}>
+            This is a mock online payment form for testing.
+          </Text>
+        </View>
 
-          <Text style={styles.label}>Request ID</Text>
+        {message ? (
+          <View
+            style={
+              message.type === "error" ? appStyles.errorBox : appStyles.successBox
+            }
+          >
+            <Text
+              style={
+                message.type === "error"
+                  ? appStyles.errorText
+                  : appStyles.successText
+              }
+            >
+              {message.text}
+            </Text>
+          </View>
+        ) : null}
+
+        <View style={appStyles.card}>
+          <Text style={appStyles.text}>Request ID: {requestId || "-"}</Text>
+          <Text style={appStyles.text}>Total Amount: {totalAmount} JOD</Text>
+
+          <Text style={appStyles.label}>Name on Card</Text>
           <TextInput
-            style={styles.input}
-            value={String(requestId || "")}
-            editable={false}
-          />
-
-          <Text style={styles.label}>Total Amount</Text>
-          <TextInput
-            style={styles.input}
-            value={`${amount.toFixed(2)} JOD`}
-            editable={false}
-          />
-
-          <Text style={styles.label}>Name on Card</Text>
-          <TextInput
-            style={styles.input}
-            value={cardName}
-            onChangeText={setCardName}
+            style={appStyles.input}
+            value={form.nameOnCard}
+            onChangeText={(v) => setField("nameOnCard", v)}
             placeholder="Aya Bani Hamad"
           />
 
-          <Text style={styles.label}>Card Number</Text>
+          <Text style={appStyles.label}>Card Number</Text>
           <TextInput
-            style={styles.input}
-            value={cardNumber}
-            onChangeText={setCardNumber}
+            style={appStyles.input}
+            value={form.cardNumber}
+            onChangeText={(v) => setField("cardNumber", v)}
             placeholder="4242 4242 4242 4242"
             keyboardType="numeric"
             maxLength={19}
           />
 
-          <View style={styles.row}>
-            <View style={styles.half}>
-              <Text style={styles.label}>Expiry</Text>
-              <TextInput
-                style={styles.input}
-                value={expiry}
-                onChangeText={setExpiry}
-                placeholder="12/29"
-                maxLength={5}
-              />
-            </View>
+          <Text style={appStyles.label}>Expiry</Text>
+          <TextInput
+            style={appStyles.input}
+            value={form.expiry}
+            onChangeText={(v) => setField("expiry", v)}
+            placeholder="12/29"
+            keyboardType="numeric"
+            maxLength={5}
+          />
 
-            <View style={styles.half}>
-              <Text style={styles.label}>CVV</Text>
-              <TextInput
-                style={styles.input}
-                value={cvv}
-                onChangeText={setCvv}
-                placeholder="123"
-                keyboardType="numeric"
-                maxLength={4}
-              />
-            </View>
-          </View>
+          <Text style={appStyles.label}>CVV</Text>
+          <TextInput
+            style={appStyles.input}
+            value={form.cvv}
+            onChangeText={(v) => setField("cvv", v)}
+            placeholder="123"
+            keyboardType="numeric"
+            maxLength={4}
+          />
 
           <TouchableOpacity
-            style={[styles.button, saving && { opacity: 0.6 }]}
-            disabled={saving}
-            onPress={submitPayment}
+            style={appStyles.primaryBtn}
+            onPress={pay}
+            disabled={loading}
           >
-            <Text style={styles.buttonText}>
-              {saving ? "Processing..." : "Pay Now"}
+            <Text style={appStyles.primaryBtnText}>
+              {loading ? "Processing..." : "Pay Now"}
             </Text>
           </TouchableOpacity>
         </View>
       </ScrollView>
-    </>
+
+      <FloatingActions navigation={navigation} />
+    </SafeAreaView>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    backgroundColor: "#E8DCCF",
-    flexGrow: 1,
-    padding: 16,
-  },
-  card: {
-    backgroundColor: "#FFF9F3",
-    borderRadius: 20,
-    borderWidth: 1,
-    borderColor: "#D8C8B8",
-    padding: 18,
-  },
-  title: {
-    fontSize: 28,
-    fontWeight: "900",
-    color: "#111",
-    marginBottom: 6,
-  },
-  subtitle: {
-    color: "#3A3028",
-    marginBottom: 16,
-  },
-  label: {
-    color: "#111",
-    fontWeight: "900",
-    marginBottom: 6,
-  },
-  input: {
-    backgroundColor: "#F6EDE2",
-    borderWidth: 1,
-    borderColor: "#D8C8B8",
-    borderRadius: 14,
-    padding: 12,
-    marginBottom: 12,
-    color: "#111",
-  },
-  row: {
-    flexDirection: "row",
-    gap: 10,
-  },
-  half: {
-    flex: 1,
-  },
-  button: {
-    backgroundColor: "#111",
-    borderRadius: 999,
-    paddingVertical: 14,
-    alignItems: "center",
-    marginTop: 8,
-  },
-  buttonText: {
-    color: "#FFF",
-    fontWeight: "900",
-  },
-});
 
 export default PaymentForm;

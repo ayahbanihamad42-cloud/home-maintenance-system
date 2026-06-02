@@ -2294,3 +2294,494 @@ td:last-child {
   flex-wrap: wrap;
   gap: 12px;
 }
+
+
+/* =========================================================
+   FINAL GLOBAL LAYOUT FIX
+   Fixed header + safe spacing for all pages
+   ========================================================= */
+
+/* الهيدر ثابت بكل الصفحات */
+.navbar {
+  position: fixed !important;
+  top: 22px !important;
+  left: 50% !important;
+  transform: translateX(-50%) !important;
+  width: min(1500px, calc(100% - 90px)) !important;
+  max-width: calc(100% - 90px) !important;
+  min-height: 76px !important;
+  margin: 0 !important;
+  z-index: 9999 !important;
+}
+
+/* كل الصفحات اللي فيها Header تنزل تحت الهيدر */
+.home-container,
+.page-container,
+.container,
+.main-container,
+.dashboard-container,
+.requests-container,
+.request-container,
+.availability-container,
+.profile-container,
+.history-container,
+.review-container,
+.technicians-container,
+.chat-container,
+.ai-chat-container,
+.admin-container,
+.payment-container,
+.payment-page,
+.payment-card,
+.gallery-details-page,
+.gallery-post-page,
+.gallery-post-container,
+.gallery-details-card {
+  margin-top: 132px !important;
+}
+
+/* منع الصفحات من الدخول تحت الهيدر بسبب padding أو margin قديم */
+.home-container,
+.page-container,
+.container,
+.main-container,
+.dashboard-container,
+.requests-container,
+.request-container,
+.availability-container,
+.profile-container,
+.history-container,
+.review-container,
+.technicians-container,
+.chat-container,
+.ai-chat-container,
+.admin-container,
+.payment-container,
+.payment-page,
+.gallery-details-page,
+.gallery-post-page,
+.gallery-post-container {
+  width: min(1180px, 92vw) !important;
+  margin-left: auto !important;
+  margin-right: auto !important;
+  padding-bottom: 80px !important;
+}
+
+/* صفحة الطلب محتاجة عرض أوسع */
+.request-container {
+  width: min(1500px, 96vw) !important;
+}
+
+/* صفحة الدفع لأن عندك الشريط البنفسجي كان داخل تحت الهيدر */
+.payment-container,
+.payment-page {
+  width: min(1500px, 96vw) !important;
+}
+
+/* الشريط البنفسجي/الصورة لا يدخل تحت الهيدر */
+.page-hero {
+  position: relative !important;
+  z-index: 1 !important;
+  min-height: 170px !important;
+  display: flex !important;
+  flex-direction: column !important;
+  justify-content: center !important;
+  padding: 42px 38px !important;
+  margin-top: 0 !important;
+  margin-bottom: 32px !important;
+  background-attachment: scroll !important;
+  overflow: hidden !important;
+}
+
+/* النص داخل الشريط البنفسجي يظل واضح فوق الصورة */
+.page-hero h1,
+.page-hero p {
+  position: relative !important;
+  z-index: 2 !important;
+  color: #fff !important;
+}
+
+.page-hero h1 {
+  margin: 0 0 12px !important;
+}
+
+.page-hero p {
+  margin: 0 !important;
+}
+
+/* لو فيه صفحة فيها hero مباشرة بعد Header بدون container */
+body > #root .page-hero:first-child,
+body > #root > .page-hero {
+  margin-top: 132px !important;
+}
+
+/* =========================================================
+   TECHNICIAN BY SERVICE CARDS FIX
+   ========================================================= */
+
+.technicians-container {
+  width: min(1320px, 92vw) !important;
+}
+
+.technicians-grid {
+  grid-template-columns: repeat(auto-fit, minmax(560px, 1fr)) !important;
+  gap: 24px !important;
+  align-items: stretch !important;
+}
+
+.technician-card {
+  width: 100% !important;
+  min-height: 410px !important;
+  padding: 30px !important;
+  overflow: visible !important;
+}
+
+.technician-card-header {
+  align-items: flex-start !important;
+}
+
+.technician-card-header h2 {
+  margin: 8px 0 12px !important;
+  max-width: 100% !important;
+  word-break: break-word !important;
+}
+
+/* مهم: هذا فقط داخل كارد التكنشن عشان ما يقص experience/phone */
+.technician-card .request-details-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  gap: 16px 28px !important;
+}
+
+.technician-card .request-details-grid p {
+  margin: 0 !important;
+  line-height: 1.45 !important;
+  white-space: normal !important;
+  overflow: visible !important;
+  overflow-wrap: anywhere !important;
+}
+
+.technician-card p,
+.technician-card span,
+.technician-card strong {
+  white-space: normal !important;
+  overflow-wrap: anywhere !important;
+}
+
+.technician-card .request-actions,
+.technician-card .actions {
+  display: flex !important;
+  flex-wrap: wrap !important;
+  gap: 12px !important;
+  margin-top: 24px !important;
+}
+
+/* =========================================================
+   TECHNICIAN PROFILE FIX
+   ========================================================= */
+
+.profile-container {
+  position: relative !important;
+}
+
+.tech-card {
+  background: rgba(255, 255, 255, 0.94) !important;
+  border: 1px solid var(--border) !important;
+  border-radius: 34px !important;
+  box-shadow: var(--shadow) !important;
+  padding: 34px !important;
+  overflow: visible !important;
+}
+
+.tech-card .tech-stats,
+.tech-card .contact-list {
+  display: grid !important;
+  grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  gap: 18px !important;
+}
+
+.tech-card .tech-stats span,
+.tech-card .contact-list span {
+  background: #fff !important;
+  border: 1px solid var(--border) !important;
+  border-radius: 18px !important;
+  padding: 16px !important;
+  word-break: break-word !important;
+}
+
+/* =========================================================
+   GALLERY POST PAGE + MODAL FIX
+   ========================================================= */
+
+/* الصفحة المنفصلة لو انفتحت من URL مباشر */
+.gallery-details-page,
+.gallery-post-page,
+.gallery-post-container {
+  background: transparent !important;
+}
+
+/* حتى صفحة post لحال ما تدخل تحت الهيدر */
+.gallery-details-card,
+.gallery-post-container,
+.gallery-post-page {
+  margin-top: 132px !important;
+}
+
+/* كارد تفاصيل البوست في الصفحة المنفصلة */
+.gallery-details-card {
+  display: grid !important;
+  grid-template-columns: 1.25fr 0.85fr !important;
+  gap: 28px !important;
+  align-items: start !important;
+  background: rgba(255, 255, 255, 0.94) !important;
+  border: 1px solid var(--border) !important;
+  border-radius: 32px !important;
+  box-shadow: var(--shadow) !important;
+  padding: 28px !important;
+}
+
+.gallery-details-image img,
+.gallery-post-main-image {
+  width: 100% !important;
+  max-height: 560px !important;
+  object-fit: contain !important;
+  border-radius: 24px !important;
+  background: #fbf8ff !important;
+  border: 1px solid var(--border) !important;
+}
+
+/* المودال فوق نفس الصفحة */
+.gallery-modal-overlay,
+.modal-overlay,
+.admin-profile-overlay {
+  position: fixed !important;
+  inset: 0 !important;
+  background: rgba(22, 13, 37, 0.48) !important;
+  z-index: 10000 !important;
+  display: grid !important;
+  place-items: center !important;
+  padding: 24px !important;
+}
+
+.gallery-modal-card,
+.gallery-popup-modal,
+.modal,
+.admin-profile-modal {
+  width: min(900px, 94vw) !important;
+  max-height: 88vh !important;
+  overflow-y: auto !important;
+  background: #fff !important;
+  border: 1px solid var(--border) !important;
+  border-radius: 30px !important;
+  padding: 28px !important;
+  box-shadow: 0 30px 90px rgba(0, 0, 0, 0.28) !important;
+}
+
+.gallery-modal-card img,
+.gallery-popup-modal img {
+  max-width: 100% !important;
+  max-height: 560px !important;
+  object-fit: contain !important;
+  border-radius: 22px !important;
+}
+
+/* =========================================================
+   PAYMENT PAGE FIX
+   ========================================================= */
+
+.payment-card {
+  width: min(1500px, 96vw) !important;
+  margin-left: auto !important;
+  margin-right: auto !important;
+  background: rgba(255, 255, 255, 0.94) !important;
+  border: 1px solid var(--border) !important;
+  border-radius: 28px !important;
+  box-shadow: var(--shadow) !important;
+}
+
+/* لو payment page عندها page-hero قبل الكارد */
+.payment-container .page-hero,
+.payment-page .page-hero {
+  margin-top: 0 !important;
+}
+
+/* =========================================================
+   CHAT POPUP FIX
+   ========================================================= */
+
+.khidma-floating-actions {
+  position: fixed !important;
+  right: 28px !important;
+  bottom: 28px !important;
+  z-index: 3000 !important;
+}
+
+.khidma-popup {
+  position: fixed !important;
+  right: 105px !important;
+  bottom: 28px !important;
+  width: 560px !important;
+  max-height: calc(100vh - 120px) !important;
+  background: #fff !important;
+  border: 1px solid var(--border) !important;
+  border-radius: 28px !important;
+  box-shadow: var(--shadow-strong) !important;
+  z-index: 3100 !important;
+  overflow: hidden !important;
+  display: flex !important;
+  flex-direction: column !important;
+}
+
+.popup-messages {
+  height: calc(100vh - 330px) !important;
+  min-height: 360px !important;
+  overflow-y: auto !important;
+}
+
+/* =========================================================
+   TABLE / GRID SAFETY
+   ========================================================= */
+
+.request-details-grid {
+  grid-template-columns: repeat(4, minmax(150px, 1fr)) !important;
+  gap: 10px 22px !important;
+}
+
+.request-card p,
+.history-card p,
+.availability-card p,
+.review-card p {
+  margin: 6px 0 !important;
+  overflow-wrap: anywhere !important;
+}
+
+/* =========================================================
+   RESPONSIVE
+   ========================================================= */
+
+@media (max-width: 1000px) {
+  .request-details-grid {
+    grid-template-columns: repeat(2, minmax(150px, 1fr)) !important;
+  }
+
+  .gallery-details-card {
+    grid-template-columns: 1fr !important;
+  }
+
+  .khidma-popup {
+    width: calc(100vw - 28px) !important;
+    right: 14px !important;
+    bottom: 102px !important;
+  }
+}
+
+@media (max-width: 900px) {
+  .navbar {
+    top: 12px !important;
+    width: calc(100% - 28px) !important;
+    max-width: calc(100% - 28px) !important;
+    flex-wrap: wrap !important;
+  }
+
+  .home-container,
+  .page-container,
+  .container,
+  .main-container,
+  .dashboard-container,
+  .requests-container,
+  .request-container,
+  .availability-container,
+  .profile-container,
+  .history-container,
+  .review-container,
+  .technicians-container,
+  .chat-container,
+  .ai-chat-container,
+  .admin-container,
+  .payment-container,
+  .payment-page,
+  .payment-card,
+  .gallery-details-page,
+  .gallery-post-page,
+  .gallery-post-container,
+  .gallery-details-card {
+    margin-top: 150px !important;
+  }
+
+  .page-hero {
+    min-height: 150px !important;
+    padding: 34px 24px !important;
+  }
+
+  .technicians-grid {
+    grid-template-columns: 1fr !important;
+  }
+
+  .technician-card .request-details-grid {
+    grid-template-columns: 1fr !important;
+  }
+
+  .tech-card .tech-stats,
+  .tech-card .contact-list {
+    grid-template-columns: 1fr !important;
+  }
+
+  .request-details-grid {
+    grid-template-columns: 1fr !important;
+  }
+}
+/* =========================================================
+   FINAL PAYMENT HERO POSITION FIX
+   Put purple hero below fixed header
+   ========================================================= */
+
+.payment-container {
+  width: min(1500px, 96vw) !important;
+  margin: 0 auto 80px !important;
+  padding-top: 145px !important;
+  padding-bottom: 80px !important;
+}
+
+/* الشريط البنفسجي بصفحة الدفع ينزل تحت الهيدر */
+.payment-container .page-hero {
+  margin-top: 0 !important;
+  margin-bottom: 34px !important;
+  min-height: 175px !important;
+  padding: 48px 38px !important;
+  display: flex !important;
+  flex-direction: column !important;
+  justify-content: center !important;
+  overflow: hidden !important;
+}
+
+/* النص داخل الشريط البنفسجي يظهر كامل */
+.payment-container .page-hero h1,
+.payment-container .page-hero p {
+  position: relative !important;
+  z-index: 2 !important;
+  color: #fff !important;
+  display: block !important;
+  opacity: 1 !important;
+  visibility: visible !important;
+}
+
+.payment-container .page-hero h1 {
+  margin: 0 0 12px !important;
+  font-size: 42px !important;
+  line-height: 1.1 !important;
+}
+
+.payment-container .page-hero p {
+  margin: 0 !important;
+  font-size: 18px !important;
+}
+
+/* كارد الدفع بعد الشريط مباشرة بدون فراغ ضخم */
+.payment-container .payment-card {
+  margin-top: 0 !important;
+  width: 100% !important;
+}
+
+/* لا تخلي payment-card نفسه ينزل 132px لأنه أصلاً داخل payment-container */
+.payment-card {
+  margin-top: 0 !important;
+}

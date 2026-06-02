@@ -9,6 +9,8 @@ import ProtectedRoute from "./src/components/Common/ProtectedRoute";
 import Welcome from "./src/screens/user/Welcome";
 import Login from "./src/screens/auth/Login";
 import Register from "./src/screens/auth/Register";
+import ForgotPassword from "./src/screens/auth/ForgotPassword";
+import ResetPassword from "./src/screens/auth/ResetPassword";
 
 import Home from "./src/screens/user/Home";
 import UserProfile from "./src/screens/user/UserProfile";
@@ -39,12 +41,12 @@ function LoadingScreen() {
     <View
       style={{
         flex: 1,
-        backgroundColor: "#E7DCCC",
+        backgroundColor: "#FBFAFF",
         alignItems: "center",
         justifyContent: "center",
       }}
     >
-      <ActivityIndicator size="large" color="#111" />
+      <ActivityIndicator size="large" color="#7C3AED" />
     </View>
   );
 }
@@ -86,13 +88,15 @@ export default function App() {
           headerShown: false,
           animation: "slide_from_right",
           contentStyle: {
-            backgroundColor: "#E7DCCC",
+            backgroundColor: "#FBFAFF",
           },
         }}
       >
         <Stack.Screen name="Welcome" component={Welcome} />
         <Stack.Screen name="Login" component={Login} />
         <Stack.Screen name="Register" component={Register} />
+        <Stack.Screen name="ForgotPassword" component={ForgotPassword} />
+        <Stack.Screen name="ResetPassword" component={ResetPassword} />
 
         <Stack.Screen name="Home">
           {(props) => (

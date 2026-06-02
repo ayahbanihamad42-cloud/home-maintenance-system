@@ -17,7 +17,7 @@ function PaymentSuccess() {
     <>
       <Header />
 
-      <main className="payment-success-container">
+      <main className="payment-container">
         <section className="page-hero">
           <h1>Payment Successful</h1>
           <p>Your online payment has been completed successfully.</p>

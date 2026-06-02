@@ -1,618 +1,531 @@
 import React, { useEffect, useMemo, useState } from "react";
 import {
-  View,
-  Text,
+  Alert,
+  Linking,
+  SafeAreaView,
   ScrollView,
+  Text,
   TextInput,
   TouchableOpacity,
-  ActivityIndicator,
-  Alert,
-  StyleSheet,
+  View,
 } from "react-native";
-import { Picker } from "@react-native-picker/picker";
-import AsyncStorage from "@react-native-async-storage/async-storage";
-import * as Location from "expo-location";
 import MapView, { Marker } from "react-native-maps";
+import * as Location from "expo-location";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import Header from "../../components/Common/Header";
+import FloatingActions from "../../components/Common/FloatingActions";
+import HeroSection from "../../components/Common/HeroSection";
+import CustomDropdown from "../../components/Common/CustomDropdown";
 import API from "../../services/api";
-import styles from "../../styles/mobileStyles";
+import appStyles, { colors } from "../../styles/mobileStyles";
 
-export default function MaintenanceRequest({ navigation, route }) {
+function MaintenanceRequest({ route, navigation }) {
   const params = route?.params || {};
-  const technician = params.tech || params.technician || {};
 
-  const technicianId =
+  const selectedTechnicianId =
     params.technicianId ||
     params.technician_id ||
-    technician.technicianId ||
-    technician.technician_id ||
-    technician.tech_id ||
-    technician.id;
+    params.id ||
+    params.technician?.id ||
+    params.technician?.technicianId ||
+    "";
 
-  const [user, setUser] = useState(null);
-  const [availableDates, setAvailableDates] = useState([]);
-  const [availableTimes, setAvailableTimes] = useState([]);
+  const [user, setUser] = useState({});
+  const [technician, setTechnician] = useState(params.technician || null);
+
+  const [availability, setAvailability] = useState([]);
   const [loadingAvailability, setLoadingAvailability] = useState(false);
-  const [message, setMessage] = useState(null);
-  const [userLocation, setUserLocation] = useState(null);
-  const [locationLoading, setLocationLoading] = useState(false);
 
   const [form, setForm] = useState({
-    service: params.service || technician.service || "",
-    technicianName: params.technicianName || technician.name || "",
-    scheduled_date: "",
-    scheduled_time: "",
-    estimated_hours: "1",
-    payment_method: "cash",
-    location_note: "",
+    service: params.service || params.service_type || "",
+    technicianName: params.technicianName || params.name || "",
+    date: "",
+    time: "",
+    estimatedHours: "1",
+    paymentMethod: "cash",
+    locationNote: "",
     description: "",
-    price_per_hour: String(
-      params.price_per_hour || technician.price_per_hour || 0
-    ),
   });
 
-  const totalPrice = useMemo(() => {
-    return (
-      Number(form.price_per_hour || 0) * Number(form.estimated_hours || 1)
-    ).toFixed(2);
-  }, [form.price_per_hour, form.estimated_hours]);
+  const [userLocation, setUserLocation] = useState(null);
+  const [message, setMessage] = useState(null);
+  const [submitting, setSubmitting] = useState(false);
+
+  const pricePerHour = Number(
+    technician?.price_per_hour ||
+      params.price_per_hour ||
+      params.price ||
+      0
+  );
+
+  const totalPrice =
+    Number(pricePerHour || 0) * Math.max(Number(form.estimatedHours || 1), 1);
+
+  const paymentOptions = [
+    { label: "Cash", value: "cash" },
+    { label: "Online", value: "online" },
+  ];
 
   const normalizeDate = (value) => {
     if (!value) return "";
-
-    const raw = String(value).trim();
-
-    if (/^\d{4}-\d{2}-\d{2}$/.test(raw)) return raw;
-
+    const raw = String(value);
     const match = raw.match(/^(\d{4}-\d{2}-\d{2})/);
-    if (match) return match[1];
-
-    return raw.slice(0, 10);
+    return match ? match[1] : raw.slice(0, 10);
   };
 
   const normalizeTime = (value) => {
     if (!value) return "";
-    const raw = String(value).trim();
-    const match = raw.match(/^(\d{2}:\d{2})(:\d{2})?/);
-    if (match) return match[0].length === 5 ? `${match[0]}:00` : match[0];
-    return raw.slice(0, 8);
+    return String(value).slice(0, 8);
   };
 
   const loadUser = async () => {
-    const rawUser = await AsyncStorage.getItem("user");
-    setUser(rawUser ? JSON.parse(rawUser) : null);
+    const raw = await AsyncStorage.getItem("user");
+    setUser(raw ? JSON.parse(raw) : {});
   };
 
   const loadTechnician = async () => {
-    try {
-      if (!technicianId) return;
+    if (!selectedTechnicianId) return;
 
-      const res = await API.get(`/technicians/${technicianId}`);
-      const tech = res.data || {};
+    try {
+      const res = await API.get(`/technicians/${selectedTechnicianId}`);
+      const data = res.data || null;
+
+      setTechnician(data);
 
       setForm((prev) => ({
         ...prev,
-        service: prev.service || tech.service || "",
-        technicianName: prev.technicianName || tech.name || "",
-        price_per_hour: String(prev.price_per_hour || tech.price_per_hour || 0),
+        service: prev.service || data?.service || "",
+        technicianName: prev.technicianName || data?.name || "",
       }));
-    } catch (err) {
-      console.log("load technician error:", err?.response?.data || err.message);
+    } catch {
+      setTechnician(params.technician || null);
     }
   };
 
-  const loadDates = async () => {
-    try {
-      if (!technicianId) {
-        setMessage({
-          type: "error",
-          title: "Error",
-          body: "Technician id is missing.",
-        });
-        return;
-      }
+  const extractAvailabilityList = (data) => {
+    if (Array.isArray(data)) return data;
 
+    if (Array.isArray(data?.availability)) return data.availability;
+    if (Array.isArray(data?.oneTime)) return data.oneTime;
+    if (Array.isArray(data?.dates)) return data.dates;
+    if (Array.isArray(data?.available)) return data.available;
+
+    return [];
+  };
+
+  const loadAvailability = async () => {
+    if (!selectedTechnicianId) return;
+
+    try {
       setLoadingAvailability(true);
       setMessage(null);
 
-      const res = await API.get(`/technicians/${technicianId}/availability`);
-      const list = Array.isArray(res.data) ? res.data : [];
+      let res;
 
-      const dates = [
-        ...new Set(
-          list
-            .filter(
-              (item) => Number(item.is_booked) !== 1 && item.is_booked !== true
-            )
-            .map((item) => normalizeDate(item.available_date))
-            .filter(Boolean)
-        ),
-      ].sort();
+      try {
+        res = await API.get(`/technicians/${selectedTechnicianId}/availability`);
+      } catch {
+        try {
+          res = await API.get(`/technicians/availability/${selectedTechnicianId}`);
+        } catch {
+          res = await API.get(`/technicians/${selectedTechnicianId}/available-times`);
+        }
+      }
 
-      setAvailableDates(dates);
+      const list = extractAvailabilityList(res.data).filter((item) => {
+        const booked = Number(item.is_booked || 0) === 1;
+        return !booked;
+      });
+
+      setAvailability(list);
+
+      const firstDate = list[0] ? normalizeDate(list[0].available_date || list[0].date) : "";
+      const firstTime = list[0] ? normalizeTime(list[0].start_time || list[0].time) : "";
 
       setForm((prev) => ({
         ...prev,
-        scheduled_date: dates.length > 0 ? prev.scheduled_date || dates[0] : "",
-        scheduled_time: dates.length > 0 ? prev.scheduled_time : "",
+        date: prev.date || firstDate,
+        time: prev.time || firstTime,
       }));
-    } catch (err) {
-      console.log("load dates error:", err?.response?.data || err.message);
-      setAvailableDates([]);
-      setAvailableTimes([]);
+    } catch {
+      setAvailability([]);
       setMessage({
         type: "error",
-        title: "Error",
-        body: "Failed to load available dates and times.",
+        text: "Failed to load available dates and times.",
       });
     } finally {
       setLoadingAvailability(false);
     }
   };
 
-  const loadTimes = async () => {
-    try {
-      if (!technicianId || !form.scheduled_date) {
-        setAvailableTimes([]);
-        return;
-      }
-
-      const res = await API.get(`/technicians/${technicianId}/availability`, {
-        params: { date: form.scheduled_date },
-      });
-
-      const list = Array.isArray(res.data) ? res.data : [];
-
-      const times = list
-        .filter(
-          (item) => Number(item.is_booked) !== 1 && item.is_booked !== true
-        )
-        .filter((item) => normalizeDate(item.available_date) === form.scheduled_date)
-        .map((item) => ({
-          id: item.id,
-          value: normalizeTime(item.start_time),
-          label: `${normalizeTime(item.start_time)} - ${normalizeTime(
-            item.end_time
-          )}`,
-        }));
-
-      setAvailableTimes(times);
-
-      setForm((prev) => ({
-        ...prev,
-        scheduled_time: times.length > 0 ? times[0].value : "",
-      }));
-    } catch (err) {
-      console.log("load times error:", err?.response?.data || err.message);
-      setAvailableTimes([]);
-    }
-  };
-
   useEffect(() => {
     loadUser();
     loadTechnician();
-    loadDates();
-  }, [technicianId]);
+    loadAvailability();
+  }, [selectedTechnicianId]);
 
-  useEffect(() => {
-    loadTimes();
-  }, [form.scheduled_date]);
+  const dateOptions = useMemo(() => {
+    const unique = new Set();
 
-  const getCurrentUserLocation = async () => {
+    availability.forEach((item) => {
+      const date = normalizeDate(item.available_date || item.date);
+      if (date) unique.add(date);
+    });
+
+    const arr = Array.from(unique);
+
+    return arr.length
+      ? arr.map((date) => ({ label: date, value: date }))
+      : [{ label: loadingAvailability ? "Loading available dates..." : "No available dates", value: "" }];
+  }, [availability, loadingAvailability]);
+
+  const timeOptions = useMemo(() => {
+    const times = availability
+      .filter((item) => normalizeDate(item.available_date || item.date) === form.date)
+      .map((item) => {
+        const start = normalizeTime(item.start_time || item.time);
+        const end = normalizeTime(item.end_time || "");
+        return {
+          label: end ? `${start} - ${end}` : start,
+          value: start,
+        };
+      })
+      .filter((item) => item.value);
+
+    return times.length
+      ? times
+      : [{ label: loadingAvailability ? "Loading available times..." : "No available times", value: "" }];
+  }, [availability, form.date, loadingAvailability]);
+
+  const updateField = (key, value) => {
+    setMessage(null);
+    setForm((prev) => ({ ...prev, [key]: value }));
+  };
+
+  const useMyLocation = async () => {
     try {
-      setLocationLoading(true);
+      setMessage(null);
 
       const permission = await Location.requestForegroundPermissionsAsync();
 
       if (permission.status !== "granted") {
-        throw new Error("Location permission was denied.");
-      }
-
-      const servicesEnabled = await Location.hasServicesEnabledAsync();
-
-      if (!servicesEnabled) {
-        throw new Error("Please turn on location services from phone settings.");
-      }
-
-      let position = await Location.getLastKnownPositionAsync({
-        maxAge: 300000,
-        requiredAccuracy: 10000,
-      });
-
-      if (!position?.coords) {
-        position = await Location.getCurrentPositionAsync({
-          accuracy: Location.Accuracy.Balanced,
+        setMessage({
+          type: "error",
+          text: "Please allow location access.",
         });
+        return;
       }
 
-      if (!position?.coords) {
-        throw new Error("Current location is unavailable.");
-      }
-
-      const lat = position.coords.latitude;
-      const lng = position.coords.longitude;
-
-      setUserLocation({
-        latitude: lat,
-        longitude: lng,
-        url: `https://www.google.com/maps?q=${lat},${lng}`,
+      const pos = await Location.getCurrentPositionAsync({
+        accuracy: Location.Accuracy.High,
       });
+
+      const loc = {
+        lat: pos.coords.latitude,
+        lng: pos.coords.longitude,
+        url: `https://www.google.com/maps?q=${pos.coords.latitude},${pos.coords.longitude}`,
+      };
+
+      setUserLocation(loc);
 
       setMessage({
         type: "success",
-        title: "Location Added",
-        body: "Your location has been added to this request.",
+        text: "Location added. Tap to open map.",
       });
-    } catch (err) {
-      Alert.alert("Location Error", err?.message || "Failed to get location.");
+    } catch {
       setMessage({
         type: "error",
-        title: "Location Error",
-        body: err?.message || "Failed to get location.",
+        text: "Failed to get your location.",
       });
-    } finally {
-      setLocationLoading(false);
     }
   };
 
-  const checkSlotStillAvailable = async () => {
-    const res = await API.get(`/technicians/${technicianId}/availability`, {
-      params: { date: form.scheduled_date },
-    });
-
-    const list = Array.isArray(res.data) ? res.data : [];
-
-    return list.some(
-      (item) =>
-        Number(item.is_booked) !== 1 &&
-        item.is_booked !== true &&
-        normalizeDate(item.available_date) === form.scheduled_date &&
-        normalizeTime(item.start_time) === normalizeTime(form.scheduled_time)
-    );
-  };
-
-  const submit = async () => {
+  const submitRequest = async () => {
     try {
       setMessage(null);
 
-      if (!user?.id) {
-        setMessage({
-          type: "error",
-          title: "Error",
-          body: "User id is missing. Please login again.",
-        });
+      if (!selectedTechnicianId) {
+        setMessage({ type: "error", text: "Technician is missing." });
         return;
       }
 
-      if (!technicianId) {
-        setMessage({
-          type: "error",
-          title: "Error",
-          body: "Technician id is missing.",
-        });
+      if (!form.service) {
+        setMessage({ type: "error", text: "Service is missing." });
         return;
       }
 
-      if (!form.scheduled_date || !form.scheduled_time) {
-        setMessage({
-          type: "error",
-          title: "Unavailable Time",
-          body: "Please choose an available date and time.",
-        });
+      if (!form.date) {
+        setMessage({ type: "error", text: "Please choose an available date." });
         return;
       }
 
-      const stillAvailable = await checkSlotStillAvailable();
-
-      if (!stillAvailable) {
-        setMessage({
-          type: "error",
-          title: "Unavailable Time",
-          body: "This date and time are already booked. Please choose another slot.",
-        });
-
-        await loadDates();
+      if (!form.time) {
+        setMessage({ type: "error", text: "Please choose an available time." });
         return;
       }
 
       if (!form.description.trim()) {
-        setMessage({
-          type: "error",
-          title: "Error",
-          body: "Please enter description.",
-        });
+        setMessage({ type: "error", text: "Please describe the problem." });
         return;
       }
 
+      setSubmitting(true);
+
       const payload = {
         user_id: user.id,
-        technician_id: technicianId,
+        technician_id: Number(selectedTechnicianId),
         service: form.service,
-        service_type: form.service,
-        description: form.description,
-        city: user.city || "",
-        location: form.location_note,
-        location_note: form.location_note,
-        scheduled_date: form.scheduled_date,
-        scheduled_time: form.scheduled_time,
-        estimated_hours: Number(form.estimated_hours || 1),
-        payment_method: form.payment_method,
-        price_per_hour: Number(form.price_per_hour || 0),
-        total_price: Number(totalPrice),
-        user_location_lat: userLocation?.latitude || null,
-        user_location_lng: userLocation?.longitude || null,
-        user_location_url: userLocation?.url || null,
+        description: form.description.trim(),
+        city: user.city || technician?.city || "",
+        scheduled_date: form.date,
+        scheduled_time: form.time,
+        estimated_hours: Number(form.estimatedHours || 1),
+        payment_method: form.paymentMethod,
+        total_price: Number(totalPrice.toFixed(2)),
+        amount: Number(totalPrice.toFixed(2)),
+        location_note: form.locationNote.trim(),
       };
 
-      const res = await API.post("/maintenance", payload);
-      const requestId = res.data?.requestId || res.data?.id;
+      if (userLocation) {
+        payload.user_location_lat = userLocation.lat;
+        payload.user_location_lng = userLocation.lng;
+        payload.location_url = userLocation.url;
+      }
 
-      if (String(form.payment_method).toLowerCase() === "online") {
+      const res = await API.post("/maintenance", payload);
+
+      const createdRequest = res.data || {};
+      const requestId = createdRequest.id || createdRequest.request_id;
+
+      if (form.paymentMethod === "online") {
         navigation.navigate("PaymentForm", {
           requestId,
-          amount: Number(totalPrice),
-          technicianId,
-          estimated_hours: Number(form.estimated_hours || 1),
+          amount: Number(totalPrice.toFixed(2)),
+          total: Number(totalPrice.toFixed(2)),
         });
       } else {
-        navigation.navigate("Review", {
-          requestId,
-          request: {
-            ...payload,
-            id: requestId,
-            status: "pending",
-          },
-        });
+        Alert.alert("Success", "Request submitted successfully.");
+        navigation.navigate("MaintenanceHistory");
       }
     } catch (err) {
-      console.log("submit request error:", err?.response?.data || err.message);
-
       setMessage({
         type: "error",
-        title: "Error",
-        body:
-          err?.response?.data?.message ||
-          "This time slot is no longer available. Please choose another time.",
+        text: err.response?.data?.message || "Failed to submit request.",
       });
+    } finally {
+      setSubmitting(false);
     }
   };
 
   return (
-    <View style={styles.screen}>
-      <Header navigation={navigation} />
+    <SafeAreaView style={appStyles.safe}>
+      <Header navigation={navigation} title="Request" />
 
-      <ScrollView contentContainerStyle={styles.pageContent}>
-        <View style={styles.card}>
-          <Text style={styles.pageTitle}>Maintenance Request</Text>
+      <ScrollView
+        contentContainerStyle={appStyles.pageContent}
+        showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
+      >
+        <HeroSection
+          title="Maintenance Request"
+          subtitle="Choose an available time, share your location, and submit your request."
+        />
 
-          {message ? (
-            <View
+        {message ? (
+          <TouchableOpacity
+            activeOpacity={message.type === "success" && userLocation ? 0.8 : 1}
+            onPress={() => {
+              if (message.type === "success" && userLocation) {
+                Linking.openURL(userLocation.url);
+              }
+            }}
+            style={
+              message.type === "success"
+                ? appStyles.successBox
+                : appStyles.errorBox
+            }
+          >
+            <Text
               style={
-                message.type === "error" ? styles.errorBox : styles.successBox
+                message.type === "success"
+                  ? appStyles.successText
+                  : appStyles.errorText
               }
             >
-              <Text
-                style={
-                  message.type === "error"
-                    ? styles.errorTitle
-                    : styles.successTitle
-                }
-              >
-                {message.title}
-              </Text>
-              <Text
-                style={
-                  message.type === "error" ? styles.errorText : styles.successText
-                }
-              >
-                {message.body}
-              </Text>
-            </View>
-          ) : null}
+              {message.text}
+            </Text>
+          </TouchableOpacity>
+        ) : null}
 
-          <Text style={styles.label}>Service</Text>
-          <TextInput style={styles.input} value={form.service} editable={false} />
-
-          <Text style={styles.label}>Technician</Text>
+        <View style={appStyles.card}>
+          <Text style={appStyles.label}>Service</Text>
           <TextInput
-            style={styles.input}
+            style={appStyles.input}
+            value={form.service}
+            editable={false}
+            placeholder="Service"
+          />
+
+          <Text style={appStyles.label}>Technician</Text>
+          <TextInput
+            style={appStyles.input}
             value={form.technicianName}
             editable={false}
+            placeholder="Technician"
           />
 
-          <View style={styles.twoColumns}>
-            <View style={styles.column}>
-              <Text style={styles.label}>Date</Text>
-              <View style={styles.pickerBox}>
-                <Picker
-                  selectedValue={form.scheduled_date}
-                  onValueChange={(value) =>
-                    setForm({
-                      ...form,
-                      scheduled_date: value,
-                      scheduled_time: "",
-                    })
-                  }
-                >
-                  {availableDates.length === 0 ? (
-                    <Picker.Item label="No available dates" value="" />
-                  ) : (
-                    availableDates.map((date) => (
-                      <Picker.Item key={date} label={date} value={date} />
-                    ))
-                  )}
-                </Picker>
-              </View>
-            </View>
-
-            <View style={styles.column}>
-              <Text style={styles.label}>Time Slot</Text>
-              <View style={styles.pickerBox}>
-                <Picker
-                  selectedValue={form.scheduled_time}
-                  onValueChange={(value) =>
-                    setForm({ ...form, scheduled_time: value })
-                  }
-                >
-                  {availableTimes.length === 0 ? (
-                    <Picker.Item label="No available times" value="" />
-                  ) : (
-                    availableTimes.map((time) => (
-                      <Picker.Item
-                        key={time.id || time.value}
-                        label={time.label}
-                        value={time.value}
-                      />
-                    ))
-                  )}
-                </Picker>
-              </View>
-            </View>
-          </View>
-
-          <View style={styles.twoColumns}>
-            <View style={styles.column}>
-              <Text style={styles.label}>Estimated Hours</Text>
-              <TextInput
-                style={styles.input}
-                keyboardType="numeric"
-                value={form.estimated_hours}
-                onChangeText={(value) =>
-                  setForm({ ...form, estimated_hours: value })
-                }
-              />
-            </View>
-
-            <View style={styles.column}>
-              <Text style={styles.label}>Payment Method</Text>
-              <View style={styles.pickerBox}>
-                <Picker
-                  selectedValue={form.payment_method}
-                  onValueChange={(value) =>
-                    setForm({ ...form, payment_method: value })
-                  }
-                >
-                  <Picker.Item label="Cash" value="cash" />
-                  <Picker.Item label="Online" value="online" />
-                </Picker>
-              </View>
-            </View>
-          </View>
-
-          <Text style={styles.label}>Price Summary</Text>
-          <TextInput
-            style={styles.input}
-            editable={false}
-            value={`${Number(form.price_per_hour || 0).toFixed(
-              2
-            )} JOD/hour | Hours: ${form.estimated_hours} | Total: ${totalPrice} JOD`}
+          <CustomDropdown
+            label="Date"
+            value={form.date}
+            options={dateOptions}
+            onChange={(value) => {
+              updateField("date", value);
+              const firstTimeForDate = availability.find(
+                (item) =>
+                  normalizeDate(item.available_date || item.date) === value
+              );
+              updateField(
+                "time",
+                firstTimeForDate
+                  ? normalizeTime(firstTimeForDate.start_time || firstTimeForDate.time)
+                  : ""
+              );
+            }}
           />
 
-          <Text style={styles.label}>Location Note</Text>
+          <CustomDropdown
+            label="Time Slot"
+            value={form.time}
+            options={timeOptions}
+            onChange={(value) => updateField("time", value)}
+          />
+
+          <Text style={appStyles.label}>Estimated Hours</Text>
           <TextInput
-            style={styles.input}
-            value={form.location_note}
-            onChangeText={(value) => setForm({ ...form, location_note: value })}
+            style={appStyles.input}
+            value={form.estimatedHours}
+            onChangeText={(value) =>
+              updateField("estimatedHours", value.replace(/[^\d]/g, ""))
+            }
+            keyboardType="numeric"
+            placeholder="1"
+          />
+
+          <Text style={appStyles.label}>Payment Method</Text>
+          <View style={appStyles.row}>
+            {paymentOptions.map((item) => {
+              const active = form.paymentMethod === item.value;
+
+              return (
+                <TouchableOpacity
+                  key={item.value}
+                  style={[
+                    appStyles.secondaryBtn,
+                    {
+                      flex: 1,
+                      backgroundColor: active ? colors.primary : "#FFFFFF",
+                    },
+                  ]}
+                  onPress={() => updateField("paymentMethod", item.value)}
+                >
+                  <Text
+                    style={[
+                      appStyles.secondaryBtnText,
+                      { color: active ? "#FFFFFF" : colors.primaryDark },
+                    ]}
+                  >
+                    {item.label}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+
+          <Text style={appStyles.label}>Price Summary</Text>
+          <View style={appStyles.infoBox}>
+            <Text style={appStyles.text}>
+              {pricePerHour.toFixed(2)} JOD/hour | Hours:{" "}
+              {Number(form.estimatedHours || 1)} | Total:{" "}
+              {totalPrice.toFixed(2)} JOD
+            </Text>
+          </View>
+
+          <Text style={appStyles.label}>Location Note</Text>
+          <TextInput
+            style={appStyles.input}
+            value={form.locationNote}
+            onChangeText={(value) => updateField("locationNote", value)}
             placeholder="Example: Irbid, near Yarmouk University"
           />
 
-          <TouchableOpacity
-            style={localStyles.locationBtn}
-            onPress={getCurrentUserLocation}
-            disabled={locationLoading}
-          >
-            <Text style={localStyles.locationBtnText}>
-              {locationLoading ? "Getting Location..." : "Use My Location"}
-            </Text>
+          <TouchableOpacity style={appStyles.secondaryBtn} onPress={useMyLocation}>
+            <Text style={appStyles.secondaryBtnText}>Use My Location</Text>
           </TouchableOpacity>
 
-          {userLocation ? (
-            <View style={localStyles.mapSection}>
-              <Text style={localStyles.mapTitle}>Your Request Location</Text>
+          {userLocation && (
+            <View style={[appStyles.card, { marginTop: 14 }]}>
+              <Text style={appStyles.sectionTitle}>Your Location</Text>
 
               <MapView
-                style={localStyles.map}
+                style={{
+                  width: "100%",
+                  height: 230,
+                  borderRadius: 22,
+                  overflow: "hidden",
+                }}
                 initialRegion={{
-                  latitude: userLocation.latitude,
-                  longitude: userLocation.longitude,
-                  latitudeDelta: 0.005,
-                  longitudeDelta: 0.005,
+                  latitude: userLocation.lat,
+                  longitude: userLocation.lng,
+                  latitudeDelta: 0.01,
+                  longitudeDelta: 0.01,
                 }}
               >
                 <Marker
                   coordinate={{
-                    latitude: userLocation.latitude,
-                    longitude: userLocation.longitude,
+                    latitude: userLocation.lat,
+                    longitude: userLocation.lng,
                   }}
-                  title="Your Request Location"
-                  description="This location will be shared with the technician."
+                  title="Your Location"
                 />
               </MapView>
 
-              <Text style={localStyles.mapNote}>
-                This static location will be shared with the technician.
-              </Text>
+              <TouchableOpacity
+                style={appStyles.secondaryBtn}
+                onPress={() => Linking.openURL(userLocation.url)}
+              >
+                <Text style={appStyles.secondaryBtnText}>Open My Location</Text>
+              </TouchableOpacity>
             </View>
-          ) : null}
+          )}
 
-          <Text style={styles.label}>Description</Text>
+          <Text style={appStyles.label}>Description</Text>
           <TextInput
-            style={[styles.input, styles.textArea]}
-            multiline
+            style={[appStyles.input, appStyles.textArea]}
             value={form.description}
-            onChangeText={(value) => setForm({ ...form, description: value })}
+            onChangeText={(value) => updateField("description", value)}
             placeholder="Describe the problem..."
+            multiline
           />
 
-          <TouchableOpacity style={styles.primaryBtn} onPress={submit}>
-            <Text style={styles.primaryBtnText}>
-              {form.payment_method === "online"
+          <TouchableOpacity
+            style={appStyles.primaryBtn}
+            onPress={submitRequest}
+            disabled={submitting}
+          >
+            <Text style={appStyles.primaryBtnText}>
+              {submitting
+                ? "Submitting..."
+                : form.paymentMethod === "online"
                 ? "Continue to Payment"
                 : "Submit Request"}
             </Text>
           </TouchableOpacity>
-
-          {loadingAvailability ? (
-            <ActivityIndicator color="#111" style={{ marginTop: 18 }} />
-          ) : null}
         </View>
       </ScrollView>
-    </View>
+
+      <FloatingActions navigation={navigation} />
+    </SafeAreaView>
   );
 }
 
-const localStyles = StyleSheet.create({
-  locationBtn: {
-    backgroundColor: "#111",
-    paddingVertical: 13,
-    paddingHorizontal: 18,
-    borderRadius: 999,
-    alignItems: "center",
-    marginBottom: 14,
-  },
-  locationBtnText: {
-    color: "#FFF",
-    fontWeight: "900",
-    fontSize: 15,
-  },
-  mapSection: {
-    marginBottom: 18,
-  },
-  mapTitle: {
-    fontSize: 19,
-    fontWeight: "900",
-    color: "#111",
-    marginBottom: 10,
-  },
-  map: {
-    width: "100%",
-    height: 250,
-    borderRadius: 22,
-  },
-  mapNote: {
-    marginTop: 8,
-    color: "#6B5E52",
-    fontSize: 14,
-    fontWeight: "700",
-  },
-});
+export default MaintenanceRequest;
