@@ -73,10 +73,13 @@ export const getMyTechnicianRequests = async () => {
   return res.data;
 };
 
-export const updateTechnicianRequestStatus = async (requestId, status) => {
-  const res = await API.put(`/technicians/requests/${requestId}/status`, {
-    status,
-  });
+export const updateTechnicianRequestStatus = async (requestId, statusOrPayload) => {
+  const payload =
+    typeof statusOrPayload === "object"
+      ? statusOrPayload
+      : { status: statusOrPayload };
+
+  const res = await API.put(`/technicians/requests/${requestId}/status`, payload);
   return res.data;
 };
 

@@ -6,13 +6,14 @@ import {
   Text,
   TextInput,
   TouchableOpacity,
+  StyleSheet,
 } from "react-native";
 import Header from "../../components/Common/Header";
 import FloatingActions from "../../components/Common/FloatingActions";
 import HeroSection from "../../components/Common/HeroSection";
 import CustomDropdown from "../../components/Common/CustomDropdown";
 import API from "../../services/api";
-import appStyles from "../../styles/mobileStyles";
+import appStyles, { colors } from "../../styles/mobileStyles";
 
 const cityOptions = [
   { label: "All Jordan cities", value: "all" },
@@ -82,11 +83,19 @@ function TechniciansByService({ route, navigation }) {
     }
 
     if (ratingFilter !== "all") {
-      result = result.filter((t) => Number(t.rating || 0) >= Number(ratingFilter));
+      result = result.filter(
+        (t) => Number(t.rating || 0) >= Number(ratingFilter)
+      );
     }
 
     return result;
   }, [technicians, search, cityFilter, ratingFilter]);
+
+  const clearFilters = () => {
+    setSearch("");
+    setCityFilter("all");
+    setRatingFilter("all");
+  };
 
   return (
     <SafeAreaView style={appStyles.safe}>
@@ -104,37 +113,37 @@ function TechniciansByService({ route, navigation }) {
           </View>
         ) : null}
 
-        <View style={appStyles.card}>
+        <View style={styles.filterBox}>
           <TextInput
-            style={appStyles.input}
+            style={styles.searchInput}
             value={search}
             onChangeText={setSearch}
             placeholder="Search by name, city, phone..."
+            placeholderTextColor={colors.muted}
           />
 
-          <CustomDropdown
-            label="City"
-            value={cityFilter}
-            options={cityOptions}
-            onChange={setCityFilter}
-          />
+          <View style={styles.filterRow}>
+            <View style={styles.filterHalf}>
+              <CustomDropdown
+                label="City"
+                value={cityFilter}
+                options={cityOptions}
+                onChange={setCityFilter}
+              />
+            </View>
 
-          <CustomDropdown
-            label="Rating"
-            value={ratingFilter}
-            options={ratingOptions}
-            onChange={setRatingFilter}
-          />
+            <View style={styles.filterHalf}>
+              <CustomDropdown
+                label="Rating"
+                value={ratingFilter}
+                options={ratingOptions}
+                onChange={setRatingFilter}
+              />
+            </View>
+          </View>
 
-          <TouchableOpacity
-            style={appStyles.secondaryBtn}
-            onPress={() => {
-              setSearch("");
-              setCityFilter("all");
-              setRatingFilter("all");
-            }}
-          >
-            <Text style={appStyles.secondaryBtnText}>Clear Filters</Text>
+          <TouchableOpacity style={styles.clearSmallBtn} onPress={clearFilters}>
+            <Text style={styles.clearSmallText}>Clear Filters</Text>
           </TouchableOpacity>
         </View>
 
@@ -197,5 +206,42 @@ function TechniciansByService({ route, navigation }) {
     </SafeAreaView>
   );
 }
+
+const styles = StyleSheet.create({
+  filterBox: {
+    backgroundColor: "#FFFFFF",
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: 22,
+    padding: 12,
+    marginBottom: 16,
+  },
+  searchInput: {
+    height: 52,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: 16,
+    paddingHorizontal: 14,
+    fontSize: 15,
+    color: colors.text,
+    marginBottom: 4,
+  },
+  filterRow: {
+    flexDirection: "row",
+    gap: 10,
+  },
+  filterHalf: {
+    flex: 1,
+  },
+  clearSmallBtn: {
+    alignSelf: "flex-end",
+    paddingVertical: 8,
+    paddingHorizontal: 10,
+  },
+  clearSmallText: {
+    color: colors.primary,
+    fontWeight: "900",
+  },
+});
 
 export default TechniciansByService;

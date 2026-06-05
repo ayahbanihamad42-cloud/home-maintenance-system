@@ -17,6 +17,7 @@ import {
 } from "../../services/maintenanceService";
 import API from "../../services/api";
 import appStyles from "../../styles/mobileStyles";
+import HeroSection from "../../components/Common/HeroSection";
 
 const Review = ({ route, navigation }) => {
   const requestId = route?.params?.requestId;
@@ -210,12 +211,11 @@ const Review = ({ route, navigation }) => {
         contentContainerStyle={appStyles.pageContent}
         showsVerticalScrollIndicator={false}
       >
-        <View style={appStyles.hero}>
-          <Text style={appStyles.heroTitle}>Request Details</Text>
-          <Text style={appStyles.heroSubtitle}>
-            View request information and submit a review after completion.
-          </Text>
-        </View>
+        <HeroSection
+          title="Request Details"
+          subtitle="View request information and submit a review after completion."
+        />
+      
 
         {message ? (
           <View

@@ -5,20 +5,21 @@ import {
   View,
   Text,
   TouchableOpacity,
+  StyleSheet,
 } from "react-native";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+
 import Header from "../../components/Common/Header";
 import FloatingActions from "../../components/Common/FloatingActions";
 import HeroSection from "../../components/Common/HeroSection";
 import CustomDropdown from "../../components/Common/CustomDropdown";
 import API from "../../services/api";
-import appStyles from "../../styles/mobileStyles";
+import appStyles, { colors } from "../../styles/mobileStyles";
 
 const statusOptions = [
-  { label: "All statuses", value: "all" },
+  { label: "All", value: "all" },
   { label: "Pending", value: "pending" },
   { label: "Accepted", value: "accepted" },
-  { label: "On the way", value: "on_the_way" },
-  { label: "In progress", value: "in_progress" },
   { label: "Completed", value: "completed" },
   { label: "Rejected", value: "rejected" },
   { label: "Cancelled", value: "cancelled" },
@@ -29,48 +30,48 @@ function MaintenanceHistory({ navigation }) {
   const [statusFilter, setStatusFilter] = useState("all");
   const [message, setMessage] = useState("");
 
-  const formatDate = (value) => {
-    if (!value) return "-";
-    const raw = String(value);
-    const match = raw.match(/^(\d{4}-\d{2}-\d{2})/);
-    return match ? match[1] : raw.slice(0, 10);
-  };
-
-  const formatTime = (value) => (value ? String(value).slice(0, 8) : "-");
-
   const loadHistory = async () => {
     try {
       setMessage("");
       const res = await API.get("/maintenance/my");
-      setRequests(Array.isArray(res.data) ? res.data : []);
-    } catch {
-      try {
-        const res = await API.get("/maintenance/history/my");
-        setRequests(Array.isArray(res.data) ? res.data : []);
-      } catch (err) {
-        setRequests([]);
-        setMessage(err.response?.data?.message || "Failed to load history.");
-      }
+      const data = Array.isArray(res.data)
+        ? res.data
+        : Array.isArray(res.data?.requests)
+        ? res.data.requests
+        : [];
+      setRequests(data);
+    } catch (err) {
+      setRequests([]);
+      setMessage(err.response?.data?.message || "Failed to load history.");
     }
   };
 
   useEffect(() => {
-    const unsubscribe = navigation.addListener("focus", loadHistory);
+    const unsub = navigation.addListener("focus", loadHistory);
     loadHistory();
-    return unsubscribe;
+    return unsub;
   }, [navigation]);
 
   const filteredRequests = useMemo(() => {
-    let result = [...requests];
-
-    if (statusFilter !== "all") {
-      result = result.filter(
-        (item) => String(item.status || "").toLowerCase() === statusFilter
-      );
-    }
-
-    return result.sort((a, b) => Number(b.id || 0) - Number(a.id || 0));
+    if (statusFilter === "all") return requests;
+    return requests.filter(
+      (r) => String(r.status || "").toLowerCase() === statusFilter
+    );
   }, [requests, statusFilter]);
+
+  const formatDate = (value) => {
+    if (!value) return "-";
+    return String(value).split("T")[0];
+  };
+
+  const openReview = (req) => {
+    navigation.navigate("Review", {
+      requestId: req.id || req.request_id,
+      technicianId: req.technician_id || req.technicianId,
+      technicianName: req.technician_name || req.tech_name,
+      status: req.status,
+    });
+  };
 
   return (
     <SafeAreaView style={appStyles.safe}>
@@ -79,24 +80,8 @@ function MaintenanceHistory({ navigation }) {
       <ScrollView contentContainerStyle={appStyles.pageContent}>
         <HeroSection
           title="Maintenance History"
-          subtitle="Track your previous and current maintenance requests."
+          subtitle="Track your requests and add reviews after completion."
         />
-
-        <View style={appStyles.card}>
-          <CustomDropdown
-            label="Filter Requests"
-            value={statusFilter}
-            options={statusOptions}
-            onChange={setStatusFilter}
-          />
-
-          <TouchableOpacity
-            style={appStyles.secondaryBtn}
-            onPress={() => setStatusFilter("all")}
-          >
-            <Text style={appStyles.secondaryBtnText}>Clear Filters</Text>
-          </TouchableOpacity>
-        </View>
 
         {message ? (
           <View style={appStyles.errorBox}>
@@ -104,47 +89,79 @@ function MaintenanceHistory({ navigation }) {
           </View>
         ) : null}
 
+        <View style={styles.filterBox}>
+          <View style={{ flex: 1 }}>
+            <CustomDropdown
+              label="Status"
+              value={statusFilter}
+              options={statusOptions}
+              onChange={setStatusFilter}
+            />
+          </View>
+
+          <TouchableOpacity
+            style={styles.clearBtn}
+            onPress={() => setStatusFilter("all")}
+          >
+            <Text style={styles.clearText}>Clear</Text>
+          </TouchableOpacity>
+        </View>
+
         {filteredRequests.length === 0 ? (
           <View style={appStyles.card}>
             <Text style={appStyles.sectionTitle}>No requests found</Text>
-            <Text style={appStyles.mutedText}>
-              Your maintenance requests will appear here.
-            </Text>
           </View>
         ) : (
-          filteredRequests.map((item) => (
-            <View style={appStyles.card} key={item.id}>
-              <View style={appStyles.between}>
-                <Text style={appStyles.sectionTitle}>{item.service || "-"}</Text>
-                <View style={appStyles.statusBadge}>
-                  <Text style={appStyles.statusText}>
-                    {String(item.status || "-").replaceAll("_", " ")}
-                  </Text>
+          filteredRequests.map((req) => {
+            const requestId = req.id || req.request_id;
+            const status = String(req.status || "pending").toLowerCase();
+
+            return (
+              <View style={appStyles.card} key={requestId}>
+                <View style={appStyles.between}>
+                  <Text style={appStyles.sectionTitle}>Request #{requestId}</Text>
+                  <View style={appStyles.statusBadge}>
+                    <Text style={appStyles.statusText}>{status}</Text>
+                  </View>
                 </View>
+
+                <Text style={appStyles.text}>
+                  Service: {req.service || req.service_type || "-"}
+                </Text>
+                <Text style={appStyles.text}>
+                  Technician: {req.technician_name || req.tech_name || "-"}
+                </Text>
+                <Text style={appStyles.text}>
+                  Date: {formatDate(req.scheduled_date || req.date)}
+                </Text>
+                <Text style={appStyles.text}>
+                  Time: {req.scheduled_time || req.time || "-"}
+                </Text>
+                <Text style={appStyles.text}>
+                  Hours: {req.estimated_hours || "-"}
+                </Text>
+                <Text style={appStyles.text}>
+                  Payment: {req.payment_method || "-"}
+                </Text>
+                <Text style={appStyles.text}>
+                  Total: {req.total_price || req.amount || 0} JOD
+                </Text>
+
+                {req.description ? (
+                  <Text style={appStyles.mutedText}>{req.description}</Text>
+                ) : null}
+
+                <TouchableOpacity
+                  style={appStyles.primaryBtn}
+                  onPress={() => openReview(req)}
+                >
+                  <Text style={appStyles.primaryBtnText}>
+                    {status === "completed" ? "Add Review" : "View Review"}
+                  </Text>
+                </TouchableOpacity>
               </View>
-
-              <Text style={appStyles.text}>
-                Technician: {item.technician_name || "-"}
-              </Text>
-              <Text style={appStyles.text}>Date: {formatDate(item.scheduled_date)}</Text>
-              <Text style={appStyles.text}>Time: {formatTime(item.scheduled_time)}</Text>
-              <Text style={appStyles.text}>Payment: {item.payment_method || "-"}</Text>
-              <Text style={appStyles.text}>
-                Total: {Number(item.total_price || item.amount || 0).toFixed(2)} JOD
-              </Text>
-
-              <TouchableOpacity
-                style={appStyles.primaryBtn}
-                onPress={() =>
-                  navigation.navigate("Review", {
-                    requestId: item.id,
-                  })
-                }
-              >
-                <Text style={appStyles.primaryBtnText}>View Details</Text>
-              </TouchableOpacity>
-            </View>
-          ))
+            );
+          })
         )}
       </ScrollView>
 
@@ -152,5 +169,31 @@ function MaintenanceHistory({ navigation }) {
     </SafeAreaView>
   );
 }
+
+const styles = StyleSheet.create({
+  filterBox: {
+    backgroundColor: "#fff",
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: 18,
+    padding: 10,
+    marginBottom: 14,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  clearBtn: {
+    height: 46,
+    paddingHorizontal: 16,
+    borderRadius: 14,
+    backgroundColor: colors.primarySoft,
+    justifyContent: "center",
+    marginTop: 18,
+  },
+  clearText: {
+    color: colors.primary,
+    fontWeight: "900",
+  },
+});
 
 export default MaintenanceHistory;

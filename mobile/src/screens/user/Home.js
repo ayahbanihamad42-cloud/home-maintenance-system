@@ -13,15 +13,24 @@ import HeroSection from "../../components/Common/HeroSection";
 import API from "../../services/api";
 import appStyles from "../../styles/mobileStyles";
 
-const serviceFallback = {
-  Plumbing: "🔧",
-  Electrical: "💡",
-  Painting: "🎨",
-  Decoration: "🏠",
+const localFallbackImages = {
+  Plumbing: require("../../assets/plumbing.png"),
+  Electrical: require("../../assets/Electrical.png"),
+  Painting: require("../../assets/Painting.png"),
+  Decoration: require("../../assets/Decoration.png"),
 };
 
 function Home({ navigation }) {
   const [services, setServices] = useState([]);
+
+  const getImageUrl = (url) => {
+    if (!url) return "";
+    if (String(url).startsWith("http")) return url;
+    if (String(url).startsWith("data:image")) return url;
+
+    const base = String(API.defaults.baseURL || "").replace(/\/api\/?$/, "");
+    return `${base}${url}`;
+  };
 
   useEffect(() => {
     const loadServices = async () => {
@@ -47,12 +56,6 @@ function Home({ navigation }) {
     ];
   }, [services]);
 
-  const getImageUrl = (url) => {
-    if (!url) return "";
-    if (String(url).startsWith("http")) return url;
-    return `http://localhost:5000${url}`;
-  };
-
   return (
     <SafeAreaView style={appStyles.safe}>
       <Header navigation={navigation} title="Home" />
@@ -70,7 +73,9 @@ function Home({ navigation }) {
 
         <View style={appStyles.grid}>
           {fixedServices.map((service) => {
-            const imageUrl = getImageUrl(service.image_url || service.image);
+            const imageUrl = getImageUrl(
+              service.image_url || service.image || service.service_image
+            );
 
             return (
               <TouchableOpacity
@@ -79,6 +84,7 @@ function Home({ navigation }) {
                 onPress={() =>
                   navigation.navigate("TechniciansByService", {
                     service: service.name,
+                    serviceId: service.id,
                   })
                 }
               >
@@ -86,13 +92,18 @@ function Home({ navigation }) {
                   {imageUrl ? (
                     <Image
                       source={{ uri: imageUrl }}
-                      style={{ width: 76, height: 76, borderRadius: 20 }}
+                      style={{ width: 92, height: 92, borderRadius: 22 }}
                       resizeMode="cover"
                     />
                   ) : (
-                    <Text style={{ fontSize: 46 }}>
-                      {serviceFallback[service.name] || "🛠️"}
-                    </Text>
+                    <Image
+                      source={
+                        localFallbackImages[service.name] ||
+                        localFallbackImages.Plumbing
+                      }
+                      style={{ width: 92, height: 92, borderRadius: 22 }}
+                      resizeMode="cover"
+                    />
                   )}
                 </View>
 

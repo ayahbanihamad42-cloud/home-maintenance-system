@@ -1,14 +1,17 @@
 import React, { useEffect, useMemo, useState } from "react";
 import {
+  Alert,
   Linking,
   SafeAreaView,
   ScrollView,
+  View,
   Text,
   TouchableOpacity,
-  View,
+  StyleSheet,
 } from "react-native";
 import MapView, { Marker } from "react-native-maps";
 import * as Location from "expo-location";
+
 import Header from "../../components/Common/Header";
 import FloatingActions from "../../components/Common/FloatingActions";
 import HeroSection from "../../components/Common/HeroSection";
@@ -17,60 +20,44 @@ import {
   getMyTechnicianRequests,
   updateTechnicianRequestStatus,
 } from "../../services/technicianService";
-import appStyles from "../../styles/mobileStyles";
+import appStyles, { colors } from "../../styles/mobileStyles";
 
-const statusOptions = [
-  { label: "All statuses", value: "all" },
+const requestStatuses = [
+  { label: "All", value: "all" },
   { label: "Pending", value: "pending" },
   { label: "Accepted", value: "accepted" },
-  { label: "On the way", value: "on_the_way" },
-  { label: "In progress", value: "in_progress" },
+  { label: "On The Way", value: "on_the_way" },
+  { label: "In Progress", value: "in_progress" },
   { label: "Completed", value: "completed" },
   { label: "Rejected", value: "rejected" },
   { label: "Cancelled", value: "cancelled" },
 ];
 
-const sortOptions = [
-  { label: "Newest request", value: "newest" },
-  { label: "Oldest request", value: "oldest" },
-];
-
 function TechnicianRequests({ navigation }) {
   const [requests, setRequests] = useState([]);
-  const [message, setMessage] = useState(null);
   const [statusFilter, setStatusFilter] = useState("all");
-  const [sortFilter, setSortFilter] = useState("newest");
+  const [message, setMessage] = useState(null);
   const [updatingId, setUpdatingId] = useState(null);
-  const [localTechLocations, setLocalTechLocations] = useState({});
+  const [loading, setLoading] = useState(false);
 
-  const formatDateOnly = (value) => {
-    if (!value) return "-";
-    const raw = String(value);
-    const match = raw.match(/^(\d{4}-\d{2}-\d{2})/);
-    return match ? match[1] : raw.slice(0, 10);
-  };
+  const normalizeStatus = (value) =>
+    String(value || "").toLowerCase().replace(/\s+/g, "_");
 
-  const formatTimeOnly = (value) => {
-    if (!value) return "-";
-    return String(value).slice(0, 8);
-  };
+  const formatDateOnly = (value) => (value ? String(value).slice(0, 10) : "-");
+  const formatTimeOnly = (value) => (value ? String(value).slice(0, 8) : "-");
 
   const getUserLocation = (item) => {
     const lat = Number(item?.user_location_lat);
     const lng = Number(item?.user_location_lng);
 
     if (Number.isFinite(lat) && Number.isFinite(lng)) {
-      return { lat, lng };
+      return { latitude: lat, longitude: lng };
     }
 
     return null;
   };
 
   const getTechnicianLocation = (item) => {
-    const local = localTechLocations[item.id];
-
-    if (local) return local;
-
     const lat = Number(
       item?.technician_location_lat ||
         item?.technician_lat ||
@@ -86,19 +73,15 @@ function TechnicianRequests({ navigation }) {
     );
 
     if (Number.isFinite(lat) && Number.isFinite(lng)) {
-      return { lat, lng };
+      return { latitude: lat, longitude: lng };
     }
 
     return null;
   };
 
-  const openMap = (loc) => {
-    if (!loc) return;
-    Linking.openURL(`https://www.google.com/maps?q=${loc.lat},${loc.lng}`);
-  };
-
   const loadRequests = async () => {
     try {
+      setLoading(true);
       setMessage(null);
 
       const data = await getMyTechnicianRequests();
@@ -107,16 +90,17 @@ function TechnicianRequests({ navigation }) {
       setRequests([]);
       setMessage({
         type: "error",
-        text: err.response?.data?.message || "Failed to load requests.",
+        body: err?.response?.data?.message || "Failed to load requests.",
       });
+    } finally {
+      setLoading(false);
     }
   };
 
   useEffect(() => {
-    const unsubscribe = navigation.addListener("focus", loadRequests);
+    const unsub = navigation.addListener("focus", loadRequests);
     loadRequests();
-
-    return unsubscribe;
+    return unsub;
   }, [navigation]);
 
   const getCurrentLocation = async () => {
@@ -141,44 +125,34 @@ function TechnicianRequests({ navigation }) {
       setUpdatingId(requestId);
       setMessage(null);
 
-      let locationPayload = {};
+      const cleanStatus = normalizeStatus(status);
+      let payload = { status: cleanStatus };
 
-      if (status === "on_the_way") {
+      if (cleanStatus === "on_the_way") {
         const loc = await getCurrentLocation();
 
         if (!loc) {
           setMessage({
             type: "error",
-            text:
-              "Please allow location access so the customer can track your location.",
+            body: "Please allow location access so the customer can track the technician.",
           });
           return;
         }
 
-        locationPayload = {
+        payload = {
+          status: cleanStatus,
           technician_location_lat: loc.lat,
           technician_location_lng: loc.lng,
-          technician_lat: loc.lat,
-          technician_lng: loc.lng,
-          current_lat: loc.lat,
-          current_lng: loc.lng,
-          latitude: loc.lat,
-          longitude: loc.lng,
         };
-
-        setLocalTechLocations((prev) => ({
-          ...prev,
-          [requestId]: loc,
-        }));
       }
 
-      await updateTechnicianRequestStatus(requestId, status, locationPayload);
+      await updateTechnicianRequestStatus(requestId, payload);
 
       setMessage({
         type: "success",
-        text:
-          status === "on_the_way"
-            ? "Status updated and your live location has been shared with the customer."
+        body:
+          cleanStatus === "on_the_way"
+            ? "Status updated and live location sent to the customer."
             : "Request status updated successfully.",
       });
 
@@ -186,9 +160,7 @@ function TechnicianRequests({ navigation }) {
     } catch (err) {
       setMessage({
         type: "error",
-        text:
-          err.response?.data?.message ||
-          "Failed to update request status.",
+        body: err?.response?.data?.message || "Failed to update request status.",
       });
     } finally {
       setUpdatingId(null);
@@ -196,28 +168,65 @@ function TechnicianRequests({ navigation }) {
   };
 
   const filteredRequests = useMemo(() => {
-    let result = [...requests];
+    if (statusFilter === "all") return requests;
 
-    if (statusFilter !== "all") {
-      result = result.filter(
-        (item) => String(item.status || "").toLowerCase() === statusFilter
-      );
+    return requests.filter(
+      (item) => normalizeStatus(item.status) === normalizeStatus(statusFilter)
+    );
+  }, [requests, statusFilter]);
+
+  const openCustomerChat = (item) => {
+    const receiverId =
+      item.user_id || item.customer_id || item.client_id || item.request_user_id;
+
+    if (!receiverId) {
+      Alert.alert("Chat", "Customer id is missing.");
+      return;
     }
 
-    result.sort((a, b) => {
-      if (sortFilter === "oldest") {
-        return Number(a.id || 0) - Number(b.id || 0);
-      }
-
-      return Number(b.id || 0) - Number(a.id || 0);
+    global.openMobileChatWith?.({
+      id: receiverId,
+      name: item.user_name || item.customer_name || "Customer",
     });
+  };
 
-    return result;
-  }, [requests, statusFilter, sortFilter]);
+  const openMap = (loc) => {
+    if (!loc) return;
+    Linking.openURL(`https://www.google.com/maps?q=${loc.latitude},${loc.longitude}`);
+  };
 
-  const nextButton = (item) => {
-    const status = String(item.status || "").toLowerCase();
-    const disabled = updatingId === item.id;
+  const renderMap = (title, loc) => {
+    if (!loc) return null;
+
+    return (
+      <View style={styles.mapCard}>
+        <Text style={styles.mapTitle}>{title}</Text>
+
+        <View style={styles.mapWrap}>
+          <MapView
+            style={styles.map}
+            initialRegion={{
+              latitude: loc.latitude,
+              longitude: loc.longitude,
+              latitudeDelta: 0.01,
+              longitudeDelta: 0.01,
+            }}
+          >
+            <Marker coordinate={loc} title={title} />
+          </MapView>
+        </View>
+
+        <TouchableOpacity style={appStyles.secondaryBtn} onPress={() => openMap(loc)}>
+          <Text style={appStyles.secondaryBtnText}>Open Map</Text>
+        </TouchableOpacity>
+      </View>
+    );
+  };
+
+  const renderActions = (item) => {
+    const status = normalizeStatus(item.status);
+    const requestId = item.id || item.request_id;
+    const disabled = updatingId === requestId;
 
     if (status === "pending") {
       return (
@@ -225,7 +234,7 @@ function TechnicianRequests({ navigation }) {
           <TouchableOpacity
             style={[appStyles.primaryBtn, { flex: 1 }]}
             disabled={disabled}
-            onPress={() => updateStatus(item.id, "accepted")}
+            onPress={() => updateStatus(requestId, "accepted")}
           >
             <Text style={appStyles.primaryBtnText}>
               {disabled ? "Updating..." : "Accept"}
@@ -233,11 +242,11 @@ function TechnicianRequests({ navigation }) {
           </TouchableOpacity>
 
           <TouchableOpacity
-            style={[appStyles.dangerBtn, { flex: 1 }]}
+            style={[appStyles.secondaryBtn, { flex: 1 }]}
             disabled={disabled}
-            onPress={() => updateStatus(item.id, "rejected")}
+            onPress={() => updateStatus(requestId, "rejected")}
           >
-            <Text style={appStyles.dangerBtnText}>Reject</Text>
+            <Text style={appStyles.secondaryBtnText}>Reject</Text>
           </TouchableOpacity>
         </View>
       );
@@ -248,7 +257,7 @@ function TechnicianRequests({ navigation }) {
         <TouchableOpacity
           style={appStyles.primaryBtn}
           disabled={disabled}
-          onPress={() => updateStatus(item.id, "on_the_way")}
+          onPress={() => updateStatus(requestId, "on_the_way")}
         >
           <Text style={appStyles.primaryBtnText}>
             {disabled ? "Getting Location..." : "On The Way"}
@@ -262,7 +271,7 @@ function TechnicianRequests({ navigation }) {
         <TouchableOpacity
           style={appStyles.primaryBtn}
           disabled={disabled}
-          onPress={() => updateStatus(item.id, "in_progress")}
+          onPress={() => updateStatus(requestId, "in_progress")}
         >
           <Text style={appStyles.primaryBtnText}>
             {disabled ? "Updating..." : "In Progress"}
@@ -276,7 +285,7 @@ function TechnicianRequests({ navigation }) {
         <TouchableOpacity
           style={appStyles.primaryBtn}
           disabled={disabled}
-          onPress={() => updateStatus(item.id, "completed")}
+          onPress={() => updateStatus(requestId, "completed")}
         >
           <Text style={appStyles.primaryBtnText}>
             {disabled ? "Updating..." : "Completed"}
@@ -292,90 +301,69 @@ function TechnicianRequests({ navigation }) {
     <SafeAreaView style={appStyles.safe}>
       <Header navigation={navigation} title="Requests" />
 
-      <ScrollView
-        contentContainerStyle={appStyles.pageContent}
-        showsVerticalScrollIndicator={false}
-      >
+      <ScrollView contentContainerStyle={appStyles.pageContent}>
         <HeroSection
           title="Technician Requests"
           subtitle="Manage assigned maintenance requests and update their status."
         />
 
+        <View style={styles.filterBox}>
+          <View style={{ flex: 1 }}>
+            <CustomDropdown
+              label="Status"
+              value={statusFilter}
+              options={requestStatuses}
+              onChange={setStatusFilter}
+            />
+          </View>
+
+          <TouchableOpacity style={styles.clearBtn} onPress={() => setStatusFilter("all")}>
+            <Text style={styles.clearText}>Clear</Text>
+          </TouchableOpacity>
+        </View>
+
         {message ? (
-          <View
-            style={
-              message.type === "success"
-                ? appStyles.successBox
-                : appStyles.errorBox
-            }
-          >
-            <Text
-              style={
-                message.type === "success"
-                  ? appStyles.successText
-                  : appStyles.errorText
-              }
-            >
-              {message.text}
+          <View style={message.type === "error" ? appStyles.errorBox : appStyles.successBox}>
+            <Text style={message.type === "error" ? appStyles.errorText : appStyles.successText}>
+              {message.body}
             </Text>
           </View>
         ) : null}
 
-        <View style={appStyles.card}>
-          <CustomDropdown
-            label="Status Filter"
-            value={statusFilter}
-            options={statusOptions}
-            onChange={setStatusFilter}
-          />
-
-          <CustomDropdown
-            label="Sort"
-            value={sortFilter}
-            options={sortOptions}
-            onChange={setSortFilter}
-          />
-
-          <TouchableOpacity
-            style={appStyles.secondaryBtn}
-            onPress={() => {
-              setStatusFilter("all");
-              setSortFilter("newest");
-            }}
-          >
-            <Text style={appStyles.secondaryBtnText}>Clear Filters</Text>
-          </TouchableOpacity>
-        </View>
-
-        {filteredRequests.length === 0 ? (
+        {loading ? (
+          <View style={appStyles.card}>
+            <Text style={appStyles.sectionTitle}>Loading...</Text>
+          </View>
+        ) : filteredRequests.length === 0 ? (
           <View style={appStyles.card}>
             <Text style={appStyles.sectionTitle}>No requests found</Text>
           </View>
         ) : (
           filteredRequests.map((item) => {
+            const requestId = item.id || item.request_id;
+            const status = normalizeStatus(item.status);
             const userLoc = getUserLocation(item);
             const techLoc = getTechnicianLocation(item);
-            const status = String(item.status || "").toLowerCase();
 
             return (
-              <View style={appStyles.card} key={item.id}>
+              <View style={appStyles.card} key={requestId}>
                 <View style={appStyles.between}>
-                  <Text style={appStyles.sectionTitle}>
-                    {item.service || "-"}
-                  </Text>
-
+                  <Text style={appStyles.sectionTitle}>Request #{requestId}</Text>
                   <View style={appStyles.statusBadge}>
                     <Text style={appStyles.statusText}>
-                      {String(item.status || "-").replaceAll("_", " ")}
+                      {status.replace(/_/g, " ")}
                     </Text>
                   </View>
                 </View>
 
                 <Text style={appStyles.text}>
-                  User: {item.user_name || item.customer_name || "-"}
+                  Customer: {item.user_name || item.customer_name || "-"}
                 </Text>
                 <Text style={appStyles.text}>
                   Phone: {item.user_phone || "-"}
+                </Text>
+                <Text style={appStyles.text}>
+                  Service: {item.service || item.service_type || "-"}
                 </Text>
                 <Text style={appStyles.text}>
                   Date: {formatDateOnly(item.scheduled_date)}
@@ -387,111 +375,44 @@ function TechnicianRequests({ navigation }) {
                   Payment: {item.payment_method || "-"}
                 </Text>
                 <Text style={appStyles.text}>
-                  Total:{" "}
-                  {Number(item.total_price || item.amount || 0).toFixed(2)} JOD
+                  Total: {Number(item.total_price || item.amount || 0).toFixed(2)} JOD
                 </Text>
-                <Text style={appStyles.text}>
+                <Text style={appStyles.mutedText}>
                   Note: {item.location_note || item.city || "-"}
                 </Text>
-
-                {userLoc && (
-                  <View style={[appStyles.card, { marginTop: 14 }]}>
-                    <Text style={appStyles.sectionTitle}>Customer Location</Text>
-
-                    <MapView
-                      style={{
-                        width: "100%",
-                        height: 230,
-                        borderRadius: 22,
-                        overflow: "hidden",
-                      }}
-                      initialRegion={{
-                        latitude: userLoc.lat,
-                        longitude: userLoc.lng,
-                        latitudeDelta: 0.01,
-                        longitudeDelta: 0.01,
-                      }}
-                    >
-                      <Marker
-                        coordinate={{
-                          latitude: userLoc.lat,
-                          longitude: userLoc.lng,
-                        }}
-                        title="Customer Location"
-                      />
-                    </MapView>
-
-                    <TouchableOpacity
-                      style={appStyles.secondaryBtn}
-                      onPress={() => openMap(userLoc)}
-                    >
-                      <Text style={appStyles.secondaryBtnText}>
-                        Open Customer Location
-                      </Text>
-                    </TouchableOpacity>
-                  </View>
-                )}
-
-                {status === "accepted" && (
-                  <View style={appStyles.successBox}>
-                    <Text style={appStyles.successText}>
-                      When you press On The Way, your live location will be
-                      shared with the customer.
-                    </Text>
-                  </View>
-                )}
-
-                {techLoc && (
-                  <View style={[appStyles.card, { marginTop: 14 }]}>
-                    <Text style={appStyles.sectionTitle}>Your Live Location</Text>
-
-                    <MapView
-                      style={{
-                        width: "100%",
-                        height: 230,
-                        borderRadius: 22,
-                        overflow: "hidden",
-                      }}
-                      initialRegion={{
-                        latitude: techLoc.lat,
-                        longitude: techLoc.lng,
-                        latitudeDelta: 0.01,
-                        longitudeDelta: 0.01,
-                      }}
-                    >
-                      <Marker
-                        coordinate={{
-                          latitude: techLoc.lat,
-                          longitude: techLoc.lng,
-                        }}
-                        title="Technician Location"
-                      />
-                    </MapView>
-
-                    <TouchableOpacity
-                      style={appStyles.secondaryBtn}
-                      onPress={() => openMap(techLoc)}
-                    >
-                      <Text style={appStyles.secondaryBtnText}>
-                        Open My Live Location
-                      </Text>
-                    </TouchableOpacity>
-                  </View>
-                )}
-
-                {status === "on_the_way" && (
-                  <View style={appStyles.successBox}>
-                    <Text style={appStyles.successText}>
-                      Your live location has been shared with the customer.
-                    </Text>
-                  </View>
-                )}
-
-                <Text style={[appStyles.mutedText, { marginTop: 10 }]}>
+                <Text style={appStyles.mutedText}>
                   {item.description || "-"}
                 </Text>
 
-                {nextButton(item)}
+                {renderMap("Customer Location", userLoc)}
+
+                {status === "on_the_way" && renderMap("Your Shared Live Location", techLoc)}
+
+                {status === "accepted" ? (
+                  <View style={appStyles.successBox}>
+                    <Text style={appStyles.successText}>
+                      When you press On The Way, your live location will be shared with the customer.
+                    </Text>
+                  </View>
+                ) : null}
+
+                <View style={appStyles.row}>
+                  <TouchableOpacity
+                    style={[appStyles.secondaryBtn, { flex: 1 }]}
+                    onPress={() => openCustomerChat(item)}
+                  >
+                    <Text style={appStyles.secondaryBtnText}>Chat</Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    style={[appStyles.secondaryBtn, { flex: 1 }]}
+                    onPress={() => openMap(userLoc)}
+                  >
+                    <Text style={appStyles.secondaryBtnText}>Customer Map</Text>
+                  </TouchableOpacity>
+                </View>
+
+                {renderActions(item)}
               </View>
             );
           })
@@ -502,5 +423,53 @@ function TechnicianRequests({ navigation }) {
     </SafeAreaView>
   );
 }
+
+const styles = StyleSheet.create({
+  filterBox: {
+    backgroundColor: "#fff",
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: 18,
+    padding: 10,
+    marginBottom: 14,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  clearBtn: {
+    height: 46,
+    paddingHorizontal: 16,
+    borderRadius: 14,
+    backgroundColor: colors.primarySoft,
+    justifyContent: "center",
+    marginTop: 18,
+  },
+  clearText: {
+    color: colors.primary,
+    fontWeight: "900",
+  },
+  mapCard: {
+    marginTop: 14,
+    marginBottom: 10,
+  },
+  mapTitle: {
+    color: colors.text,
+    fontWeight: "900",
+    fontSize: 18,
+    marginBottom: 10,
+  },
+  mapWrap: {
+    height: 230,
+    borderRadius: 22,
+    overflow: "hidden",
+    borderWidth: 1,
+    borderColor: colors.border,
+    marginBottom: 10,
+  },
+  map: {
+    width: "100%",
+    height: "100%",
+  },
+});
 
 export default TechnicianRequests;

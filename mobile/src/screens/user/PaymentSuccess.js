@@ -3,6 +3,7 @@ import { SafeAreaView, ScrollView, View, Text, TouchableOpacity } from "react-na
 import Header from "../../components/Common/Header";
 import FloatingActions from "../../components/Common/FloatingActions";
 import appStyles from "../../styles/mobileStyles";
+import HeroSection from "../../components/Common/HeroSection";
 
 function PaymentSuccess({ route, navigation }) {
   const requestId = route?.params?.requestId || "-";
@@ -17,12 +18,10 @@ function PaymentSuccess({ route, navigation }) {
         contentContainerStyle={appStyles.pageContent}
         showsVerticalScrollIndicator={false}
       >
-        <View style={appStyles.hero}>
-          <Text style={appStyles.heroTitle}>Payment Successful</Text>
-          <Text style={appStyles.heroSubtitle}>
-            Your payment was completed and your request is ready.
-          </Text>
-        </View>
+        <HeroSection
+          title="Payment Successful"
+          subtitle="Your payment was completed and your request is ready."
+        />
 
         <View style={appStyles.card}>
           <Text style={{ fontSize: 58, textAlign: "center", marginBottom: 18 }}>

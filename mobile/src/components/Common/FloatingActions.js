@@ -10,16 +10,19 @@ import {
   StyleSheet,
   KeyboardAvoidingView,
   Platform,
+  Linking,
 } from "react-native";
 import * as ImagePicker from "expo-image-picker";
 import * as Location from "expo-location";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+
 import appStyles, { colors } from "../../styles/mobileStyles";
-import {
-  getChatMessages,
-  sendChatMessage,
-} from "../../services/chatService";
 import API from "../../services/api";
+import {
+  getChatConversations,
+  getMessages,
+  sendMessage,
+} from "../../services/chatService";
 
 function FloatingActions({ navigation }) {
   const [chatOpen, setChatOpen] = useState(false);
@@ -41,6 +44,7 @@ function FloatingActions({ navigation }) {
     },
   ]);
   const [aiText, setAiText] = useState("");
+  const [aiImage, setAiImage] = useState(null);
   const [aiLoading, setAiLoading] = useState(false);
 
   const scrollRef = useRef(null);
@@ -54,80 +58,74 @@ function FloatingActions({ navigation }) {
     loadUser();
   }, []);
 
-  const loadChatUsers = async () => {
-    try {
-      setChatError("");
-
-      const res = await API.get("/chat/conversations");
-      const list = Array.isArray(res.data) ? res.data : [];
-
-      setChatUsers(list);
-    } catch {
-      try {
-        const res = await API.get("/users");
-        const list = Array.isArray(res.data) ? res.data : [];
-        setChatUsers(list.filter((item) => Number(item.id) !== Number(user.id)));
-      } catch {
-        setChatUsers([]);
-      }
-    }
-  };
-
-  const openChatList = async () => {
-    setChatListOpen(true);
-    await loadChatUsers();
-  };
-
-  const openChatWith = async (item) => {
-    const receiverId =
-      item.receiver_id ||
-      item.sender_id ||
-      item.user_id ||
-      item.id ||
-      item.other_user_id;
-
-    const receiverName =
-      item.receiver_name ||
-      item.sender_name ||
-      item.name ||
-      item.other_user_name ||
-      "Chat";
-
-    if (!receiverId) {
-      setChatError("Could not open this conversation.");
-      return;
-    }
-
-    const selected = {
-      id: receiverId,
-      name: receiverName,
-    };
-
-    setReceiver(selected);
-    setChatListOpen(false);
-    setChatOpen(true);
-    await loadMessages(selected.id);
-  };
-
-  const loadMessages = async (receiverIdParam = receiver?.id) => {
+  const loadMessages = async (receiverIdParam) => {
     try {
       if (!receiverIdParam) return;
 
-      const data = await getChatMessages(receiverIdParam);
+      const data = await getMessages(receiverIdParam);
       setMessages(Array.isArray(data) ? data : []);
 
       setTimeout(() => {
         scrollRef.current?.scrollToEnd?.({ animated: true });
-      }, 100);
+      }, 120);
     } catch {
       setMessages([]);
+      setChatError("Could not load messages.");
     }
   };
 
+  const loadChatUsers = async () => {
+    try {
+      setChatError("");
+      const data = await getChatConversations();
+      setChatUsers(Array.isArray(data) ? data : []);
+    } catch {
+      setChatUsers([]);
+      setChatError("Could not load conversations.");
+    }
+  };
+
+  const openChatList = async () => {
+    setChatOpen(false);
+    setChatListOpen(true);
+    await loadChatUsers();
+  };
+
+  useEffect(() => {
+    global.openMobileChatCard = () => {
+      openChatList();
+    };
+
+    global.openMobileAICard = () => {
+      setAiOpen(true);
+    };
+
+    global.openMobileChatWith = async (person) => {
+      if (!person?.id) {
+        setChatError("Could not open this conversation.");
+        setChatListOpen(true);
+        return;
+      }
+
+      setReceiver({
+        id: person.id,
+        name: person.name || "Chat",
+      });
+
+      setChatListOpen(false);
+      setChatOpen(true);
+      await loadMessages(person.id);
+    };
+
+    return () => {
+      global.openMobileChatCard = null;
+      global.openMobileAICard = null;
+      global.openMobileChatWith = null;
+    };
+  }, [user?.id]);
+
   useEffect(() => {
     if (!chatOpen || !receiver?.id) return;
-
-    loadMessages(receiver.id);
 
     const timer = setInterval(() => {
       loadMessages(receiver.id);
@@ -136,11 +134,47 @@ function FloatingActions({ navigation }) {
     return () => clearInterval(timer);
   }, [chatOpen, receiver?.id]);
 
+  const getReceiverId = (item) => {
+    return (
+      item.other_user_id ||
+      item.userId ||
+      item.user_id ||
+      item.receiver_id ||
+      item.sender_id ||
+      item.id
+    );
+  };
+
+  const getReceiverName = (item) => {
+    return (
+      item.other_user_name ||
+      item.receiver_name ||
+      item.sender_name ||
+      item.name ||
+      "Chat"
+    );
+  };
+
+  const openChatWith = async (item) => {
+    const id = getReceiverId(item);
+    const name = getReceiverName(item);
+
+    if (!id) {
+      setChatError("Could not open this conversation.");
+      return;
+    }
+
+    setReceiver({ id, name });
+    setChatListOpen(false);
+    setChatOpen(true);
+    await loadMessages(id);
+  };
+
   const sendText = async () => {
     try {
       if (!receiver?.id || !chatText.trim()) return;
 
-      await sendChatMessage({
+      await sendMessage({
         receiver_id: Number(receiver.id),
         message: chatText.trim(),
         type: "text",
@@ -157,8 +191,7 @@ function FloatingActions({ navigation }) {
     try {
       if (!receiver?.id) return;
 
-      const permission =
-        await ImagePicker.requestMediaLibraryPermissionsAsync();
+      const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
 
       if (!permission.granted) {
         setChatError("Please allow gallery access.");
@@ -167,7 +200,7 @@ function FloatingActions({ navigation }) {
 
       const result = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: ImagePicker.MediaTypeOptions.Images,
-        quality: 0.45,
+        quality: 0.35,
         base64: true,
       });
 
@@ -180,7 +213,7 @@ function FloatingActions({ navigation }) {
         return;
       }
 
-      await sendChatMessage({
+      await sendMessage({
         receiver_id: Number(receiver.id),
         message: `data:image/jpeg;base64,${asset.base64}`,
         type: "image",
@@ -209,7 +242,7 @@ function FloatingActions({ navigation }) {
 
       const url = `https://www.google.com/maps?q=${pos.coords.latitude},${pos.coords.longitude}`;
 
-      await sendChatMessage({
+      await sendMessage({
         receiver_id: Number(receiver.id),
         message: url,
         type: "location",
@@ -221,34 +254,62 @@ function FloatingActions({ navigation }) {
     }
   };
 
+  const pickAIImage = async () => {
+    const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+
+    if (!permission.granted) return;
+
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      quality: 0.35,
+      base64: true,
+    });
+
+    if (!result.canceled) {
+      const asset = result.assets?.[0];
+      if (asset?.base64) {
+        setAiImage(`data:image/jpeg;base64,${asset.base64}`);
+      }
+    }
+  };
+
   const sendAI = async () => {
     try {
-      if (!aiText.trim()) return;
+      if (!aiText.trim() && !aiImage) return;
 
-      const userMessage = aiText.trim();
+      const text = aiText.trim();
 
-      setAiMessages((prev) => [...prev, { role: "user", text: userMessage }]);
+      setAiMessages((prev) => [
+        ...prev,
+        { role: "user", text: text || "Analyze this image", image: aiImage },
+      ]);
+
       setAiText("");
       setAiLoading(true);
 
       const res = await API.post("/ai/chat", {
-        message: userMessage,
+        message: text || "Analyze this image",
+        image: aiImage,
       });
 
-      const reply =
-        res.data?.reply ||
-        res.data?.message ||
-        res.data?.text ||
-        "I could not generate a response right now.";
-
-      setAiMessages((prev) => [...prev, { role: "assistant", text: reply }]);
-    } catch {
       setAiMessages((prev) => [
         ...prev,
         {
           role: "assistant",
-          text: "AI assistant is currently unavailable. Please try again later.",
+          text:
+            res.data?.reply ||
+            res.data?.message ||
+            res.data?.text ||
+            "Done.",
+          image: res.data?.url || res.data?.image || null,
         },
+      ]);
+
+      setAiImage(null);
+    } catch {
+      setAiMessages((prev) => [
+        ...prev,
+        { role: "assistant", text: "AI assistant failed." },
       ]);
     } finally {
       setAiLoading(false);
@@ -266,19 +327,11 @@ function FloatingActions({ navigation }) {
         style={[styles.messageBubble, mine && styles.mineBubble]}
       >
         {type === "image" ? (
-          <Image
-            source={{ uri: content }}
-            style={styles.messageImage}
-            resizeMode="cover"
-          />
+          <Image source={{ uri: content }} style={styles.messageImage} />
         ) : type === "location" ? (
           <Text
             style={[styles.messageText, mine && styles.mineText]}
-            onPress={() => {
-              try {
-                navigation?.navigate?.("Home");
-              } catch {}
-            }}
+            onPress={() => Linking.openURL(content)}
           >
             📍 Open Location
           </Text>
@@ -323,46 +376,34 @@ function FloatingActions({ navigation }) {
               {chatUsers.length === 0 ? (
                 <View style={styles.emptyCard}>
                   <Text style={styles.emptyTitle}>No conversations</Text>
-                  <Text style={styles.emptyText}>
-                    Messages will appear here.
-                  </Text>
+                  <Text style={styles.emptyText}>Messages will appear here.</Text>
                 </View>
               ) : (
-                chatUsers.map((item, index) => {
-                  const name =
-                    item.receiver_name ||
-                    item.sender_name ||
-                    item.other_user_name ||
-                    item.name ||
-                    "User";
+                chatUsers.map((item, index) => (
+                  <TouchableOpacity
+                    key={item.id || item.user_id || index}
+                    style={styles.conversationItem}
+                    onPress={() => openChatWith(item)}
+                  >
+                    <View style={styles.smallAvatar}>
+                      <Text style={styles.smallAvatarText}>
+                        {String(getReceiverName(item)).charAt(0).toUpperCase()}
+                      </Text>
+                    </View>
 
-                  const last =
-                    item.last_message ||
-                    item.message ||
-                    item.snippet ||
-                    "Open conversation";
-
-                  return (
-                    <TouchableOpacity
-                      key={item.id || item.user_id || index}
-                      style={styles.conversationItem}
-                      onPress={() => openChatWith(item)}
-                    >
-                      <View style={styles.smallAvatar}>
-                        <Text style={styles.smallAvatarText}>
-                          {String(name).charAt(0).toUpperCase()}
-                        </Text>
-                      </View>
-
-                      <View style={{ flex: 1 }}>
-                        <Text style={styles.conversationName}>{name}</Text>
-                        <Text style={styles.conversationLast} numberOfLines={1}>
-                          {last}
-                        </Text>
-                      </View>
-                    </TouchableOpacity>
-                  );
-                })
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.conversationName}>
+                        {getReceiverName(item)}
+                      </Text>
+                      <Text style={styles.conversationLast} numberOfLines={1}>
+                        {item.last_message ||
+                          item.message ||
+                          item.snippet ||
+                          "Open conversation"}
+                      </Text>
+                    </View>
+                  </TouchableOpacity>
+                ))
               )}
             </ScrollView>
           </View>
@@ -459,6 +500,10 @@ function FloatingActions({ navigation }) {
                   >
                     {item.text}
                   </Text>
+
+                  {item.image ? (
+                    <Image source={{ uri: item.image }} style={styles.messageImage} />
+                  ) : null}
                 </View>
               ))}
 
@@ -469,7 +514,20 @@ function FloatingActions({ navigation }) {
               ) : null}
             </ScrollView>
 
+            {aiImage ? (
+              <View style={styles.previewBox}>
+                <Image source={{ uri: aiImage }} style={styles.previewImage} />
+                <TouchableOpacity onPress={() => setAiImage(null)}>
+                  <Text style={styles.removeImage}>Remove</Text>
+                </TouchableOpacity>
+              </View>
+            ) : null}
+
             <View style={styles.inputRow}>
+              <TouchableOpacity style={styles.aiImageBtn} onPress={pickAIImage}>
+                <Text style={styles.aiImageText}>📷</Text>
+              </TouchableOpacity>
+
               <TextInput
                 style={styles.messageInput}
                 value={aiText}
@@ -496,7 +554,6 @@ const styles = StyleSheet.create({
     zIndex: 100,
     gap: 14,
   },
-
   floatBtn: {
     width: 66,
     height: 66,
@@ -504,204 +561,194 @@ const styles = StyleSheet.create({
     backgroundColor: colors.primary,
     justifyContent: "center",
     alignItems: "center",
-    shadowColor: colors.primaryDark,
-    shadowOpacity: 0.25,
-    shadowRadius: 10,
-    shadowOffset: { width: 0, height: 6 },
     elevation: 7,
   },
-
-  floatText: {
-    fontSize: 27,
-  },
-
+  floatText: { fontSize: 27 },
   overlay: {
     flex: 1,
     backgroundColor: "rgba(31,22,51,0.38)",
     justifyContent: "flex-end",
   },
-
   bottomCard: {
-    backgroundColor: "#FFFFFF",
+    backgroundColor: "#fff",
     borderTopLeftRadius: 30,
     borderTopRightRadius: 30,
+    padding: 18,
+    height: "66%",
     borderWidth: 1,
     borderColor: colors.border,
-    padding: 18,
-    maxHeight: "82%",
-    minHeight: "58%",
   },
-
   cardHeader: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
     marginBottom: 14,
   },
-
   cardTitle: {
-    fontSize: 28,
-    fontWeight: "900",
     color: colors.text,
+    fontSize: 30,
+    fontWeight: "900",
   },
-
   close: {
-    fontSize: 28,
-    fontWeight: "900",
     color: colors.text,
-  },
-
-  messagesArea: {
-    flex: 1,
-    backgroundColor: "#FBFAFF",
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: 24,
-    padding: 12,
-    marginBottom: 12,
-  },
-
-  messageBubble: {
-    backgroundColor: "#FFFFFF",
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: 18,
-    padding: 12,
-    marginBottom: 10,
-    maxWidth: "85%",
-    alignSelf: "flex-start",
-  },
-
-  mineBubble: {
-    backgroundColor: colors.primary,
-    alignSelf: "flex-end",
-  },
-
-  messageText: {
-    color: colors.text,
-    fontSize: 16,
-    lineHeight: 23,
-  },
-
-  mineText: {
-    color: "#FFFFFF",
-  },
-
-  messageImage: {
-    width: 210,
-    height: 160,
-    borderRadius: 16,
-  },
-
-  toolsRow: {
-    flexDirection: "row",
-    gap: 10,
-    marginBottom: 10,
-  },
-
-  toolBtn: {
-    flex: 1,
-    backgroundColor: "#FFFFFF",
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: 18,
-    paddingVertical: 12,
-    alignItems: "center",
-  },
-
-  toolText: {
-    color: colors.primaryDark,
+    fontSize: 34,
     fontWeight: "900",
   },
-
-  inputRow: {
-    flexDirection: "row",
-    gap: 10,
-    alignItems: "center",
-  },
-
-  messageInput: {
-    flex: 1,
-    minHeight: 52,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: 18,
-    paddingHorizontal: 14,
-    fontSize: 16,
-    color: colors.text,
-  },
-
-  sendBtn: {
-    backgroundColor: colors.primary,
-    borderRadius: 18,
-    minHeight: 52,
-    paddingHorizontal: 18,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-
-  sendText: {
-    color: "#FFFFFF",
-    fontWeight: "900",
-  },
-
-  emptyCard: {
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: 20,
-    padding: 18,
-    backgroundColor: "#FFFFFF",
-  },
-
-  emptyTitle: {
-    fontSize: 18,
-    fontWeight: "900",
-    color: colors.text,
-  },
-
-  emptyText: {
-    fontSize: 15,
-    color: colors.muted,
-    marginTop: 6,
-  },
-
   conversationItem: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 12,
+    gap: 14,
     backgroundColor: "#FBFAFF",
     borderWidth: 1,
     borderColor: colors.border,
-    borderRadius: 20,
+    borderRadius: 22,
     padding: 14,
     marginBottom: 12,
   },
-
   smallAvatar: {
-    width: 48,
-    height: 48,
-    borderRadius: 18,
+    width: 56,
+    height: 56,
+    borderRadius: 20,
     backgroundColor: colors.primarySoft,
-    alignItems: "center",
     justifyContent: "center",
+    alignItems: "center",
   },
-
   smallAvatarText: {
-    color: colors.primaryDark,
+    color: colors.primary,
+    fontSize: 22,
     fontWeight: "900",
-    fontSize: 18,
   },
-
   conversationName: {
     color: colors.text,
     fontSize: 17,
     fontWeight: "900",
   },
-
   conversationLast: {
     color: colors.muted,
-    fontSize: 14,
-    marginTop: 3,
+    fontSize: 15,
+    marginTop: 4,
+  },
+  emptyCard: {
+    backgroundColor: "#FBFAFF",
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: 22,
+    padding: 18,
+  },
+  emptyTitle: {
+    color: colors.text,
+    fontSize: 17,
+    fontWeight: "900",
+  },
+  emptyText: {
+    color: colors.muted,
+    marginTop: 6,
+    fontWeight: "700",
+  },
+  messagesArea: {
+    flex: 1,
+    backgroundColor: "#FBFAFF",
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: 22,
+    padding: 12,
+  },
+  messageBubble: {
+    maxWidth: "82%",
+    backgroundColor: "#fff",
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: 18,
+    padding: 12,
+    marginBottom: 10,
+    alignSelf: "flex-start",
+  },
+  mineBubble: {
+    alignSelf: "flex-end",
+    backgroundColor: colors.primary,
+    borderColor: colors.primary,
+  },
+  messageText: {
+    color: colors.text,
+    fontSize: 15,
+    lineHeight: 23,
+    fontWeight: "700",
+  },
+  mineText: { color: "#fff" },
+  messageImage: {
+    width: 190,
+    height: 160,
+    borderRadius: 16,
+    marginTop: 8,
+  },
+  toolsRow: {
+    flexDirection: "row",
+    gap: 10,
+    marginTop: 10,
+  },
+  toolBtn: {
+    flex: 1,
+    backgroundColor: colors.primarySoft,
+    borderRadius: 16,
+    paddingVertical: 11,
+    alignItems: "center",
+  },
+  toolText: {
+    color: colors.primaryDark,
+    fontWeight: "900",
+  },
+  inputRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    marginTop: 10,
+  },
+  messageInput: {
+    flex: 1,
+    minHeight: 54,
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: colors.border,
+    paddingHorizontal: 14,
+    color: colors.text,
+    fontSize: 15,
+  },
+  sendBtn: {
+    minHeight: 54,
+    borderRadius: 18,
+    backgroundColor: colors.primary,
+    paddingHorizontal: 16,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  sendText: {
+    color: "#fff",
+    fontWeight: "900",
+    fontSize: 15,
+  },
+  aiImageBtn: {
+    width: 54,
+    height: 54,
+    borderRadius: 18,
+    backgroundColor: colors.primarySoft,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  aiImageText: { fontSize: 22 },
+  previewBox: {
+    marginTop: 10,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+  },
+  previewImage: {
+    width: 70,
+    height: 70,
+    borderRadius: 16,
+  },
+  removeImage: {
+    color: "#D62828",
+    fontWeight: "900",
   },
 });
 

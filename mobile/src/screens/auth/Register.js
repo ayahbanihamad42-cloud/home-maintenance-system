@@ -18,21 +18,11 @@ import API from "../../services/api";
 import appStyles, { colors } from "../../styles/mobileStyles";
 import CustomDropdown from "../../components/Common/CustomDropdown";
 
-const homeLogo = require("../../../assets/home.png");
+const homeLogo = require("../../assets/home.png");
 
 const cityOptions = [
-  "Amman",
-  "Irbid",
-  "Zarqa",
-  "Aqaba",
-  "Mafraq",
-  "Jerash",
-  "Ajloun",
-  "Madaba",
-  "Karak",
-  "Tafilah",
-  "Maan",
-  "Balqa",
+  "Amman", "Irbid", "Zarqa", "Aqaba", "Mafraq", "Jerash",
+  "Ajloun", "Madaba", "Karak", "Tafilah", "Maan", "Balqa"
 ].map((city) => ({ label: city, value: city }));
 
 function Register({ navigation }) {
@@ -133,10 +123,7 @@ function Register({ navigation }) {
     } catch (err) {
       setMessage({
         type: "error",
-        text:
-          err.response?.data?.message ||
-          err.message ||
-          "Failed to create account.",
+        text: err.response?.data?.message || err.message || "Failed to create account.",
       });
     } finally {
       setLoading(false);
@@ -147,7 +134,7 @@ function Register({ navigation }) {
     <SafeAreaView style={styles.safe}>
       <KeyboardAvoidingView
         style={styles.flex}
-        behavior={Platform.OS === "ios" ? "padding" : undefined}
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
       >
         <ScrollView
           contentContainerStyle={styles.scrollContent}
@@ -156,7 +143,7 @@ function Register({ navigation }) {
         >
           <View style={styles.authCard}>
             <ImageBackground
-              source={authBg}
+              source={homeLogo}
               style={styles.leftSide}
               imageStyle={styles.leftImage}
             >
@@ -180,42 +167,22 @@ function Register({ navigation }) {
                 />
 
                 <Text style={styles.brand}>خدمة</Text>
-
                 <Text style={styles.heroTitle}>Create your account.</Text>
-
                 <Text style={styles.heroText}>
-                  Join خدمة to request home maintenance services, choose trusted
-                  technicians, track requests, chat, pay, and review completed work.
+                  Join us to manage your home maintenance services easily.
                 </Text>
-
-                <View style={styles.logoCard}>
-                  <Image source={homeLogo} style={styles.logo} resizeMode="contain" />
-                </View>
               </View>
             </ImageBackground>
 
             <View style={styles.rightSide}>
               <Text style={styles.title}>Register</Text>
-
               <Text style={styles.subtitle}>
                 Create a customer account and start booking services.
               </Text>
 
               {message ? (
-                <View
-                  style={
-                    message.type === "success"
-                      ? appStyles.successBox
-                      : appStyles.errorBox
-                  }
-                >
-                  <Text
-                    style={
-                      message.type === "success"
-                        ? appStyles.successText
-                        : appStyles.errorText
-                    }
-                  >
+                <View style={message.type === "success" ? appStyles.successBox : appStyles.errorBox}>
+                  <Text style={message.type === "success" ? appStyles.successText : appStyles.errorText}>
                     {message.text}
                   </Text>
                 </View>
@@ -245,9 +212,7 @@ function Register({ navigation }) {
               <TextInput
                 style={styles.input}
                 value={form.phone}
-                onChangeText={(value) =>
-                  setField("phone", value.replace(/[^\d]/g, ""))
-                }
+                onChangeText={(value) => setField("phone", value.replace(/[^\d]/g, ""))}
                 placeholder="07XXXXXXXX"
                 placeholderTextColor="#777"
                 keyboardType="phone-pad"
@@ -279,13 +244,16 @@ function Register({ navigation }) {
                 />
               )}
 
-              <CustomDropdown
-                label="City"
-                value={form.city}
-                placeholder="Select city..."
-                options={cityOptions}
-                onChange={(value) => setField("city", value)}
-              />
+              {/* الـ Dropdown يحتاج لمساحة مريحة أسفله */}
+              <View style={{ marginTop: 10 }}>
+                <CustomDropdown
+                  label="City"
+                  value={form.city}
+                  placeholder="Select city..."
+                  options={cityOptions}
+                  onChange={(value) => setField("city", value)}
+                />
+              </View>
 
               <Text style={styles.label}>Password</Text>
               <TextInput
@@ -332,122 +300,105 @@ const styles = StyleSheet.create({
   scrollContent: {
     flexGrow: 1,
     justifyContent: "center",
-    padding: 18,
+    padding: 12,
   },
 
   authCard: {
     backgroundColor: "#FFFFFF",
-    borderRadius: 36,
+    borderRadius: 24,
     overflow: "hidden",
     borderWidth: 1,
     borderColor: "#E9DDF8",
-    shadowColor: "#5B21B6",
-    shadowOpacity: 0.16,
-    shadowRadius: 18,
-    shadowOffset: { width: 0, height: 10 },
-    elevation: 8,
+    elevation: 4,
   },
 
+  // ضغط حجم الهيدر العلوي بشكل كبير من 420 لـ 170 ليناسب حقول الإدخال الكثيرة
   leftSide: {
-    minHeight: 420,
+    minHeight: 170,
   },
 
   leftImage: {
-    opacity: 0.26,
+    opacity: 0.22,
   },
 
   leftOverlay: {
     flex: 1,
     backgroundColor: "rgba(124,58,237,0.84)",
-    padding: 30,
+    paddingHorizontal: 24,
+    paddingVertical: 16,
     justifyContent: "center",
     overflow: "hidden",
   },
 
   brand: {
     color: "#120D22",
-    fontSize: 44,
+    fontSize: 28,
     fontWeight: "900",
-    marginBottom: 34,
+    marginBottom: 4,
   },
 
   heroTitle: {
     color: "#FFFFFF",
-    fontSize: 35,
-    lineHeight: 43,
+    fontSize: 22,
+    lineHeight: 28,
     fontWeight: "900",
-    marginBottom: 22,
+    marginBottom: 4,
   },
 
   heroText: {
     color: "#FFFFFF",
-    fontSize: 17,
-    lineHeight: 30,
-    fontWeight: "800",
-  },
-
-  logoCard: {
-    width: 142,
-    height: 122,
-    borderRadius: 30,
-    backgroundColor: "rgba(255,255,255,0.22)",
-    justifyContent: "center",
-    alignItems: "center",
-    marginTop: 34,
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.18)",
-  },
-
-  logo: {
-    width: 96,
-    height: 96,
+    fontSize: 13,
+    lineHeight: 18,
+    fontWeight: "700",
   },
 
   rightSide: {
-    padding: 30,
+    paddingHorizontal: 20,
+    paddingVertical: 16,
     backgroundColor: "#FFFFFF",
   },
 
   title: {
     color: colors.text,
-    fontSize: 42,
+    fontSize: 28,
     fontWeight: "900",
   },
 
   subtitle: {
     color: colors.muted,
-    fontSize: 17,
-    lineHeight: 25,
-    fontWeight: "800",
-    marginTop: 12,
-    marginBottom: 24,
+    fontSize: 13,
+    lineHeight: 18,
+    fontWeight: "700",
+    marginTop: 4,
+    marginBottom: 12,
   },
 
   label: {
     color: colors.text,
-    fontSize: 16,
+    fontSize: 14,
     fontWeight: "900",
-    marginTop: 16,
-    marginBottom: 9,
+    marginTop: 10,
+    marginBottom: 4,
   },
 
+  // تقليص ارتفاع الحقول لـ 52 لكي تظهر الشاشة كلها بوضوح عند تفعيل الكيبورد
   input: {
-    minHeight: 62,
-    borderRadius: 22,
+    minHeight: 52,
+    borderRadius: 14,
     borderWidth: 1,
     borderColor: "#E9DDF8",
-    paddingHorizontal: 16,
+    paddingHorizontal: 14,
     color: colors.text,
-    fontSize: 17,
+    fontSize: 15,
     backgroundColor: "#FFFFFF",
   },
 
   inputLike: {
-    minHeight: 62,
-    borderRadius: 22,
+    minHeight: 52,
+    borderRadius: 14,
     borderWidth: 1,
     borderColor: "#E9DDF8",
-    paddingHorizontal: 16,
+    paddingHorizontal: 14,
     backgroundColor: "#FFFFFF",
     flexDirection: "row",
     alignItems: "center",
@@ -456,26 +407,26 @@ const styles = StyleSheet.create({
 
   inputLikeText: {
     color: colors.text,
-    fontSize: 17,
+    fontSize: 15,
   },
 
   placeholderText: {
     color: "#777",
-    fontSize: 17,
+    fontSize: 15,
   },
 
   calendarIcon: {
-    fontSize: 20,
+    fontSize: 18,
   },
 
   primaryButton: {
-    minHeight: 62,
-    borderRadius: 22,
+    minHeight: 52,
+    borderRadius: 14,
     backgroundColor: colors.primaryDark,
     justifyContent: "center",
     alignItems: "center",
-    marginTop: 26,
-    marginBottom: 14,
+    marginTop: 20,
+    marginBottom: 10,
   },
 
   primaryText: {
@@ -486,9 +437,10 @@ const styles = StyleSheet.create({
 
   link: {
     color: colors.primaryDark,
-    fontSize: 15,
-    fontWeight: "900",
-    marginTop: 10,
+    fontSize: 14,
+    fontWeight: "800",
+    textAlign: "center",
+    marginTop: 6,
   },
 
   bubble: {
@@ -498,17 +450,17 @@ const styles = StyleSheet.create({
   },
 
   bubbleOne: {
-    width: 170,
-    height: 170,
-    right: -55,
-    top: 55,
+    width: 120,
+    height: 120,
+    right: -30,
+    top: 20,
   },
 
   bubbleTwo: {
-    width: 120,
-    height: 120,
-    left: -40,
-    bottom: 90,
+    width: 90,
+    height: 90,
+    left: -20,
+    bottom: 10,
   },
 });
 

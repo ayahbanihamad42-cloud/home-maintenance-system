@@ -1,161 +1,128 @@
 import React, { useMemo, useState } from "react";
 import {
+  Alert,
+  KeyboardAvoidingView,
+  Platform,
   SafeAreaView,
   ScrollView,
-  View,
   Text,
   TextInput,
   TouchableOpacity,
+  View,
 } from "react-native";
+
 import Header from "../../components/Common/Header";
 import FloatingActions from "../../components/Common/FloatingActions";
+import HeroSection from "../../components/Common/HeroSection";
 import API from "../../services/api";
 import appStyles from "../../styles/mobileStyles";
 
 function PaymentForm({ route, navigation }) {
-  const requestId = route?.params?.requestId || "";
-  const amount = Number(route?.params?.amount || route?.params?.total_price || 0);
+  const params = route?.params || {};
+  const requestDraft = params.requestDraft || null;
+  const amount = Number(params.amount || requestDraft?.total_price || 0);
 
   const [form, setForm] = useState({
-    nameOnCard: "",
+    cardName: "",
     cardNumber: "",
     expiry: "",
     cvv: "",
   });
 
-  const [message, setMessage] = useState(null);
+  const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
-  const totalAmount = useMemo(() => Number(amount || 0).toFixed(2), [amount]);
-
-  const onlyNumbers = (value) => String(value || "").replace(/\D/g, "");
-  const onlyLettersSpaces = (value) =>
-    String(value || "").replace(/[^a-zA-Z\s]/g, "");
+  const cleanCardNumber = useMemo(
+    () => form.cardNumber.replace(/\s/g, ""),
+    [form.cardNumber]
+  );
 
   const formatCardNumber = (value) => {
-    const digits = onlyNumbers(value).slice(0, 16);
-    return digits.replace(/(.{4})/g, "$1 ").trim();
+    const nums = value.replace(/\D/g, "").slice(0, 16);
+    return nums.replace(/(.{4})/g, "$1 ").trim();
   };
 
   const formatExpiry = (value) => {
-    let cleaned = String(value || "").replace(/[^\d/]/g, "");
-
-    if (cleaned.startsWith("/")) cleaned = "";
-
-    const digits = cleaned.replace(/\D/g, "").slice(0, 4);
-
-    if (cleaned.includes("/")) {
-      const month = digits.slice(0, 2);
-      const year = digits.slice(2, 4);
-
-      if (digits.length <= 2) return month ? `${month}/` : "";
-      return `${month}/${year}`;
-    }
-
-    if (digits.length <= 2) return digits;
-
-    return `${digits.slice(0, 2)}/${digits.slice(2, 4)}`;
-  };
-
-  const setField = (key, value) => {
-    setMessage(null);
-
-    if (key === "nameOnCard") {
-      setForm((prev) => ({ ...prev, nameOnCard: onlyLettersSpaces(value) }));
-      return;
-    }
-
-    if (key === "cardNumber") {
-      setForm((prev) => ({ ...prev, cardNumber: formatCardNumber(value) }));
-      return;
-    }
-
-    if (key === "expiry") {
-      setForm((prev) => ({ ...prev, expiry: formatExpiry(value) }));
-      return;
-    }
-
-    if (key === "cvv") {
-      setForm((prev) => ({ ...prev, cvv: onlyNumbers(value).slice(0, 4) }));
-    }
+    const nums = value.replace(/\D/g, "").slice(0, 4);
+    if (nums.length <= 2) return nums;
+    return `${nums.slice(0, 2)}/${nums.slice(2)}`;
   };
 
   const validate = () => {
-    const name = form.nameOnCard.trim();
-    const cardDigits = onlyNumbers(form.cardNumber);
-    const expiry = form.expiry.trim();
-    const cvv = form.cvv.trim();
+    const name = form.cardName.trim();
 
-    if (!requestId) return "Missing request ID.";
-    if (!amount || amount <= 0) return "Invalid payment amount.";
+    if (!requestDraft) return "Request information is missing.";
+    if (name.length < 3) return "Name on card must be at least 3 characters.";
+    if (!/^[A-Za-z\s]+$/.test(name)) return "Name on card must contain letters only.";
+    if (cleanCardNumber.length !== 16) return "Card number must be 16 digits.";
+    if (!/^\d{2}\/\d{2}$/.test(form.expiry)) return "Expiry must be MM/YY.";
 
-    if (!name) return "Please enter the name on card.";
-    if (!/^[a-zA-Z\s]{3,}$/.test(name)) {
-      return "Name on card must contain letters only and at least 3 characters.";
-    }
-
-    if (cardDigits.length !== 16) {
-      return "Card number must contain exactly 16 digits.";
-    }
-
-    if (!/^\d{2}\/\d{2}$/.test(expiry)) {
-      return "Expiry date must be in MM/YY format, for example 12/29.";
-    }
-
-    const [monthText, yearText] = expiry.split("/");
-    const month = Number(monthText);
-    const year = Number(`20${yearText}`);
-
-    if (month < 1 || month > 12) {
-      return "Expiry month must be between 01 and 12.";
-    }
+    const [month, year] = form.expiry.split("/").map(Number);
+    if (month < 1 || month > 12) return "Expiry month must be between 01 and 12.";
 
     const now = new Date();
+    const currentYear = Number(String(now.getFullYear()).slice(2));
     const currentMonth = now.getMonth() + 1;
-    const currentYear = now.getFullYear();
 
     if (year < currentYear || (year === currentYear && month < currentMonth)) {
-      return "Card expiry date cannot be in the past.";
+      return "Card is expired.";
     }
 
-    if (!/^\d{3,4}$/.test(cvv)) {
-      return "CVV must contain 3 or 4 digits only.";
-    }
+    if (!/^\d{3,4}$/.test(form.cvv)) return "CVV must be 3 or 4 digits.";
+    if (!amount || amount <= 0) return "Invalid payment amount.";
 
     return "";
   };
 
-  const pay = async () => {
-    try {
-      const error = validate();
+  const submitPayment = async () => {
+    const validationError = validate();
 
-      if (error) {
-        setMessage({ type: "error", text: error });
-        return;
+    if (validationError) {
+      setError(validationError);
+      return;
+    }
+
+    try {
+      setLoading(true);
+      setError("");
+
+      const createRes = await API.post("/maintenance", requestDraft);
+
+      const requestId =
+        createRes.data?.requestId ||
+        createRes.data?.request_id ||
+        createRes.data?.id ||
+        createRes.data?.insertId;
+
+      if (!requestId) {
+        throw new Error("Request id was not returned.");
       }
 
-      setLoading(true);
-      setMessage(null);
-
-      const res = await API.post(`/maintenance/${requestId}/online-payment`, {
-        amount: Number(totalAmount),
-        card_last_four: onlyNumbers(form.cardNumber).slice(-4),
+      await API.post(`/maintenance/${requestId}/online-payment`, {
+        amount,
+        card_name: form.cardName.trim(),
+        card_number: cleanCardNumber,
+        expiry: form.expiry,
+        cvv: form.cvv,
       });
 
-      const transactionId = res.data?.transactionId || `mock_txn_${Date.now()}`;
+      Alert.alert("Success", "Payment completed successfully.");
 
-      navigation.navigate("PaymentSuccess", {
-        requestId,
-        amount: totalAmount,
-        transactionId,
+      navigation.reset({
+        index: 0,
+        routes: [
+          {
+            name: "PaymentSuccess",
+            params: { requestId, amount },
+          },
+        ],
       });
     } catch (err) {
-      setMessage({
-        type: "error",
-        text:
-          err.response?.data?.message ||
-          "Payment failed. Please check the information and try again.",
-      });
+      setError(
+        err.response?.data?.message ||
+          err.message ||
+          "Payment failed. Request was not completed."
+      );
     } finally {
       setLoading(false);
     }
@@ -165,88 +132,107 @@ function PaymentForm({ route, navigation }) {
     <SafeAreaView style={appStyles.safe}>
       <Header navigation={navigation} title="Payment" />
 
-      <ScrollView
-        contentContainerStyle={appStyles.pageContent}
-        showsVerticalScrollIndicator={false}
+      <KeyboardAvoidingView
+        style={{ flex: 1 }}
+        behavior={Platform.OS === "ios" ? "padding" : undefined}
       >
-        <View style={appStyles.hero}>
-          <Text style={appStyles.heroTitle}>Payment Details</Text>
-          <Text style={appStyles.heroSubtitle}>
-            This is a mock online payment form for testing.
-          </Text>
-        </View>
+        <ScrollView
+          contentContainerStyle={appStyles.pageContent}
+          keyboardShouldPersistTaps="handled"
+        >
+          <HeroSection
+            title="Payment"
+            subtitle="Complete your online payment securely."
+          />
 
-        {message ? (
-          <View
-            style={
-              message.type === "error" ? appStyles.errorBox : appStyles.successBox
-            }
-          >
-            <Text
-              style={
-                message.type === "error"
-                  ? appStyles.errorText
-                  : appStyles.successText
+          {error ? (
+            <View style={appStyles.errorBox}>
+              <Text style={appStyles.errorText}>{error}</Text>
+            </View>
+          ) : null}
+
+          <View style={appStyles.card}>
+            <Text style={appStyles.text}>
+              Request: Will be created after payment
+            </Text>
+            <Text style={appStyles.text}>
+              Total Amount: {amount.toFixed(2)} JOD
+            </Text>
+
+            <Text style={appStyles.label}>Name on Card</Text>
+            <TextInput
+              style={appStyles.input}
+              value={form.cardName}
+              onChangeText={(value) =>
+                setForm((prev) => ({ ...prev, cardName: value }))
               }
+              placeholder="Aya Bani Hamad"
+              autoCapitalize="words"
+              keyboardType="default"
+            />
+
+            <Text style={appStyles.label}>Card Number</Text>
+            <TextInput
+              style={appStyles.input}
+              value={form.cardNumber}
+              onChangeText={(value) =>
+                setForm((prev) => ({
+                  ...prev,
+                  cardNumber: formatCardNumber(value),
+                }))
+              }
+              placeholder="4242 4242 4242 4242"
+              keyboardType="number-pad"
+              maxLength={19}
+            />
+
+            <Text style={appStyles.label}>Expiry</Text>
+            <TextInput
+              style={appStyles.input}
+              value={form.expiry}
+              onChangeText={(value) =>
+                setForm((prev) => ({ ...prev, expiry: formatExpiry(value) }))
+              }
+              placeholder="MM/YY"
+              keyboardType="numbers-and-punctuation"
+              maxLength={5}
+            />
+
+            <Text style={appStyles.label}>CVV</Text>
+            <TextInput
+              style={appStyles.input}
+              value={form.cvv}
+              onChangeText={(value) =>
+                setForm((prev) => ({
+                  ...prev,
+                  cvv: value.replace(/\D/g, "").slice(0, 4),
+                }))
+              }
+              placeholder="123"
+              keyboardType="number-pad"
+              secureTextEntry
+              maxLength={4}
+            />
+
+            <TouchableOpacity
+              style={appStyles.primaryBtn}
+              onPress={submitPayment}
+              disabled={loading}
             >
-              {message.text}
-            </Text>
+              <Text style={appStyles.primaryBtnText}>
+                {loading ? "Processing..." : "Pay Now"}
+              </Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={appStyles.secondaryBtn}
+              onPress={() => navigation.goBack()}
+            >
+              <Text style={appStyles.secondaryBtnText}>Cancel</Text>
+            </TouchableOpacity>
           </View>
-        ) : null}
-
-        <View style={appStyles.card}>
-          <Text style={appStyles.text}>Request ID: {requestId || "-"}</Text>
-          <Text style={appStyles.text}>Total Amount: {totalAmount} JOD</Text>
-
-          <Text style={appStyles.label}>Name on Card</Text>
-          <TextInput
-            style={appStyles.input}
-            value={form.nameOnCard}
-            onChangeText={(v) => setField("nameOnCard", v)}
-            placeholder="Aya Bani Hamad"
-          />
-
-          <Text style={appStyles.label}>Card Number</Text>
-          <TextInput
-            style={appStyles.input}
-            value={form.cardNumber}
-            onChangeText={(v) => setField("cardNumber", v)}
-            placeholder="4242 4242 4242 4242"
-            keyboardType="numeric"
-            maxLength={19}
-          />
-
-          <Text style={appStyles.label}>Expiry</Text>
-          <TextInput
-            style={appStyles.input}
-            value={form.expiry}
-            onChangeText={(v) => setField("expiry", v)}
-            placeholder="12/29"
-            keyboardType="numeric"
-            maxLength={5}
-          />
-
-          <Text style={appStyles.label}>CVV</Text>
-          <TextInput
-            style={appStyles.input}
-            value={form.cvv}
-            onChangeText={(v) => setField("cvv", v)}
-            placeholder="123"
-            keyboardType="numeric"
-            maxLength={4}
-          />
-
-          <TouchableOpacity
-            style={appStyles.primaryBtn}
-            onPress={pay}
-            disabled={loading}
-          >
-            <Text style={appStyles.primaryBtnText}>
-              {loading ? "Processing..." : "Pay Now"}
-            </Text>
-          </TouchableOpacity>
-        </View>
-      </ScrollView>
+        </ScrollView>
+      </KeyboardAvoidingView>
 
       <FloatingActions navigation={navigation} />
     </SafeAreaView>

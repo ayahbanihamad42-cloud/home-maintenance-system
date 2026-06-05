@@ -8,10 +8,13 @@ import {
   Text,
   TouchableOpacity,
   View,
+  ScrollView, // قمنا بإضافة ScrollView لحماية العناصر من الاختفاء
 } from "react-native";
 import { colors } from "../../styles/mobileStyles";
 
 const homeLogo = require("../../assets/home.png");
+// ملاحظة: تأكد من مسار الخلفية أدناه، أو قم بتغييره للمسار الصحيح لديك حتى لا يحدث خطأ
+const authBg = require("../../assets/home.png"); 
 
 function Welcome({ navigation }) {
   const bubbleOne = useRef(new Animated.Value(0)).current;
@@ -72,7 +75,11 @@ function Welcome({ navigation }) {
             ]}
           />
 
-          <View style={styles.content}>
+          {/* استخدام ScrollView يضمن ظهور بقية العناصر والأزرار عند سحب الشاشة للأجهزة الصغيرة */}
+          <ScrollView 
+            contentContainerStyle={styles.scrollContent}
+            showsVerticalScrollIndicator={false}
+          >
             <Text style={styles.brand}>خدمة</Text>
 
             <Text style={styles.title}>Home services made simple.</Text>
@@ -103,7 +110,7 @@ function Welcome({ navigation }) {
                 <Text style={styles.registerText}>Register</Text>
               </TouchableOpacity>
             </View>
-          </View>
+          </ScrollView>
         </View>
       </ImageBackground>
     </SafeAreaView>
@@ -129,60 +136,68 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(124, 58, 237, 0.84)",
   },
 
-  content: {
-    flex: 1,
-    paddingHorizontal: 28,
-    paddingTop: 72,
-    paddingBottom: 34,
+  // تعديل الـ padding العلوي والسفلي ليعطي مساحة أكبر للأزرار
+  scrollContent: {
+    flexGrow: 1,
+    paddingHorizontal: 24,
+    paddingTop: 50, 
+    paddingBottom: 24,
   },
 
+  // تقليل المسافة السفلية من 48 إلى 24
   brand: {
     color: "#120D22",
-    fontSize: 50,
+    fontSize: 44,
     fontWeight: "900",
-    marginBottom: 48,
+    marginBottom: 24,
   },
 
+  // تقليل حجم الخط والمسافة السفلية لتوفير مساحة رأسية
   title: {
     color: "#FFFFFF",
-    fontSize: 42,
-    lineHeight: 52,
+    fontSize: 34,
+    lineHeight: 44,
     fontWeight: "900",
-    marginBottom: 28,
+    marginBottom: 16,
   },
 
+  // تقليل حجم خط الوصف والـ LineHeight ليكون ملموماً أكثر
   subtitle: {
     color: "#FFFFFF",
-    fontSize: 19,
-    lineHeight: 34,
-    fontWeight: "800",
+    fontSize: 16,
+    lineHeight: 26,
+    fontWeight: "700",
   },
 
+  // تصغير حجم الكارد الخاص باللوجو ليوفر مساحة كبيرة للأزرار بالأسفل
   logoCard: {
-    width: 166,
-    height: 150,
-    borderRadius: 34,
+    width: 120,
+    height: 110,
+    borderRadius: 24,
     backgroundColor: "rgba(255,255,255,0.22)",
     alignItems: "center",
     justifyContent: "center",
-    marginTop: 48,
+    marginTop: 24,
     borderWidth: 1,
     borderColor: "rgba(255,255,255,0.18)",
   },
 
+  // تصغير اللوجو الداخلي بالتناسب مع الكارد
   logo: {
-    width: 110,
-    height: 110,
+    width: 70,
+    height: 70,
   },
 
+  // تعديل الـ marginTop ليعمل بشكل سليم داخل الـ ScrollView
   buttons: {
-    marginTop: "auto",
-    gap: 18,
+    marginTop: 40,
+    gap: 14,
   },
 
+  // تقليل ارتفاع الزر قليلاً ليناسب الشاشات الصغيرة
   loginBtn: {
-    height: 66,
-    borderRadius: 24,
+    height: 56,
+    borderRadius: 20,
     backgroundColor: "#FFFFFF",
     alignItems: "center",
     justifyContent: "center",
@@ -190,13 +205,13 @@ const styles = StyleSheet.create({
 
   loginText: {
     color: colors.primaryDark || "#5B21B6",
-    fontSize: 19,
+    fontSize: 18,
     fontWeight: "900",
   },
 
   registerBtn: {
-    height: 66,
-    borderRadius: 24,
+    height: 56,
+    borderRadius: 20,
     borderWidth: 1.4,
     borderColor: "rgba(255,255,255,0.86)",
     alignItems: "center",
@@ -205,7 +220,7 @@ const styles = StyleSheet.create({
 
   registerText: {
     color: "#FFFFFF",
-    fontSize: 19,
+    fontSize: 18,
     fontWeight: "900",
   },
 

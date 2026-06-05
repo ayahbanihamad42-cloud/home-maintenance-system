@@ -1,53 +1,45 @@
 import React, { useEffect, useMemo, useState } from "react";
 import {
+  Image,
   SafeAreaView,
   ScrollView,
-  View,
   Text,
   TouchableOpacity,
-  Image,
+  View,
   Modal,
 } from "react-native";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+
 import Header from "../../components/Common/Header";
 import FloatingActions from "../../components/Common/FloatingActions";
+import HeroSection from "../../components/Common/HeroSection";
 import API from "../../services/api";
-import { getTechnicianGallery } from "../../services/technicianService";
 import appStyles from "../../styles/mobileStyles";
 
 function TechnicianProfile({ route, navigation }) {
-  const technicianId =
-    route?.params?.technicianId ||
-    route?.params?.technician_id ||
-    route?.params?.id;
-
+  const params = route?.params || {};
+  const [user, setUser] = useState({});
   const [tech, setTech] = useState(null);
-  const [galleryPosts, setGalleryPosts] = useState([]);
-  const [selectedPost, setSelectedPost] = useState(null);
+  const [gallery, setGallery] = useState([]);
   const [message, setMessage] = useState("");
+  const [viewPost, setViewPost] = useState(null);
 
-  const loadTech = async () => {
-    try {
-      const res = await API.get(`/technicians/${technicianId}`);
-      setTech(res.data || null);
-    } catch {
-      setMessage("Failed to load technician profile.");
-    }
+  const technicianId =
+    params.technicianId ||
+    params.technician_id ||
+    params.id ||
+    params.tech?.id ||
+    params.tech?.technician_id ||
+    "";
+
+  const baseUrl = String(API.defaults.baseURL || "").replace(/\/api\/?$/, "");
+
+  const getImageUrl = (url) => {
+    if (!url) return "";
+    if (String(url).startsWith("http")) return url;
+    if (String(url).startsWith("data:image")) return url;
+    return `${baseUrl}${url}`;
   };
-
-  const loadGallery = async () => {
-    try {
-      const posts = await getTechnicianGallery(technicianId);
-      setGalleryPosts(Array.isArray(posts) ? posts : []);
-    } catch {
-      setGalleryPosts([]);
-    }
-  };
-
-  useEffect(() => {
-    if (!technicianId) return;
-    loadTech();
-    loadGallery();
-  }, [technicianId]);
 
   const normalizeImages = (post) => {
     if (!post) return [];
@@ -72,24 +64,98 @@ function TechnicianProfile({ route, navigation }) {
     return [];
   };
 
-  const fixedPosts = useMemo(() => {
-    return galleryPosts.map((post) => ({
+  const fixedGallery = useMemo(() => {
+    return gallery.map((post) => ({
       ...post,
-      images: normalizeImages(post),
+      fixedImages: normalizeImages(post).map(getImageUrl),
     }));
-  }, [galleryPosts]);
+  }, [gallery]);
+
+  const loadUser = async () => {
+    const raw = await AsyncStorage.getItem("user");
+    setUser(raw ? JSON.parse(raw) : {});
+  };
+
+  const loadTech = async () => {
+    try {
+      setMessage("");
+
+      if (!technicianId) {
+        setMessage("Technician id is missing.");
+        return;
+      }
+
+      const res = await API.get(`/technicians/${technicianId}`);
+      setTech(res.data || null);
+    } catch {
+      setMessage("Failed to load technician profile.");
+    }
+  };
+
+  const loadGallery = async () => {
+    try {
+      if (!technicianId) return;
+
+      const res = await API.get(`/technicians/${technicianId}/gallery`);
+      const data = Array.isArray(res.data)
+        ? res.data
+        : Array.isArray(res.data?.posts)
+        ? res.data.posts
+        : [];
+
+      setGallery(data);
+    } catch {
+      setGallery([]);
+    }
+  };
+
+  useEffect(() => {
+    loadUser();
+    loadTech();
+    loadGallery();
+  }, [technicianId]);
+
+  const openChat = () => {
+    const receiverId =
+      tech?.user_id ||
+      tech?.userId ||
+      tech?.technician_user_id ||
+      tech?.technicianUserId;
+
+    if (!receiverId) {
+      setMessage("Could not open chat. Technician user id is missing.");
+      return;
+    }
+
+    global.openMobileChatWith?.({
+      id: receiverId,
+      name: tech?.name || "Technician",
+    });
+  };
+
+  const openBooking = () => {
+    navigation.navigate("MaintenanceRequest", {
+      technicianId: tech?.technician_id || tech?.technicianId || tech?.id || technicianId,
+      technicianName: tech?.name,
+      service: tech?.service || tech?.service_name,
+      price_per_hour: tech?.price_per_hour,
+    });
+  };
 
   if (!tech) {
     return (
       <SafeAreaView style={appStyles.safe}>
-        <Header navigation={navigation} title="Profile" />
-        <View style={appStyles.pageContent}>
+        <Header navigation={navigation} title="Technician" />
+        <ScrollView contentContainerStyle={appStyles.pageContent}>
+          <HeroSection
+            title="Technician Profile"
+            subtitle="View technician details and work gallery."
+          />
           <View style={appStyles.card}>
-            <Text style={appStyles.text}>
-              {message || "Loading technician profile..."}
-            </Text>
+            <Text style={appStyles.text}>{message || "Loading..."}</Text>
           </View>
-        </View>
+        </ScrollView>
+        <FloatingActions navigation={navigation} />
       </SafeAreaView>
     );
   }
@@ -98,16 +164,11 @@ function TechnicianProfile({ route, navigation }) {
     <SafeAreaView style={appStyles.safe}>
       <Header navigation={navigation} title="Technician" />
 
-      <ScrollView
-        contentContainerStyle={appStyles.pageContent}
-        showsVerticalScrollIndicator={false}
-      >
-        <View style={appStyles.hero}>
-          <Text style={appStyles.heroTitle}>{tech.name || "Technician"}</Text>
-          <Text style={appStyles.heroSubtitle}>
-            {tech.service || "-"} Specialist
-          </Text>
-        </View>
+      <ScrollView contentContainerStyle={appStyles.pageContent}>
+        <HeroSection
+          title={tech.name || "Technician"}
+          subtitle={`${tech.service || tech.service_name || "-"} Specialist`}
+        />
 
         {message ? (
           <View style={appStyles.errorBox}>
@@ -135,57 +196,40 @@ function TechnicianProfile({ route, navigation }) {
             {tech.bio || "Experienced technician ready to help."}
           </Text>
 
-          <TouchableOpacity
-            style={appStyles.primaryBtn}
-            onPress={() =>
-              navigation.navigate("Chat", {
-                receiverId: tech.user_id,
-                receiverName: tech.name,
-              })
-            }
-          >
+          <TouchableOpacity style={appStyles.primaryBtn} onPress={openChat}>
             <Text style={appStyles.primaryBtnText}>Send Message</Text>
           </TouchableOpacity>
 
-          <TouchableOpacity
-            style={appStyles.secondaryBtn}
-            onPress={() =>
-              navigation.navigate("MaintenanceRequest", {
-                technicianId: tech.technicianId || tech.id,
-                technicianName: tech.name,
-                service: tech.service,
-                price_per_hour: tech.price_per_hour,
-              })
-            }
-          >
+          <TouchableOpacity style={appStyles.secondaryBtn} onPress={openBooking}>
             <Text style={appStyles.secondaryBtnText}>Book Now</Text>
           </TouchableOpacity>
         </View>
 
         <Text style={appStyles.sectionTitle}>Work Gallery</Text>
 
-        {fixedPosts.length === 0 ? (
+        {fixedGallery.length === 0 ? (
           <View style={appStyles.card}>
-            <Text style={appStyles.mutedText}>No work posts yet.</Text>
+            <Text style={appStyles.mutedText}>No gallery posts yet.</Text>
           </View>
         ) : (
-          fixedPosts.map((post) => {
-            const firstImage = post.images?.[0];
+          fixedGallery.map((post, index) => {
+            const image = post.fixedImages?.[0];
 
             return (
               <TouchableOpacity
-                key={post.id}
+                key={post.id || index}
                 style={appStyles.card}
-                onPress={() => setSelectedPost(post)}
+                activeOpacity={0.9}
+                onPress={() => setViewPost(post)}
               >
-                {firstImage ? (
+                {image ? (
                   <Image
-                    source={{ uri: firstImage }}
+                    source={{ uri: image }}
                     style={{
                       width: "100%",
-                      height: 210,
+                      height: 250,
                       borderRadius: 22,
-                      marginBottom: 12,
+                      marginBottom: 14,
                     }}
                     resizeMode="cover"
                   />
@@ -195,30 +239,27 @@ function TechnicianProfile({ route, navigation }) {
                   {post.description || post.caption || "No description"}
                 </Text>
 
-                {(post.location_note || post.location) && (
-                  <Text style={appStyles.mutedText}>
-                    Location: {post.location_note || post.location}
-                  </Text>
-                )}
+                <Text style={appStyles.mutedText}>
+                  Location: {post.location_note || post.location || "Not provided"}
+                </Text>
               </TouchableOpacity>
             );
           })
         )}
       </ScrollView>
 
-      <Modal transparent visible={!!selectedPost} animationType="fade">
+      <Modal transparent visible={!!viewPost} animationType="fade">
         <View style={appStyles.modalOverlay}>
           <View style={appStyles.modalBox}>
             <View style={appStyles.between}>
-              <Text style={appStyles.modalTitle}>Work Post Details</Text>
-
-              <TouchableOpacity onPress={() => setSelectedPost(null)}>
-                <Text style={{ fontSize: 26, fontWeight: "900" }}>✕</Text>
+              <Text style={appStyles.modalTitle}>Post Details</Text>
+              <TouchableOpacity onPress={() => setViewPost(null)}>
+                <Text style={{ fontSize: 28, fontWeight: "900" }}>✕</Text>
               </TouchableOpacity>
             </View>
 
-            <ScrollView showsVerticalScrollIndicator={false}>
-              {(selectedPost?.images || []).map((img, index) => (
+            <ScrollView>
+              {(viewPost?.fixedImages || []).map((img, index) => (
                 <Image
                   key={`${img}-${index}`}
                   source={{ uri: img }}
@@ -228,25 +269,16 @@ function TechnicianProfile({ route, navigation }) {
                     borderRadius: 22,
                     marginBottom: 14,
                   }}
-                  resizeMode="contain"
+                  resizeMode="cover"
                 />
               ))}
 
-              <View style={appStyles.card}>
-                <Text style={appStyles.text}>
-                  Description:{" "}
-                  {selectedPost?.description ||
-                    selectedPost?.caption ||
-                    "No description"}
-                </Text>
-
-                <Text style={appStyles.text}>
-                  Location:{" "}
-                  {selectedPost?.location_note ||
-                    selectedPost?.location ||
-                    "Not provided"}
-                </Text>
-              </View>
+              <Text style={appStyles.text}>
+                {viewPost?.description || viewPost?.caption || "No description"}
+              </Text>
+              <Text style={appStyles.mutedText}>
+                Location: {viewPost?.location_note || viewPost?.location || "Not provided"}
+              </Text>
             </ScrollView>
           </View>
         </View>
