@@ -1,8 +1,10 @@
   // React library and useState hook
 import React, { useState } from "react";
+import { useTranslation } from "react-i18next";
 
   // AI input box component
 function AIBox({ onAsk }) {
+  const { t } = useTranslation();
 
    // State to store user input
   const [text, setText] = useState("");
@@ -25,11 +27,11 @@ function AIBox({ onAsk }) {
       <textarea
         value={text}
         onChange={e => setText(e.target.value)}
-        placeholder="Ask AI..."
+        placeholder={t("aiChat.askPlaceholder")}
       />
 
        {/* Submit question */}
-      <button className="primary" onClick={submit}>Ask</button>
+      <button className="primary" onClick={submit}>{t("aiChat.ask")}</button>
     </div>
   );
 }

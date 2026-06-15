@@ -1,5 +1,6 @@
    // React library
 import React from "react";
+import { useTranslation } from "react-i18next";
 
    // Hook for page navigation
 import { useNavigate } from "react-router-dom";
@@ -7,6 +8,7 @@ import { useNavigate } from "react-router-dom";
    // Card component to display technician information
 function TechnicianCard({ technician }) {
   const navigate = useNavigate();
+  const { t } = useTranslation();
 
   return (
     <div className="card">
@@ -15,22 +17,22 @@ function TechnicianCard({ technician }) {
         {/* Technician service */}
       <p>{technician.service}</p>
        {/* Technician experience */}
-      <p>{technician.experience} years</p>
+      <p>{technician.experience} {t("cards.years")}</p>
 
       {/* Navigate to booking request page */}
       <button
         className="primary"
         onClick={() => navigate(`/request/${technician.technicianId}`)}
       >
-        Booking
+        {t("cards.booking")}
       </button>
 
-      {/* Navigate to technician profile page */} 
+      {/* Navigate to technician profile page */}
       <button
         className="secondary"
         onClick={() => navigate(`/technician/${technician.technicianId}`)}
       >
-        View Profile
+        {t("cards.viewProfile")}
       </button>
     </div>
   );

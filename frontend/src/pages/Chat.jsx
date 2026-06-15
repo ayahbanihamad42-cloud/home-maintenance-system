@@ -1,9 +1,11 @@
 import React, { useEffect, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 import Header from "../components/common/Header";
 import API from "../services/api";
 import { useParams } from "react-router-dom";
 
 function Chat() {
+  const { t } = useTranslation();
   const { userId } = useParams();
   const currentUser = JSON.parse(localStorage.getItem("user") || "{}");
 
@@ -24,7 +26,7 @@ function Chat() {
       setMessages(Array.isArray(res.data) ? res.data : []);
     } catch (err) {
       console.error("chat messages error:", err);
-      setError(err.response?.data?.message || "Failed to load messages.");
+      setError(err.response?.data?.message || t("chat.failedToLoad"));
       setMessages([]);
     }
   };
@@ -101,7 +103,7 @@ function Chat() {
       await loadMessages();
     } catch (err) {
       console.error("send message error:", err);
-      setError(err.response?.data?.message || "Failed to send message.");
+      setError(err.response?.data?.message || t("chat.failedToSend"));
     }
   };
 
@@ -114,13 +116,13 @@ function Chat() {
       await sendMessage(compressed, "image");
       e.target.value = "";
     } catch {
-      setError("Failed to send image.");
+      setError(t("chat.failedToSendImage"));
     }
   };
 
   const sendLocation = () => {
     if (!navigator.geolocation) {
-      setError("Location is not supported by this browser.");
+      setError(t("chat.locationNotSupported"));
       return;
     }
 
@@ -131,7 +133,7 @@ function Chat() {
         await sendMessage(url, "location");
       },
       () => {
-        setError("Failed to get location.");
+        setError(t("chat.failedToGetLocation"));
       }
     );
   };
@@ -153,7 +155,7 @@ function Chat() {
     ) {
       return (
         <a href={msg.message} target="_blank" rel="noreferrer">
-          📍 Open shared location
+          {t("chat.openLocation")}
         </a>
       );
     }
@@ -174,7 +176,7 @@ function Chat() {
 
         <section className="chat-messages">
           {messages.length === 0 ? (
-            <div className="notification-empty">No messages yet.</div>
+            <div className="notification-empty">{t("chat.noMessages")}</div>
           ) : (
             messages.map((msg, index) => {
               const mine = Number(msg.sender_id) === Number(currentUser.id);
@@ -207,7 +209,7 @@ function Chat() {
             type="button"
             onClick={() => fileRef.current?.click()}
           >
-            📷 Image
+            {t("chat.image")}
           </button>
 
           <button
@@ -215,7 +217,7 @@ function Chat() {
             type="button"
             onClick={sendLocation}
           >
-            📍 Location
+            {t("chat.location")}
           </button>
         </div>
 
@@ -223,14 +225,14 @@ function Chat() {
           <input
             value={text}
             onChange={(e) => setText(e.target.value)}
-            placeholder="Type a message..."
+            placeholder={t("chat.typePlaceholder")}
             onKeyDown={(e) => {
               if (e.key === "Enter") sendMessage();
             }}
           />
 
           <button className="primary" onClick={() => sendMessage()}>
-            Send
+            {t("chat.send")}
           </button>
         </div>
       </main>

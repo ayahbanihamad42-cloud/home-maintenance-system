@@ -1,9 +1,11 @@
 import React, { useState } from "react";
 import { Link } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import API from "../../services/api";
 import welcomeimage from "../../images/home.png";
 
 function ForgotPassword() {
+  const { t } = useTranslation();
   const [email, setEmail] = useState("");
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
@@ -19,10 +21,10 @@ function ForgotPassword() {
 
       setMessage(
         res.data?.message ||
-          "If this email exists, a password reset link will be sent."
+          t("forgot.success")
       );
     } catch (err) {
-      setError(err.response?.data?.message || "Failed to send reset link.");
+      setError(err.response?.data?.message || t("forgot.failed"));
     }
   };
 
@@ -30,45 +32,44 @@ function ForgotPassword() {
     <div className="auth-shell">
       <div className="split-card">
         <section className="brand-panel">
-          <h1 className="brand-logo-text">خدمة</h1>
+          <h1 className="brand-logo-text">{t("brand")}</h1>
 
-          <h2>Reset access safely.</h2>
+          <h2>{t("forgot.tagline")}</h2>
 
           <p>
-            Enter your email address and we will help you recover your account
-            securely so you can continue managing your maintenance requests.
+            {t("forgot.description")}
           </p>
 
           <img className="brand-icon" src={welcomeimage} alt="Khidma" />
         </section>
 
         <section className="form-panel">
-          <h1>Forgot Password</h1>
-          <p>Enter your email address to receive a reset link.</p>
+          <h1>{t("forgot.title")}</h1>
+          <p>{t("forgot.subtitle")}</p>
 
           {error && <div className="auth-error">{error}</div>}
           {message && <div className="auth-success">{message}</div>}
 
           <form className="auth-form" onSubmit={handleSubmit}>
             <div className="auth-field">
-              <label>Email</label>
+              <label>{t("forgot.email")}</label>
               <input
                 type="email"
                 name="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                placeholder="example@email.com"
+                placeholder={t("forgot.emailPlaceholder")}
                 required
               />
             </div>
 
             <button className="primary" type="submit">
-              Send Reset Link
+              {t("forgot.submit")}
             </button>
           </form>
 
           <div className="auth-links">
-            <Link to="/login">Back to Login</Link>
+            <Link to="/login">{t("forgot.backToLogin")}</Link>
           </div>
         </section>
       </div>

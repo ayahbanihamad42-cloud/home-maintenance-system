@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import {
   createTechnicianGalleryPost,
   deleteTechnicianGalleryPost,
@@ -8,6 +9,7 @@ import {
 } from "../../services/technicianService";
 
 function TechnicianGalleryManager() {
+  const { t } = useTranslation();
   const navigate = useNavigate();
 
   const [posts, setPosts] = useState([]);
@@ -113,7 +115,7 @@ function TechnicianGalleryManager() {
       setImages((prev) => [...prev, ...compressed].slice(0, 6));
       setMessage("");
     } catch {
-      setMessage("Failed to read images.");
+      setMessage(t("techGallery.failedToReadImages"));
     }
   };
 
@@ -150,12 +152,12 @@ function TechnicianGalleryManager() {
     e.preventDefault();
 
     if (!description.trim()) {
-      setMessage("Write a caption first.");
+      setMessage(t("techGallery.writeCaptionFirst"));
       return;
     }
 
     if (!images.length) {
-      setMessage("Choose at least one image.");
+      setMessage(t("techGallery.chooseImage"));
       return;
     }
 
@@ -177,14 +179,14 @@ function TechnicianGalleryManager() {
       resetForm();
       await loadPosts();
     } catch (err) {
-      setMessage(err?.response?.data?.message || "Failed to save post.");
+      setMessage(err?.response?.data?.message || t("techGallery.failedToSave"));
     } finally {
       setSaving(false);
     }
   };
 
   const deletePost = async (postId) => {
-    const ok = window.confirm("Are you sure you want to delete this post?");
+    const ok = window.confirm(t("techGallery.confirmDelete"));
     if (!ok) return;
 
     try {
@@ -196,7 +198,7 @@ function TechnicianGalleryManager() {
 
       await loadPosts();
     } catch (err) {
-      setMessage(err?.response?.data?.message || "Failed to delete post.");
+      setMessage(err?.response?.data?.message || t("techGallery.failedToDelete"));
     }
   };
 
@@ -221,16 +223,16 @@ function TechnicianGalleryManager() {
         <span></span>
       </div>
 
-      <h3 className="profile-gallery-title">Work Gallery</h3>
+      <h3 className="profile-gallery-title">{t("techGallery.title")}</h3>
 
       {message ? <div className="mini-error">{message}</div> : null}
 
       {showCreate ? (
         <div className="create-post-card">
-          <h3>{isEditing ? "Edit Work Post" : "Create New Work Post"}</h3>
+          <h3>{isEditing ? t("techGallery.editPost") : t("techGallery.createPost")}</h3>
 
           <form onSubmit={submitPost}>
-            <label>Images</label>
+            <label>{t("techGallery.images")}</label>
 
             <input
               type="file"
@@ -272,30 +274,30 @@ function TechnicianGalleryManager() {
               </div>
             ) : null}
 
-            <label>Caption</label>
+            <label>{t("techGallery.caption")}</label>
 
             <textarea
-              placeholder="Write caption / work details..."
+              placeholder={t("techGallery.captionPlaceholder")}
               value={description}
               onChange={(e) => setDescription(e.target.value)}
             />
 
-            <label>Location / Office / Work place</label>
+            <label>{t("techGallery.locationLabel")}</label>
 
             <input
               type="text"
-              placeholder="Example: Irbid, customer house, office..."
+              placeholder={t("techGallery.locationPlaceholder")}
               value={locationNote}
               onChange={(e) => setLocationNote(e.target.value)}
             />
 
             <div className="create-post-actions">
               <button type="submit" disabled={saving}>
-                {saving ? "Saving..." : isEditing ? "Update Post" : "Post"}
+                {saving ? t("techGallery.saving") : isEditing ? t("techGallery.updatePost") : t("techGallery.post")}
               </button>
 
               <button type="button" onClick={resetForm}>
-                Cancel
+                {t("techGallery.cancel")}
               </button>
             </div>
           </form>
@@ -303,7 +305,7 @@ function TechnicianGalleryManager() {
       ) : null}
 
       {posts.length === 0 ? (
-        <div className="gallery-empty-text">No posts yet.</div>
+        <div className="gallery-empty-text">{t("techGallery.noPosts")}</div>
       ) : (
         <div className="pinterest-gallery">
           {posts.map((post) => {
@@ -369,7 +371,7 @@ function TechnicianGalleryManager() {
                         cursor: "pointer",
                       }}
                     >
-                      Edit
+                      {t("techGallery.edit")}
                     </button>
 
                     <button
@@ -387,7 +389,7 @@ function TechnicianGalleryManager() {
                         cursor: "pointer",
                       }}
                     >
-                      Delete
+                      {t("techGallery.delete")}
                     </button>
                   </div>
                 ) : null}
@@ -407,7 +409,7 @@ function TechnicianGalleryManager() {
                   {firstImage ? (
                     <img src={firstImage} alt="work post" />
                   ) : (
-                    <div className="gallery-empty-text">No image</div>
+                    <div className="gallery-empty-text">{t("techProfile.noImage")}</div>
                   )}
 
                   <div className="pinterest-caption">

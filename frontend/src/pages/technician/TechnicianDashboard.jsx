@@ -1,25 +1,28 @@
 import { Link } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import Header from "../../components/common/Header";
 
 function TechnicianDashboard() {
+  const { t } = useTranslation();
+
   return (
     <>
       <Header />
 
       <main className="dashboard-container technician-dashboard">
         <section className="page-hero">
-          <h1>Technician Dashboard</h1>
-          <p>Manage requests, availability, and work gallery from one place.</p>
+          <h1>{t("techDashboard.title")}</h1>
+          <p>{t("techDashboard.subtitle")}</p>
         </section>
 
         <section className="dashboard-grid">
           <article className="dashboard-card">
             <div className="dashboard-icon">📋</div>
             <div>
-              <h3>Assigned Requests</h3>
-              <p>Track and manage current maintenance requests.</p>
+              <h3>{t("techDashboard.assignedRequests")}</h3>
+              <p>{t("techDashboard.assignedRequestsDesc")}</p>
               <Link className="primary dashboard-link" to="/technician/requests">
-                View Requests
+                {t("techDashboard.viewRequests")}
               </Link>
             </div>
           </article>
@@ -27,10 +30,10 @@ function TechnicianDashboard() {
           <article className="dashboard-card">
             <div className="dashboard-icon">🕒</div>
             <div>
-              <h3>Availability</h3>
-              <p>Set one-time availability and regular monthly schedules.</p>
+              <h3>{t("techDashboard.availability")}</h3>
+              <p>{t("techDashboard.availabilityDesc")}</p>
               <Link className="primary dashboard-link" to="/technician/availability">
-                Set Availability
+                {t("techDashboard.setAvailability")}
               </Link>
             </div>
           </article>
@@ -38,10 +41,10 @@ function TechnicianDashboard() {
           <article className="dashboard-card">
             <div className="dashboard-icon">🖼️</div>
             <div>
-              <h3>Work Gallery</h3>
-              <p>Add work posts and show completed jobs to customers.</p>
+              <h3>{t("techDashboard.workGallery")}</h3>
+              <p>{t("techDashboard.workGalleryDesc")}</p>
               <Link className="primary dashboard-link" to="/profile">
-                Manage Gallery
+                {t("techDashboard.manageGallery")}
               </Link>
             </div>
           </article>

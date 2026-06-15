@@ -1,11 +1,13 @@
 import React from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import Header from "../../components/common/Header";
 
 function PaymentSuccess() {
   const navigate = useNavigate();
   const location = useLocation();
   const { requestId } = useParams();
+  const { t } = useTranslation();
 
   const amount = Number(location.state?.amount || 0);
   const transactionId = location.state?.transactionId || `mock_txn_${Date.now()}`;
@@ -19,27 +21,27 @@ function PaymentSuccess() {
 
       <main className="payment-container">
         <section className="page-hero">
-          <h1>Payment Successful</h1>
-          <p>Your online payment has been completed successfully.</p>
+          <h1>{t("paymentSuccess.title")}</h1>
+          <p>{t("paymentSuccess.subtitle")}</p>
         </section>
 
         <section className="form-card payment-success-card">
           <div className="success-icon">✓</div>
 
-          <h2>Success</h2>
+          <h2>{t("paymentSuccess.success")}</h2>
           <p>{message}</p>
 
           <div className="request-details-grid">
             <p>
-              <strong>Request ID:</strong> {requestId || "-"}
+              <strong>{t("paymentSuccess.requestId")}:</strong> {requestId || "-"}
             </p>
 
             <p>
-              <strong>Transaction ID:</strong> {transactionId}
+              <strong>{t("paymentSuccess.transactionId")}:</strong> {transactionId}
             </p>
 
             <p>
-              <strong>Total Paid:</strong> {amount.toFixed(2)} JOD
+              <strong>{t("paymentSuccess.totalPaid")}:</strong> {amount.toFixed(2)} JOD
             </p>
           </div>
 
@@ -49,7 +51,7 @@ function PaymentSuccess() {
               type="button"
               onClick={() => navigate(`/review/${requestId}`)}
             >
-              Go to Review
+              {t("paymentSuccess.goToReview")}
             </button>
 
             <button
@@ -57,7 +59,7 @@ function PaymentSuccess() {
               type="button"
               onClick={() => navigate("/history")}
             >
-              Back to History
+              {t("paymentSuccess.backToHistory")}
             </button>
           </div>
         </section>

@@ -1,5 +1,6 @@
    //React library
-import React from "react"; 
+import React from "react";
+import { useTranslation } from "react-i18next";
 
 // Hook for page navigation
 import { useNavigate } from "react-router-dom";
@@ -9,6 +10,7 @@ function MaintenanceCard({ request, rating }) {
 
    // Initialize navigation
   const navigate = useNavigate();
+  const { t } = useTranslation();
 
   return (
     <div className="card">
@@ -17,19 +19,19 @@ function MaintenanceCard({ request, rating }) {
 
       {/* Request status */}
       <div style={{ margin: '15px 0', fontWeight: 'bold' }}>
-         Status: <span style={{color: request.status === 'completed' ? 'green' : 'orange'}}>{request.status}</span>
+         {t("cards.status")} <span style={{color: request.status === 'completed' ? 'green' : 'orange'}}>{request.status}</span>
       </div>
 
        {/* Rating display */}
       {rating ? (
-        <p><b>Rating:</b> {rating.rating} ⭐</p>
+        <p><b>{t("cards.rating")}</b> {rating.rating} ⭐</p>
       ) : (
-        <p><b>Rating:</b> Not submitted</p>
+        <p><b>{t("cards.rating")}</b> {t("cards.notSubmitted")}</p>
       )}
 
         {/* Navigate to review details */}
       <button className="primary" onClick={() => navigate(`/review/${request.id}`)}>
-        View Details
+        {t("cards.viewDetails")}
       </button>
     </div>
   );

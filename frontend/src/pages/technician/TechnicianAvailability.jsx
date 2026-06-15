@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 import Header from "../../components/common/Header";
 import API from "../../services/api.jsx";
 import {
@@ -19,6 +20,7 @@ const days = [
 ];
 
 function TechnicianAvailability() {
+  const { t } = useTranslation();
   const [mode, setMode] = useState("one-time");
   const [availability, setAvailability] = useState([]);
   const [regularAvailability, setRegularAvailability] = useState([]);
@@ -71,7 +73,7 @@ function TechnicianAvailability() {
     e.preventDefault();
 
     if (!startTime || !endTime) {
-      setMessage("Start time and end time are required.");
+      setMessage(t("techAvailability.startEndRequired"));
       return;
     }
 
@@ -81,7 +83,7 @@ function TechnicianAvailability() {
 
       if (mode === "one-time") {
         if (!availableDate) {
-          setMessage("Date is required.");
+          setMessage(t("techAvailability.dateRequired"));
           return;
         }
 
@@ -94,7 +96,7 @@ function TechnicianAvailability() {
         await loadOneTime();
       } else {
         if (!monthStart || !monthEnd) {
-          setMessage("Month start and month end are required.");
+          setMessage(t("techAvailability.monthStartEndRequired"));
           return;
         }
 
@@ -111,9 +113,9 @@ function TechnicianAvailability() {
       }
 
       resetForm();
-      setMessage("Availability saved successfully.");
+      setMessage(t("techAvailability.savedSuccess"));
     } catch (err) {
-      setMessage(err?.response?.data?.message || "Failed to save availability.");
+      setMessage(err?.response?.data?.message || t("techAvailability.failedToSave"));
     } finally {
       setSaving(false);
     }
@@ -135,8 +137,8 @@ function TechnicianAvailability() {
 
       <main className="availability-container">
         <section className="page-hero">
-          <h1>Technician Availability</h1>
-          <p>Set your working hours and manage available booking times.</p>
+          <h1>{t("techAvailability.title")}</h1>
+          <p>{t("techAvailability.subtitle")}</p>
         </section>
 
         {message ? (
@@ -155,7 +157,7 @@ function TechnicianAvailability() {
               setMessage("");
             }}
           >
-            One-Time Availability
+            {t("techAvailability.oneTime")}
           </button>
 
           <button
@@ -167,7 +169,7 @@ function TechnicianAvailability() {
               setMessage("");
             }}
           >
-            Regular Monthly Schedule
+            {t("techAvailability.regularMonthly")}
           </button>
         </section>
 
@@ -176,7 +178,7 @@ function TechnicianAvailability() {
             {mode === "regular" ? (
               <>
                 <div>
-                  <label>Month Start</label>
+                  <label>{t("techAvailability.monthStart")}</label>
                   <input
                     type="date"
                     value={monthStart}
@@ -185,7 +187,7 @@ function TechnicianAvailability() {
                 </div>
 
                 <div>
-                  <label>Month End</label>
+                  <label>{t("techAvailability.monthEnd")}</label>
                   <input
                     type="date"
                     value={monthEnd}
@@ -194,7 +196,7 @@ function TechnicianAvailability() {
                 </div>
 
                 <div>
-                  <label>Day Of Week</label>
+                  <label>{t("techAvailability.dayOfWeek")}</label>
                   <select
                     value={dayOfWeek}
                     onChange={(e) => setDayOfWeek(e.target.value)}
@@ -209,7 +211,7 @@ function TechnicianAvailability() {
               </>
             ) : (
               <div>
-                <label>Date</label>
+                <label>{t("techAvailability.date")}</label>
                 <input
                   type="date"
                   value={availableDate}
@@ -219,7 +221,7 @@ function TechnicianAvailability() {
             )}
 
             <div>
-              <label>Start Time</label>
+              <label>{t("techAvailability.startTime")}</label>
               <input
                 type="time"
                 value={startTime}
@@ -228,7 +230,7 @@ function TechnicianAvailability() {
             </div>
 
             <div>
-              <label>End Time</label>
+              <label>{t("techAvailability.endTime")}</label>
               <input
                 type="time"
                 value={endTime}
@@ -238,22 +240,22 @@ function TechnicianAvailability() {
 
             {mode === "regular" && (
               <div>
-                <label>Each Request Duration</label>
+                <label>{t("techAvailability.duration")}</label>
                 <select
                   value={slotMinutes}
                   onChange={(e) => setSlotMinutes(e.target.value)}
                 >
-                  <option value="30">30 minutes</option>
-                  <option value="60">1 hour</option>
-                  <option value="90">1.5 hours</option>
-                  <option value="120">2 hours</option>
-                  <option value="180">3 hours</option>
+                  <option value="30">{t("techAvailability.min30")}</option>
+                  <option value="60">{t("techAvailability.hour1")}</option>
+                  <option value="90">{t("techAvailability.hour1_5")}</option>
+                  <option value="120">{t("techAvailability.hour2")}</option>
+                  <option value="180">{t("techAvailability.hour3")}</option>
                 </select>
               </div>
             )}
 
             <button className="primary" type="submit" disabled={saving}>
-              {saving ? "Saving..." : "Save Availability"}
+              {saving ? t("techAvailability.saving") : t("techAvailability.saveAvailability")}
             </button>
           </form>
         </section>
@@ -261,12 +263,12 @@ function TechnicianAvailability() {
         <section className="availability-list">
           {mode === "one-time" ? (
             <>
-              <h2 className="section-title">One-Time Availability</h2>
+              <h2 className="section-title">{t("techAvailability.oneTime")}</h2>
 
               {availability.length === 0 ? (
                 <article className="availability-card">
-                  <h3>No availability added.</h3>
-                  <p>Your saved one-time availability will appear here.</p>
+                  <h3>{t("techAvailability.noAvailability")}</h3>
+                  <p>{t("techAvailability.availabilityWillAppear")}</p>
                 </article>
               ) : (
                 availability.map((item) => (
@@ -286,7 +288,7 @@ function TechnicianAvailability() {
                       type="button"
                       onClick={() => deleteOneTime(item.id)}
                     >
-                      Delete
+                      {t("techAvailability.delete")}
                     </button>
                   </article>
                 ))
@@ -294,30 +296,30 @@ function TechnicianAvailability() {
             </>
           ) : (
             <>
-              <h2 className="section-title">Regular Monthly Schedule</h2>
+              <h2 className="section-title">{t("techAvailability.regularMonthly")}</h2>
 
               {regularAvailability.length === 0 ? (
                 <article className="availability-card">
-                  <h3>No regular schedule added.</h3>
-                  <p>Your saved regular schedule will appear here.</p>
+                  <h3>{t("techAvailability.noRegularSchedule")}</h3>
+                  <p>{t("techAvailability.regularScheduleWillAppear")}</p>
                 </article>
               ) : (
                 regularAvailability.map((item) => (
                   <article className="availability-card" key={item.id}>
                     <div className="request-details-grid">
                       <p>
-                        <strong>Month:</strong>{" "}
+                        <strong>{t("techAvailability.monthLabel")}</strong>{" "}
                         {String(item.month_start).slice(0, 10)} →{" "}
                         {String(item.month_end).slice(0, 10)}
                       </p>
                       <p>
-                        <strong>Day:</strong> {item.day_of_week}
+                        <strong>{t("techAvailability.dayLabel")}</strong> {item.day_of_week}
                       </p>
                       <p>
                         <strong>Time:</strong> {item.start_time} - {item.end_time}
                       </p>
                       <p>
-                        <strong>Each Request:</strong> {item.slot_minutes} minutes
+                        <strong>{t("techAvailability.eachRequest")}</strong> {item.slot_minutes} {t("techAvailability.minutes")}
                       </p>
                     </div>
 
@@ -326,7 +328,7 @@ function TechnicianAvailability() {
                       type="button"
                       onClick={() => deleteRegular(item.id)}
                     >
-                      Delete
+                      {t("techAvailability.delete")}
                     </button>
                   </article>
                 ))

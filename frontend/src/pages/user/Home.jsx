@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import Header from "../../components/common/Header";
 import API from "../../services/api.jsx";
 import Footer from "../../components/common/Footer";
@@ -42,6 +43,7 @@ function getBackendImageUrl(imageUrl, serviceName = "") {
 
 function Home() {
   const navigate = useNavigate();
+  const { t } = useTranslation();
   const [services, setServices] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -56,7 +58,7 @@ function Home() {
     } catch (err) {
       console.error("load services error:", err);
       setServices([]);
-      setError("Failed to load services. Please try again.");
+      setError(t("home.failedToLoad"));
     } finally {
       setLoading(false);
     }
@@ -73,36 +75,35 @@ function Home() {
       <main className="home-container">
         <section className="page-hero">
           <div>
-            <h1>Book trusted home services</h1>
-            <p>خدمة بيتك بسهولة وموثوقية</p>
+            <h1>{t("home.heroTitle")}</h1>
+            <p>{t("home.heroSubtitle")}</p>
           </div>
         </section>
 
         <section className="home-message card">
-          <h2>Welcome to خدمة</h2>
+          <h2>{t("home.welcomeTitle")}</h2>
           <p>
-            Find skilled technicians, book maintenance requests, chat instantly,
-            use AI assistance, and track your service from one modern platform.
+            {t("home.description")}
           </p>
 
           <button className="primary" onClick={() => navigate("/history")}>
-            View My Requests
+            {t("home.viewRequests")}
           </button>
         </section>
 
-        <h2 className="section-title">Available Services</h2>
+        <h2 className="section-title">{t("home.availableServices")}</h2>
 
         {loading ? (
-          <section className="card">Loading services...</section>
+          <section className="card">{t("home.loadingServices")}</section>
         ) : error ? (
           <section className="card">
             <p>{error}</p>
             <button className="primary" onClick={loadServices}>
-              Try Again
+              {t("home.tryAgain")}
             </button>
           </section>
         ) : services.length === 0 ? (
-          <section className="card">No services available yet.</section>
+          <section className="card">{t("home.noServices")}</section>
         ) : (
           <section className="services-container">
             {services.map((service) => {

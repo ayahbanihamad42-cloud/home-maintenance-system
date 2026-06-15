@@ -1,9 +1,11 @@
 import React, { useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 import Header from "../components/common/Header";
 import API from "../services/api";
 import { useNavigate } from "react-router-dom";
 
 function ChatList() {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const [conversations, setConversations] = useState([]);
   const [error, setError] = useState("");
@@ -30,16 +32,16 @@ function ChatList() {
 
       <main className="chat-list-container">
         <section className="page-hero">
-          <h1>Messages</h1>
-          <p>Continue your conversations with users and technicians.</p>
+          <h1>{t("chatList.title")}</h1>
+          <p>{t("chatList.subtitle")}</p>
         </section>
 
         {error && <div className="auth-error">{error}</div>}
 
         {conversations.length === 0 ? (
           <section className="card">
-            <h3>No conversations yet</h3>
-            <p>Your messages will appear here once you start chatting.</p>
+            <h3>{t("chatList.noConversations")}</h3>
+            <p>{t("chatList.noConversationsMsg")}</p>
           </section>
         ) : (
           <section className="chat-list-grid">
@@ -58,10 +60,10 @@ function ChatList() {
 
                   <p>
                     {item.lastMessageType === "image"
-                      ? "📷 Image"
+                      ? t("chat.image")
                       : item.lastMessageType === "location"
-                      ? "📍 Location"
-                      : item.lastMessage || "No messages yet"}
+                      ? t("chat.location")
+                      : item.lastMessage || t("chatList.noMessages")}
                   </p>
                 </div>
 

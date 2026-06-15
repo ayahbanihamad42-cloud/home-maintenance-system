@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
+import { useTranslation } from "react-i18next";
 import Header from "../../components/common/Header";
 import API from "../../services/api.jsx";
 import { useNavigate, useParams } from "react-router-dom";
@@ -6,6 +7,7 @@ import { useNavigate, useParams } from "react-router-dom";
 function Review() {
   const { requestId } = useParams();
   const navigate = useNavigate();
+  const { t } = useTranslation();
 
   const [request, setRequest] = useState(null);
   const [existingReview, setExistingReview] = useState(null);
@@ -71,7 +73,7 @@ function Review() {
       }
     } catch (err) {
       if (!silent) {
-        setError(err.response?.data?.message || "Failed to load request.");
+        setError(err.response?.data?.message || t("review.loadFailed"));
       }
     }
   };
@@ -96,12 +98,12 @@ function Review() {
     e.preventDefault();
 
     if (!isCompleted) {
-      setMessage("Review is available only after the request is completed.");
+      setMessage(t("review.reviewAfterCompletion"));
       return;
     }
 
     if (existingReview) {
-      setMessage("You already reviewed this request.");
+      setMessage(t("review.alreadyReviewed"));
       return;
     }
 
@@ -116,11 +118,11 @@ function Review() {
       });
 
       setExistingReview({ rating: form.rating, comment: form.comment });
-      setMessage("Review submitted successfully.");
+      setMessage(t("review.submitSuccess"));
 
       setTimeout(() => navigate("/history"), 900);
     } catch (err) {
-      setError(err.response?.data?.message || "Failed to submit review.");
+      setError(err.response?.data?.message || t("review.submitFailed"));
     }
   };
 
@@ -132,14 +134,14 @@ function Review() {
 
       await API.delete(`/maintenance/${requestId}`);
 
-      setMessage("Request cancelled successfully.");
+      setMessage(t("review.cancelSuccess"));
       await loadRequest(true);
 
       setTimeout(() => navigate("/history"), 900);
     } catch (err) {
       setError(
         err.response?.data?.message ||
-          "Failed to cancel request. This request may no longer be cancellable."
+          t("review.cancelFailed")
       );
     } finally {
       setCancelLoading(false);
@@ -172,8 +174,8 @@ function Review() {
 
       <main className="review-container" style={{ paddingTop: "135px" }}>
         <section className="page-hero">
-          <h1>Request Details</h1>
-          <p>View request information and submit a review after completion.</p>
+          <h1>{t("review.title")}</h1>
+          <p>{t("review.subtitle")}</p>
         </section>
 
         {message && <div className="auth-success">{message}</div>}
@@ -181,12 +183,12 @@ function Review() {
 
         {!request ? (
           <section className="card">
-            <h3>No request found</h3>
+            <h3>{t("review.noRequestFound")}</h3>
           </section>
         ) : (
           <section className="review-card">
             <div className="request-card-header">
-              <h2>{request.service || "Maintenance Request"}</h2>
+              <h2>{request.service || t("review.maintenanceRequest")}</h2>
               <span className="status-badge">
                 {String(request.status || "-").replaceAll("_", " ")}
               </span>
@@ -194,46 +196,46 @@ function Review() {
 
             <div className="request-details-grid">
               <p>
-                <strong>Description:</strong> {request.description || "-"}
+                <strong>{t("review.descriptionLabel")}:</strong> {request.description || "-"}
               </p>
 
               <p>
-                <strong>Technician:</strong>{" "}
+                <strong>{t("review.technicianLabel")}:</strong>{" "}
                 {request.technician_name || technician?.name || "-"}
               </p>
 
               <p>
-                <strong>Request Date:</strong>{" "}
+                <strong>{t("review.requestDateLabel")}:</strong>{" "}
                 {formatDate(request.scheduled_date)}
               </p>
 
               <p>
-                <strong>Request Time:</strong>{" "}
+                <strong>{t("review.requestTimeLabel")}:</strong>{" "}
                 {formatTime(request.scheduled_time)}
               </p>
 
               <p>
-                <strong>Created At:</strong>{" "}
+                <strong>{t("review.createdAtLabel")}:</strong>{" "}
                 {request.created_at
                   ? new Date(request.created_at).toLocaleString()
                   : "-"}
               </p>
 
               <p>
-                <strong>Payment Method:</strong> {request.payment_method || "-"}
+                <strong>{t("review.paymentMethodLabel")}:</strong> {request.payment_method || "-"}
               </p>
 
               <p>
-                <strong>Amount:</strong>{" "}
+                <strong>{t("review.amountLabel")}:</strong>{" "}
                 {formatMoney(request.total_price || request.amount)}
               </p>
 
               <p>
-                <strong>City:</strong> {request.city || "-"}
+                <strong>{t("review.cityLabel")}:</strong> {request.city || "-"}
               </p>
 
               <p>
-                <strong>Location Note:</strong> {request.location_note || "-"}
+                <strong>{t("review.locationNoteLabel")}:</strong> {request.location_note || "-"}
               </p>
             </div>
 
@@ -245,24 +247,23 @@ function Review() {
                   disabled={cancelLoading}
                   onClick={cancelRequest}
                 >
-                  {cancelLoading ? "Cancelling..." : "Cancel Request"}
+                  {cancelLoading ? t("review.cancelling") : t("review.cancelRequest")}
                 </button>
               </div>
             )}
 
             {shouldShowLocationWaitingMessage && (
               <div className="auth-success">
-                <strong>Technician location is not live yet.</strong>
+                <strong>{t("review.locationNotLive")}</strong>
                 <div>
-                  The technician location will appear here when the status
-                  becomes On The Way.
+                  {t("review.locationWillAppear")}
                 </div>
               </div>
             )}
 
             {shouldShowTechnicianMap && techLat && techLng && (
               <div className="map-card">
-                <h3>Technician Live Location</h3>
+                <h3>{t("review.technicianLiveLocation")}</h3>
                 <iframe
                   title="technician-live-location"
                   src={getMapSrc(techLat, techLng)}
@@ -272,36 +273,34 @@ function Review() {
                   loading="lazy"
                 />
                 <p>
-                  This location refreshes automatically when the technician
-                  updates their location.
+                  {t("review.locationRefreshes")}
                 </p>
               </div>
             )}
 
             {shouldShowTechnicianMap && (!techLat || !techLng) && (
               <div className="auth-error">
-                Technician status is On The Way, but the live location has not
-                been received yet.
+                {t("review.locationNotReceived")}
               </div>
             )}
 
             {!isCompleted && (
               <div className="auth-error">
-                Rating appears only after the request status becomes completed.
+                {t("review.ratingAfterCompletion")}
               </div>
             )}
 
             {existingReview && (
               <div className="auth-success">
-                <strong>Already reviewed.</strong>
-                <div>Rating: {existingReview.rating}</div>
-                <div>Comment: {existingReview.comment || "-"}</div>
+                <strong>{t("review.alreadyReviewedLabel")}</strong>
+                <div>{t("review.ratingLabel")}: {existingReview.rating}</div>
+                <div>{t("review.commentLabel")}: {existingReview.comment || "-"}</div>
               </div>
             )}
 
             {canReview && (
               <form className="form-container" onSubmit={submitReview}>
-                <label>Rating</label>
+                <label>{t("review.ratingLabel")}</label>
 
                 <select
                   value={form.rating}
@@ -309,14 +308,14 @@ function Review() {
                     setForm({ ...form, rating: e.target.value })
                   }
                 >
-                  <option value="5">5 - Excellent</option>
-                  <option value="4">4 - Very Good</option>
-                  <option value="3">3 - Good</option>
-                  <option value="2">2 - Fair</option>
-                  <option value="1">1 - Poor</option>
+                  <option value="5">{t("review.excellent")}</option>
+                  <option value="4">{t("review.veryGood")}</option>
+                  <option value="3">{t("review.good")}</option>
+                  <option value="2">{t("review.fair")}</option>
+                  <option value="1">{t("review.poor")}</option>
                 </select>
 
-                <label>Comment</label>
+                <label>{t("review.commentLabel")}</label>
 
                 <textarea
                   value={form.comment}
@@ -328,7 +327,7 @@ function Review() {
                 />
 
                 <button className="primary" type="submit">
-                  Submit Review
+                  {t("review.submitReview")}
                 </button>
               </form>
             )}

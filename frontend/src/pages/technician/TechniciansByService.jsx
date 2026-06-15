@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import Header from "../../components/common/Header";
 import API from "../../services/api.jsx";
 import {
@@ -53,6 +54,7 @@ function getTechnicianId(tech) {
 }
 
 function CommentsBox({ technicianId }) {
+  const { t } = useTranslation();
   const [open, setOpen] = useState(false);
   const [comments, setComments] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -80,15 +82,15 @@ function CommentsBox({ technicianId }) {
   return (
     <div className="comments-box">
       <button className="secondary-btn" type="button" onClick={loadComments}>
-        {open ? "Hide comments" : "View comments"}
+        {open ? t("techByService.hideComments") : t("techByService.viewComments")}
       </button>
 
       {open && (
         <div className="comments-list">
           {loading ? (
-            <p>Loading comments...</p>
+            <p>{t("techByService.loadingComments")}</p>
           ) : comments.length === 0 ? (
-            <p>No comments yet.</p>
+            <p>{t("techByService.noComments")}</p>
           ) : (
             comments.map((item, index) => (
               <div className="comment-card" key={item.id || index}>
@@ -104,6 +106,7 @@ function CommentsBox({ technicianId }) {
 }
 
 export default function TechniciansByService() {
+  const { t } = useTranslation();
   const { service } = useParams();
   const navigate = useNavigate();
   const currentUser = JSON.parse(localStorage.getItem("user") || "{}");
@@ -246,27 +249,27 @@ export default function TechniciansByService() {
 
       <main className="technicians-container">
         <section className="page-hero">
-          <h1>{decodedService} Technicians</h1>
-          <p>Choose a technician, filter by city, rating, price, or experience.</p>
+          <h1>{decodedService} {t("techByService.title")}</h1>
+          <p>{t("techByService.subtitle")}</p>
         </section>
 
         <section className="request-filters">
           <input
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search: name, city, cheapest, best technician..."
+            placeholder={t("techByService.searchPlaceholder")}
           />
 
           <select value={resultType} onChange={(e) => setResultType(e.target.value)}>
-            <option value="technicians">Technicians</option>
-            <option value="stores">Stores</option>
+            <option value="technicians">{t("techByService.technicians")}</option>
+            <option value="stores">{t("techByService.stores")}</option>
           </select>
 
           <select
             value={locationFilter}
             onChange={(e) => setLocationFilter(e.target.value)}
           >
-            <option value="all">All Jordan cities</option>
+            <option value="all">{t("techByService.allCities")}</option>
             {jordanCities.map((city) => (
               <option key={city} value={city}>
                 {city}
@@ -275,60 +278,60 @@ export default function TechniciansByService() {
           </select>
 
           <select value={priceFilter} onChange={(e) => setPriceFilter(e.target.value)}>
-            <option value="all">All prices</option>
-            <option value="low">Low: 10 JOD or less</option>
-            <option value="mid">Medium: 11 - 25 JOD</option>
-            <option value="high">High: more than 25 JOD</option>
+            <option value="all">{t("techByService.allPrices")}</option>
+            <option value="low">{t("techByService.priceLow")}</option>
+            <option value="mid">{t("techByService.priceMedium")}</option>
+            <option value="high">{t("techByService.priceHigh")}</option>
           </select>
 
           <select
             value={ratingFilter}
             onChange={(e) => setRatingFilter(e.target.value)}
           >
-            <option value="all">All ratings</option>
+            <option value="all">{t("techByService.allRatings")}</option>
             <option value="5">5+</option>
             <option value="4">4+</option>
             <option value="3">3+</option>
           </select>
 
           <select value={sortFilter} onChange={(e) => setSortFilter(e.target.value)}>
-            <option value="recommended">Recommended</option>
-            <option value="rating">Best rating</option>
-            <option value="experience">Most experience</option>
-            <option value="price_low">Lowest price</option>
-            <option value="price_high">Highest price</option>
+            <option value="recommended">{t("techByService.recommended")}</option>
+            <option value="rating">{t("techByService.bestRating")}</option>
+            <option value="experience">{t("techByService.mostExperience")}</option>
+            <option value="price_low">{t("techByService.lowestPrice")}</option>
+            <option value="price_high">{t("techByService.highestPrice")}</option>
           </select>
 
           <button className="clear-filter-btn" type="button" onClick={clearFilters}>
-            Clear Filters
+            {t("techByService.clearFilters")}
           </button>
         </section>
 
         {search.trim() && (
           <div className="auth-success">
-            Assistant search: {search} {smartLoading ? "..." : ""}
+            {t("techByService.assistantSearch")} {search} {smartLoading ? "..." : ""}
           </div>
         )}
 
         {loading ? (
           <section className="card">
-            <h3>Loading</h3>
-            <p>Loading technicians...</p>
+            <h3>{t("techByService.loading")}</h3>
+            <p>{t("techByService.loadingTechnicians")}</p>
           </section>
         ) : resultType === "stores" ? (
           <section className="card">
-            <h3>Stores</h3>
-            <p>Store results will be connected later.</p>
+            <h3>{t("techByService.storesTab")}</h3>
+            <p>{t("techByService.storesComingSoon")}</p>
           </section>
         ) : smartLoading ? (
           <section className="card">
-            <h3>Assistant Search</h3>
-            <p>Searching...</p>
+            <h3>{t("techByService.assistantSearchTitle")}</h3>
+            <p>{t("techByService.searching")}</p>
           </section>
         ) : filteredTechnicians.length === 0 ? (
           <section className="card">
-            <h3>No results</h3>
-            <p>No technicians found.</p>
+            <h3>{t("techByService.noResults")}</h3>
+            <p>{t("techByService.noTechnicians")}</p>
           </section>
         ) : (
           <section className="technicians-grid">
@@ -351,14 +354,14 @@ export default function TechniciansByService() {
                   </div>
 
                   <div className="request-details-grid">
-                    <p><strong>Rating:</strong> ⭐ {getRating(tech).toFixed(1)}</p>
-                    <p><strong>City:</strong> {tech.city || "-"}</p>
-                    <p><strong>Phone:</strong> {tech.phone || "-"}</p>
-                    <p><strong>Experience:</strong> {tech.experience || 0} years</p>
-                    <p><strong>Price:</strong> {getPrice(tech).toFixed(2)} JOD/hour</p>
+                    <p><strong>{t("techByService.ratingLabel")}</strong> ⭐ {getRating(tech).toFixed(1)}</p>
+                    <p><strong>{t("techByService.cityLabel")}</strong> {tech.city || "-"}</p>
+                    <p><strong>{t("techByService.phoneLabel")}</strong> {tech.phone || "-"}</p>
+                    <p><strong>{t("techByService.experienceLabel")}</strong> {tech.experience || 0} {t("techByService.yearsUnit")}</p>
+                    <p><strong>{t("techByService.priceLabel")}</strong> {getPrice(tech).toFixed(2)} {t("techByService.jodHour")}</p>
                     <p>
-                      <strong>Reviews:</strong>{" "}
-                      {tech.review_count ? `${tech.review_count} reviews` : "No reviews yet"}
+                      <strong>{t("techByService.reviewsLabel")}</strong>{" "}
+                      {tech.review_count ? `${tech.review_count} ${t("techByService.reviewsUnit")}` : t("techByService.noReviews")}
                     </p>
                   </div>
 
@@ -368,7 +371,7 @@ export default function TechniciansByService() {
                       type="button"
                       onClick={() => navigate(`/technician/${technicianId}`)}
                     >
-                      View Profile
+                      {t("techByService.viewProfile")}
                     </button>
 
                     <button
@@ -386,7 +389,7 @@ export default function TechniciansByService() {
                         })
                       }
                     >
-                      Book Now
+                      {t("techByService.bookNow")}
                     </button>
                   </div>
 

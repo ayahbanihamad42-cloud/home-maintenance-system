@@ -1,10 +1,12 @@
 import React, { useEffect, useMemo, useState } from "react";
+import { useTranslation } from "react-i18next";
 import Header from "../../components/common/Header";
 import API from "../../services/api";
 import { useNavigate } from "react-router-dom";
 
 function MaintenanceHistory() {
   const navigate = useNavigate();
+  const { t } = useTranslation();
   const user = JSON.parse(localStorage.getItem("user") || "{}");
 
   const [requests, setRequests] = useState([]);
@@ -78,24 +80,24 @@ function MaintenanceHistory() {
 
       <main className="history-container">
         <section className="page-hero">
-          <h1>Maintenance History</h1>
-          <p>Track your previous and current maintenance requests.</p>
+          <h1>{t("history.title")}</h1>
+          <p>{t("history.subtitle")}</p>
         </section>
 
         <section className="request-filters">
-          
+
           <select
             value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value)}
           >
-            <option value="all">All statuses</option>
-            <option value="pending">Pending</option>
-            <option value="accepted">Accepted</option>
-            <option value="on_the_way">On the way</option>
-            <option value="in_progress">In progress</option>
-            <option value="completed">Completed</option>
-            <option value="cancelled">Cancelled</option>
-            <option value="rejected">Rejected</option>
+            <option value="all">{t("history.allStatuses")}</option>
+            <option value="pending">{t("history.pending")}</option>
+            <option value="accepted">{t("history.accepted")}</option>
+            <option value="on_the_way">{t("history.onTheWay")}</option>
+            <option value="in_progress">{t("history.inProgress")}</option>
+            <option value="completed">{t("history.completed")}</option>
+            <option value="cancelled">{t("history.cancelled")}</option>
+            <option value="rejected">{t("history.rejected")}</option>
           </select>
 
           <input
@@ -112,7 +114,7 @@ function MaintenanceHistory() {
               setDateFilter("");
             }}
           >
-            Clear Filters
+            {t("history.clearFilters")}
           </button>
         </section>
 
@@ -120,8 +122,8 @@ function MaintenanceHistory() {
 
         {filteredRequests.length === 0 ? (
           <section className="card">
-            <h3>No requests found</h3>
-            <p>Your maintenance requests will appear here.</p>
+            <h3>{t("history.noRequests")}</h3>
+            <p>{t("history.requestsWillAppear")}</p>
           </section>
         ) : (
           <section className="request-list">
@@ -136,29 +138,29 @@ function MaintenanceHistory() {
 
                 <div className="request-details-grid">
                   <p>
-                    <strong>Description:</strong> {request.description || "-"}
+                    <strong>{t("history.descriptionLabel")}</strong> {request.description || "-"}
                   </p>
                   <p>
-                    <strong>Technician:</strong> {request.technician_name || "-"}
+                    <strong>{t("history.technicianLabel")}</strong> {request.technician_name || "-"}
                   </p>
                   <p>
-                    <strong>Date:</strong> {formatDateOnly(request.scheduled_date)}
+                    <strong>{t("history.dateLabel")}</strong> {formatDateOnly(request.scheduled_date)}
                   </p>
                   <p>
-                    <strong>Time:</strong> {formatTimeOnly(request.scheduled_time)}
+                    <strong>{t("history.timeLabel")}</strong> {formatTimeOnly(request.scheduled_time)}
                   </p>
                   <p>
-                    <strong>City:</strong> {request.city || "-"}
+                    <strong>{t("history.cityLabel")}</strong> {request.city || "-"}
                   </p>
                   <p>
-                    <strong>Payment:</strong> {request.payment_method || "-"}
+                    <strong>{t("history.paymentLabel")}</strong> {request.payment_method || "-"}
                   </p>
                   <p>
-                    <strong>Amount:</strong>{" "}
+                    <strong>{t("history.amountLabel")}</strong>{" "}
                     {Number(request.total_price || request.amount || 0).toFixed(2)} JOD
                   </p>
                   <p>
-                    <strong>Created:</strong>{" "}
+                    <strong>{t("history.createdLabel")}</strong>{" "}
                     {request.created_at
                       ? new Date(request.created_at).toLocaleString()
                       : "-"}
@@ -170,7 +172,7 @@ function MaintenanceHistory() {
                     className="primary"
                     onClick={() => navigate(`/review/${request.id}`)}
                   >
-                    View Details
+                    {t("history.viewDetails")}
                   </button>
                 </div>
               </article>

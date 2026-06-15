@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
+import { useTranslation } from "react-i18next";
 import Header from "../../components/common/Header";
 import {
   getMyTechnicianRequests,
@@ -17,6 +18,7 @@ const requestStatuses = [
 ];
 
 function TechnicianRequests() {
+  const { t } = useTranslation();
   const [requests, setRequests] = useState([]);
   const [message, setMessage] = useState(null);
   const [statusFilter, setStatusFilter] = useState("all");
@@ -75,7 +77,7 @@ function TechnicianRequests() {
       setMessage({
         type: "error",
         title: "Error",
-        body: err?.response?.data?.message || "Failed to load requests.",
+        body: err?.response?.data?.message || t("techRequests.failedToLoad"),
       });
     }
   };
@@ -121,9 +123,8 @@ function TechnicianRequests() {
         if (!loc) {
           setMessage({
             type: "error",
-            title: "Location Required",
-            body:
-              "Please allow location access so the customer can track the technician.",
+            title: t("techRequests.locationRequired"),
+            body: t("techRequests.allowLocationAccess"),
           });
 
           return;
@@ -145,11 +146,11 @@ function TechnicianRequests() {
 
       setMessage({
         type: "success",
-        title: "Updated",
+        title: t("techRequests.updated"),
         body:
           cleanStatus === "on_the_way"
-            ? "Status updated and live location sent to the customer."
-            : "Request status updated successfully.",
+            ? t("techRequests.statusUpdatedLocation")
+            : t("techRequests.statusUpdated"),
       });
 
       await loadRequests();
@@ -159,7 +160,7 @@ function TechnicianRequests() {
         title: "Error",
         body:
           err?.response?.data?.message ||
-          "Failed to update request status.",
+          t("techRequests.failedToUpdate"),
       });
     } finally {
       setUpdatingId(null);
@@ -222,7 +223,7 @@ function TechnicianRequests() {
             disabled={disabled}
             onClick={() => updateStatus(item.id, "accepted")}
           >
-            {disabled ? "Updating..." : "Accept"}
+            {disabled ? "..." : t("techRequests.accept")}
           </button>
 
           <button
@@ -230,7 +231,7 @@ function TechnicianRequests() {
             disabled={disabled}
             onClick={() => updateStatus(item.id, "rejected")}
           >
-            Reject
+            {t("techRequests.reject")}
           </button>
         </div>
       );
@@ -243,7 +244,7 @@ function TechnicianRequests() {
           disabled={disabled}
           onClick={() => updateStatus(item.id, "on_the_way")}
         >
-          {disabled ? "Getting Location..." : "On The Way"}
+          {disabled ? t("techRequests.gettingLocation") : t("techRequests.onTheWay")}
         </button>
       );
     }
@@ -255,7 +256,7 @@ function TechnicianRequests() {
           disabled={disabled}
           onClick={() => updateStatus(item.id, "in_progress")}
         >
-          In Progress
+          {t("techRequests.inProgress")}
         </button>
       );
     }
@@ -267,7 +268,7 @@ function TechnicianRequests() {
           disabled={disabled}
           onClick={() => updateStatus(item.id, "completed")}
         >
-          Completed
+          {t("techRequests.completed")}
         </button>
       );
     }
@@ -288,15 +289,15 @@ function TechnicianRequests() {
 
       <main className="requests-container" style={{ paddingTop: "135px" }}>
         <section className="page-hero">
-          <h1>Technician Requests</h1>
-          <p>Manage assigned maintenance requests and update their status.</p>
+          <h1>{t("techRequests.title")}</h1>
+          <p>{t("techRequests.subtitle")}</p>
         </section>
 
         <section className="request-filters">
           <input
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search by user, phone, city, service, status..."
+            placeholder={t("techRequests.searchPlaceholder")}
           />
 
           <select
@@ -305,7 +306,7 @@ function TechnicianRequests() {
           >
             {requestStatuses.map((status) => (
               <option key={status} value={status}>
-                {status === "all" ? "All statuses" : status.replaceAll("_", " ")}
+                {status === "all" ? t("techRequests.allStatuses") : status.replaceAll("_", " ")}
               </option>
             ))}
           </select>
@@ -320,12 +321,12 @@ function TechnicianRequests() {
             value={sortFilter}
             onChange={(e) => setSortFilter(e.target.value)}
           >
-            <option value="newest">Newest request</option>
-            <option value="oldest">Oldest request</option>
+            <option value="newest">{t("techRequests.newest")}</option>
+            <option value="oldest">{t("techRequests.oldest")}</option>
           </select>
 
           <button className="clear-filter-btn" onClick={clearFilters}>
-            Clear Filters
+            {t("techRequests.clearFilters")}
           </button>
         </section>
 
@@ -340,7 +341,7 @@ function TechnicianRequests() {
 
         {filteredRequests.length === 0 ? (
           <section className="card">
-            <h3>No requests found</h3>
+            <h3>{t("techRequests.noRequests")}</h3>
           </section>
         ) : (
           <section className="request-list">
@@ -360,42 +361,42 @@ function TechnicianRequests() {
 
                   <div className="request-details-grid">
                     <p>
-                      <strong>User:</strong>{" "}
+                      <strong>{t("techRequests.userLabel")}</strong>{" "}
                       {item.user_name || item.customer_name || "-"}
                     </p>
 
                     <p>
-                      <strong>Phone:</strong> {item.user_phone || "-"}
+                      <strong>{t("techRequests.phoneLabel")}</strong> {item.user_phone || "-"}
                     </p>
 
                     <p>
-                      <strong>Date:</strong>{" "}
+                      <strong>{t("techRequests.dateLabel")}</strong>{" "}
                       {formatDateOnly(item.scheduled_date)}
                     </p>
 
                     <p>
-                      <strong>Time:</strong>{" "}
+                      <strong>{t("techRequests.timeLabel")}</strong>{" "}
                       {formatTimeOnly(item.scheduled_time)}
                     </p>
 
                     <p>
-                      <strong>Created:</strong>{" "}
+                      <strong>{t("techRequests.createdLabel")}</strong>{" "}
                       {item.created_at
                         ? new Date(item.created_at).toLocaleString()
                         : "-"}
                     </p>
 
                     <p>
-                      <strong>Note:</strong>{" "}
+                      <strong>{t("techRequests.noteLabel")}</strong>{" "}
                       {item.location_note || item.city || "-"}
                     </p>
 
                     <p>
-                      <strong>Payment:</strong> {item.payment_method || "-"}
+                      <strong>{t("techRequests.paymentLabel")}</strong> {item.payment_method || "-"}
                     </p>
 
                     <p>
-                      <strong>Total:</strong>{" "}
+                      <strong>{t("techRequests.totalLabel")}</strong>{" "}
                       {Number(item.total_price || item.amount || 0).toFixed(2)}{" "}
                       JOD
                     </p>
@@ -403,7 +404,7 @@ function TechnicianRequests() {
 
                   {userLoc && (
                     <div className="map-card">
-                      <h3>Customer Location</h3>
+                      <h3>{t("techRequests.customerLocation")}</h3>
                       <iframe
                         title={`customer-location-${item.id}`}
                         src={getStaticMapSrc(userLoc)}
@@ -417,7 +418,7 @@ function TechnicianRequests() {
 
                   {status === "on_the_way" && techLoc && (
                     <div className="map-card">
-                      <h3>Your Shared Live Location</h3>
+                      <h3>{t("techRequests.liveLocation")}</h3>
                       <iframe
                         title={`technician-location-${item.id}`}
                         src={getStaticMapSrc(techLoc)}
@@ -431,8 +432,7 @@ function TechnicianRequests() {
 
                   {status === "accepted" && (
                     <div className="auth-success">
-                      When you press On The Way, your live location will be
-                      shared with the customer.
+                      {t("techRequests.liveLocationNote")}
                     </div>
                   )}
 

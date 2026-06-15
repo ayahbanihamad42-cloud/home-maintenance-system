@@ -1,8 +1,10 @@
  // React library and hooks
 import React, { useState, useEffect, useRef } from "react";
+import { useTranslation } from "react-i18next";
 
   // Chat box component
 function ChatBox({ messages, onSend }) {
+  const { t } = useTranslation();
 
    // State for current input text
   const [text, setText] = useState("");
@@ -47,7 +49,7 @@ function ChatBox({ messages, onSend }) {
           onChange={e => setText(e.target.value)}
           onKeyDown={e => e.key === "Enter" && send()}
         />
-        <button className="primary" onClick={send}>Send</button>
+        <button className="primary" onClick={send}>{t("chat.send")}</button>
       </div>
     </div>
   );

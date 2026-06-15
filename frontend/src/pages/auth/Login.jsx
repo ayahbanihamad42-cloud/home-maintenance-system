@@ -1,9 +1,11 @@
 import React, { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import API from "../../services/api";
 import welcomeimage from "../../images/home.png";
 
 function Login() {
+  const { t } = useTranslation();
   const navigate = useNavigate();
 
   const [form, setForm] = useState({
@@ -37,7 +39,7 @@ function Login() {
       else if (role === "technician") navigate("/technician-dashboard");
       else navigate("/home");
     } catch (err) {
-      setError(err.response?.data?.message || "Login failed.");
+      setError(err.response?.data?.message || t("login.failed"));
     }
   };
 
@@ -45,57 +47,56 @@ function Login() {
     <div className="auth-shell">
       <div className="split-card">
         <section className="brand-panel">
-          <h1 className="brand-logo-text">خدمة</h1>
+          <h1 className="brand-logo-text">{t("brand")}</h1>
 
-          <h2>Welcome back.</h2>
+          <h2>{t("login.welcomeBack")}</h2>
 
           <p>
-            Sign in to manage your maintenance requests, chat with technicians,
-            review services, and continue your bookings.
+            {t("login.description")}
           </p>
 
           <img className="brand-icon" src={welcomeimage} alt="Khidma" />
         </section>
 
         <section className="form-panel">
-          <h1>Login</h1>
-          <p>Enter your account information to continue.</p>
+          <h1>{t("login.title")}</h1>
+          <p>{t("login.subtitle")}</p>
 
           {error && <div className="auth-error">{error}</div>}
 
           <form className="auth-form" onSubmit={handleSubmit}>
             <div className="auth-field">
-              <label>Email</label>
+              <label>{t("login.email")}</label>
               <input
                 type="email"
                 name="email"
                 value={form.email}
                 onChange={handleChange}
-                placeholder="example@email.com"
+                placeholder={t("login.emailPlaceholder")}
                 required
               />
             </div>
 
             <div className="auth-field">
-              <label>Password</label>
+              <label>{t("login.password")}</label>
               <input
                 type="password"
                 name="password"
                 value={form.password}
                 onChange={handleChange}
-                placeholder="Enter password"
+                placeholder={t("login.passwordPlaceholder")}
                 required
               />
             </div>
 
             <button className="primary" type="submit">
-              Login
+              {t("login.submit")}
             </button>
           </form>
 
           <div className="auth-links">
-            <Link to="/register">Don&apos;t have an account? Register</Link>
-            <Link to="/forgot-password">Forgot password?</Link>
+            <Link to="/register">{t("login.noAccount")} {t("login.registerLink")}</Link>
+            <Link to="/forgot-password">{t("login.forgotPassword")}</Link>
           </div>
         </section>
       </div>

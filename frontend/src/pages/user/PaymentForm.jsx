@@ -1,11 +1,13 @@
 import React, { useMemo, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import Header from "../../components/common/Header";
 import { confirmOnlinePayment } from "../../services/paymentService";
 
 function PaymentForm() {
   const navigate = useNavigate();
   const location = useLocation();
+  const { t } = useTranslation();
 
   const requestId = location.state?.requestId || "";
   const amount = Number(location.state?.amount || location.state?.total_price || 0);
@@ -108,27 +110,27 @@ function PaymentForm() {
     const cvv = form.cvv.trim();
 
     if (!requestId) {
-      return "Missing request ID. Please go back and create the request again.";
+      return t("payment.missingRequestId");
     }
 
     if (!amount || amount <= 0) {
-      return "Invalid payment amount.";
+      return t("payment.invalidAmount");
     }
 
     if (!name) {
-      return "Please enter the name on card.";
+      return t("payment.enterNameOnCard");
     }
 
     if (!/^[a-zA-Z\s]{3,}$/.test(name)) {
-      return "Name on card must contain letters only and at least 3 characters.";
+      return t("payment.nameLettersOnly");
     }
 
     if (cardDigits.length !== 16) {
-      return "Card number must contain exactly 16 digits.";
+      return t("payment.cardDigitsError");
     }
 
     if (!/^\d{2}\/\d{2}$/.test(expiry)) {
-      return "Expiry date must be in MM/YY format, for example 12/29.";
+      return t("payment.expiryFormatError");
     }
 
     const [monthText, yearText] = expiry.split("/");
@@ -136,7 +138,7 @@ function PaymentForm() {
     const year = Number(`20${yearText}`);
 
     if (month < 1 || month > 12) {
-      return "Expiry month must be between 01 and 12.";
+      return t("payment.expiryMonthError");
     }
 
     const now = new Date();
@@ -144,11 +146,11 @@ function PaymentForm() {
     const currentYear = now.getFullYear();
 
     if (year < currentYear || (year === currentYear && month < currentMonth)) {
-      return "Card expiry date cannot be in the past.";
+      return t("payment.expiryPastError");
     }
 
     if (!/^\d{3,4}$/.test(cvv)) {
-      return "CVV must contain 3 or 4 digits only.";
+      return t("payment.cvvError");
     }
 
     return "";
@@ -177,7 +179,7 @@ function PaymentForm() {
 
       const transactionId = res?.transactionId || `mock_txn_${Date.now()}`;
 
-      setSuccess("Payment completed successfully.");
+      setSuccess(t("payment.success"));
 
       setTimeout(() => {
         navigate(`/payment-success/${requestId}`, {
@@ -195,7 +197,7 @@ function PaymentForm() {
 
       setError(
         err.response?.data?.message ||
-          "Payment failed. Please check the information and try again."
+          t("payment.failed")
       );
     } finally {
       setLoading(false);
@@ -208,8 +210,8 @@ function PaymentForm() {
 
       <main className="payment-container">
         <section className="page-hero">
-          <h1>Payment Details</h1>
-          <p>This is a mock online payment form for testing.</p>
+          <h1>{t("payment.title")}</h1>
+          <p>{t("payment.subtitle")}</p>
         </section>
 
         <section className="form-card payment-card">
@@ -219,15 +221,15 @@ function PaymentForm() {
           <form className="form-container" onSubmit={handlePay}>
             <div className="request-details-grid">
               <p>
-                <strong>Request ID:</strong> {requestId || "-"}
+                <strong>{t("payment.requestId")}:</strong> {requestId || "-"}
               </p>
 
               <p>
-                <strong>Total Amount:</strong> {totalAmount} JOD
+                <strong>{t("payment.totalAmount")}:</strong> {totalAmount} JOD
               </p>
             </div>
 
-            <label>Name on Card</label>
+            <label>{t("payment.nameOnCard")}</label>
             <input
               value={form.nameOnCard}
               onChange={(e) => handleChange("nameOnCard", e.target.value)}
@@ -235,7 +237,7 @@ function PaymentForm() {
               autoComplete="cc-name"
             />
 
-            <label>Card Number</label>
+            <label>{t("payment.cardNumber")}</label>
             <input
               value={form.cardNumber}
               onChange={(e) => handleChange("cardNumber", e.target.value)}
@@ -247,7 +249,7 @@ function PaymentForm() {
 
             <div className="form-row">
               <div>
-                <label>Expiry</label>
+                <label>{t("payment.expiry")}</label>
                 <input
                   value={form.expiry}
                   onChange={(e) => handleChange("expiry", e.target.value)}
@@ -259,7 +261,7 @@ function PaymentForm() {
               </div>
 
               <div>
-                <label>CVV</label>
+                <label>{t("payment.cvv")}</label>
                 <input
                   value={form.cvv}
                   onChange={(e) => handleChange("cvv", e.target.value)}
@@ -272,7 +274,7 @@ function PaymentForm() {
             </div>
 
             <button className="primary" type="submit" disabled={loading}>
-              {loading ? "Processing..." : "Pay Now"}
+              {loading ? t("payment.processing") : t("payment.payNow")}
             </button>
           </form>
         </section>

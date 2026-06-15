@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import Header from "../../components/common/Header";
 import API from "../../services/api.jsx";
 import { getTechnicianGallery } from "../../services/technicianService.jsx";
@@ -9,6 +10,7 @@ import {
 } from "../../services/chatService.jsx";
 
 function TechnicianProfile() {
+  const { t } = useTranslation();
   const { technicianId } = useParams();
   const navigate = useNavigate();
 
@@ -84,7 +86,7 @@ function TechnicianProfile() {
 
   const openChat = async () => {
     if (!receiverId) {
-      setChatError("Technician chat account was not found.");
+      setChatError(t("techProfile.chatNotFound"));
       return;
     }
 
@@ -211,7 +213,7 @@ function TechnicianProfile() {
     if (msg.type === "location") {
       return (
         <a href={msg.message} target="_blank" rel="noreferrer">
-          Open Location
+          {t("techProfile.openLocation")}
         </a>
       );
     }
@@ -232,7 +234,7 @@ function TechnicianProfile() {
       <>
         <Header />
         <div className="loader" style={{ paddingTop: "150px" }}>
-          Loading...
+          {t("techProfile.loading")}
         </div>
       </>
     );
@@ -250,42 +252,42 @@ function TechnicianProfile() {
 
           <div className="tech-stats">
             <span>
-              <b>Experience:</b> {tech.experience} Years
+              <b>{t("techProfile.experience")}</b> {tech.experience} {t("techProfile.years")}
             </span>
 
             <span>
-              <b>Rating:</b> ⭐ {Number(tech.rating || 0).toFixed(1)}
+              <b>{t("techProfile.rating")}</b> ⭐ {Number(tech.rating || 0).toFixed(1)}
             </span>
 
             <span>
-              <b>Price / hour:</b>{" "}
+              <b>{t("techProfile.pricePerHour")}</b>{" "}
               {Number(tech.price_per_hour || 0).toFixed(2)} JOD
             </span>
           </div>
 
           <div className="contact-list">
             <span>
-              <b>City:</b> {tech.city || "Not provided"}
+              <b>{t("techProfile.city")}</b> {tech.city || t("techProfile.notProvided")}
             </span>
 
             <span>
-              <b>Phone:</b> {tech.phone || "Not provided"}
+              <b>{t("techProfile.phone")}</b> {tech.phone || t("techProfile.notProvided")}
             </span>
 
             <span>
-              <b>Email:</b> {tech.email || "Not provided"}
+              <b>{t("techProfile.email")}</b> {tech.email || t("techProfile.notProvided")}
             </span>
           </div>
 
           <p className="bio">
-            {tech.bio || "Experienced technician ready to help."}
+            {tech.bio || t("techProfile.defaultBio")}
           </p>
 
           {chatError && <div className="auth-error">{chatError}</div>}
 
           <div className="actions">
             <button className="primary-btn" onClick={openChat}>
-              Send Message
+              {t("techProfile.sendMessage")}
             </button>
 
             <button
@@ -304,7 +306,7 @@ function TechnicianProfile() {
                 })
               }
             >
-              Book Now
+              {t("techProfile.bookNow")}
             </button>
           </div>
 
@@ -313,10 +315,10 @@ function TechnicianProfile() {
           <div className="gallery-soft-divider"></div>
 
           <div className="public-gallery-wrapper">
-            <h3 className="profile-gallery-title">Work Gallery</h3>
+            <h3 className="profile-gallery-title">{t("techProfile.workGallery")}</h3>
 
             {fixedGalleryPosts.length === 0 ? (
-              <div className="gallery-empty-text">No work posts yet.</div>
+              <div className="gallery-empty-text">{t("techProfile.noWorkPosts")}</div>
             ) : (
               <div className="pinterest-gallery">
                 {fixedGalleryPosts.map((post) => {
@@ -335,7 +337,7 @@ function TechnicianProfile() {
                           alt="Technician completed work"
                         />
                       ) : (
-                        <div className="gallery-empty-text">No image</div>
+                        <div className="gallery-empty-text">{t("techProfile.noImage")}</div>
                       )}
 
                       <div className="pinterest-caption">
@@ -414,7 +416,7 @@ function TechnicianProfile() {
                 type="button"
                 onClick={() => chatFileRef.current?.click()}
               >
-                📷 Image
+                {t("chat.image")}
               </button>
 
               <button
@@ -422,7 +424,7 @@ function TechnicianProfile() {
                 type="button"
                 onClick={handleChatLocation}
               >
-                📍 Location
+                {t("chat.location")}
               </button>
             </div>
 
@@ -430,14 +432,14 @@ function TechnicianProfile() {
               <input
                 value={chatText}
                 onChange={(e) => setChatText(e.target.value)}
-                placeholder="Type a message..."
+                placeholder={t("chat.typePlaceholder")}
                 onKeyDown={(e) => {
                   if (e.key === "Enter") sendChat();
                 }}
               />
 
               <button className="primary" onClick={() => sendChat()}>
-                Send
+                {t("chat.send")}
               </button>
             </div>
           </div>
@@ -473,7 +475,7 @@ function TechnicianProfile() {
             onClick={(e) => e.stopPropagation()}
           >
             <div className="request-card-header">
-              <h2>Work Post Details</h2>
+              <h2>{t("techProfile.workPostDetails")}</h2>
 
               <button
                 className="link-button"
@@ -509,10 +511,10 @@ function TechnicianProfile() {
               </p>
 
               <p>
-                <strong>Location:</strong>{" "}
+                <strong>{t("techProfile.locationLabel")}</strong>{" "}
                 {selectedPost.location_note ||
                   selectedPost.location ||
-                  "Not provided"}
+                  t("techProfile.notProvided")}
               </p>
             </div>
           </div>

@@ -1,4 +1,6 @@
 import React, { useEffect, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
+import { useTheme } from "../../Context/ThemeContext";
 import Header from "../../components/common/Header";
 import API from "../../services/api";
 import TechnicianProfileGallery from "../technician/TechnicianGalleryManager";
@@ -9,6 +11,8 @@ import {
 } from "../../services/paymentService";
 
 function UserProfile() {
+  const { t, i18n } = useTranslation();
+  const { toggleTheme } = useTheme();
   const currentUser = JSON.parse(localStorage.getItem("user") || "{}");
 
   const [profile, setProfile] = useState(null);
@@ -144,8 +148,8 @@ function UserProfile() {
     } catch (err) {
       setProfileMessage({
         type: "error",
-        title: "Error",
-        body: "Failed to load profile.",
+        title: t("profile.error"),
+        body: t("profile.failedToLoadProfile"),
       });
     }
   };
@@ -174,16 +178,6 @@ function UserProfile() {
     if (currentUser?.id) loadProfile();
   }, [currentUser?.id]);
 
-  const openSoonMessage = (name) => {
-    setMenuOpen(false);
-    setSubmenu(null);
-
-    setProfileMessage({
-      type: "warning",
-      title: name,
-      body: "We will add this feature soon.",
-    });
-  };
 
   const handleSaveProfile = async () => {
     try {
@@ -216,15 +210,15 @@ function UserProfile() {
 
       setProfileMessage({
         type: "success",
-        title: "Saved Successfully",
-        body: "Profile updated successfully and we sent an email.",
+        title: t("profile.savedSuccessfully"),
+        body: t("profile.profileUpdated"),
       });
 
       await loadProfile();
     } catch (err) {
       setProfileMessage({
         type: "error",
-        title: "Error",
+        title: t("profile.error"),
         body: err.response?.data?.message || "Failed to update profile.",
       });
     }
@@ -238,13 +232,13 @@ function UserProfile() {
 
       setProfileMessage({
         type: "success",
-        title: "Payment Info Saved",
-        body: "Your mock wallet information was saved successfully.",
+        title: t("profile.paymentInfoSaved"),
+        body: t("profile.walletInfoSaved"),
       });
     } catch (err) {
       setProfileMessage({
         type: "error",
-        title: "Error",
+        title: t("profile.error"),
         body: err.response?.data?.message || "Failed to save payment info.",
       });
     }
@@ -260,7 +254,7 @@ function UserProfile() {
 
       setProfileMessage({
         type: "success",
-        title: "My Balance",
+        title: t("profile.myBalance"),
         body: `Total earnings: ${Number(data.totalEarnings || 0).toFixed(
           2
         )} JOD | Payments: ${data.totalPayments || 0} | Wallet: ${
@@ -270,7 +264,7 @@ function UserProfile() {
     } catch (err) {
       setProfileMessage({
         type: "error",
-        title: "Error",
+        title: t("profile.error"),
         body: err.response?.data?.message || "Failed to load balance.",
       });
     }
@@ -317,15 +311,15 @@ function UserProfile() {
 
         setProfileMessage({
           type: "success",
-          title: "Saved Successfully",
-          body: "Profile photo updated successfully.",
+          title: t("profile.savedSuccessfully"),
+          body: t("profile.photoUpdated"),
         });
 
         await loadProfile();
       } catch (err) {
         setProfileMessage({
           type: "error",
-          title: "Error",
+          title: t("profile.error"),
           body: err.response?.data?.message || "Failed to update profile photo.",
         });
       }
@@ -341,8 +335,8 @@ function UserProfile() {
         <div className="profile-container">
           <div className="profile-card">
             <div className="message-box-card error">
-              <div className="message-box-title">Error</div>
-              <div className="message-box-body">User id is missing.</div>
+              <div className="message-box-title">{t("profile.error")}</div>
+              <div className="message-box-body">{t("profile.missingId")}</div>
             </div>
           </div>
         </div>
@@ -362,7 +356,7 @@ function UserProfile() {
                 <div className="message-box-body">{profileMessage.body}</div>
               </div>
             ) : (
-              <p>Loading...</p>
+              <p>{t("profile.loading")}</p>
             )}
           </div>
         </div>
@@ -414,7 +408,7 @@ function UserProfile() {
                       setSubmenu(null);
                     }}
                   >
-                    Edit Contact
+                    {t("profile.editContact")}
                   </button>
 
                   <button
@@ -425,17 +419,17 @@ function UserProfile() {
                       setSubmenu(null);
                     }}
                   >
-                    Edit Photo
+                    {t("profile.editPhoto")}
                   </button>
 
                   {isTechnician && (
                     <>
                       <button type="button" onClick={openPaymentModal}>
-                        Payment Info
+                        {t("profile.paymentInfo")}
                       </button>
 
                       <button type="button" onClick={handleShowBalance}>
-                        My Balance
+                        {t("profile.myBalance")}
                       </button>
                     </>
                   )}
@@ -446,7 +440,7 @@ function UserProfile() {
                       setSubmenu(submenu === "language" ? null : "language")
                     }
                   >
-                    Language ▸
+                    {t("profile.language")}
                   </button>
 
                   <button
@@ -455,7 +449,7 @@ function UserProfile() {
                       setSubmenu(submenu === "theme" ? null : "theme")
                     }
                   >
-                    Theme ▸
+                    {t("profile.theme")}
                   </button>
 
                   {submenu === "language" && (
@@ -473,12 +467,12 @@ function UserProfile() {
                         zIndex: 40,
                       }}
                     >
-                      <button type="button" onClick={() => openSoonMessage("Arabic")}>
-                        Arabic
+                      <button type="button" onClick={() => { i18n.changeLanguage("ar"); setMenuOpen(false); setSubmenu(null); }}>
+                        {t("profile.arabic")}
                       </button>
 
-                      <button type="button" onClick={() => openSoonMessage("English")}>
-                        English
+                      <button type="button" onClick={() => { i18n.changeLanguage("en"); setMenuOpen(false); setSubmenu(null); }}>
+                        {t("profile.english")}
                       </button>
                     </div>
                   )}
@@ -498,12 +492,12 @@ function UserProfile() {
                         zIndex: 40,
                       }}
                     >
-                      <button type="button" onClick={() => openSoonMessage("Light Theme")}>
-                        Light
+                      <button type="button" onClick={() => { toggleTheme(); setMenuOpen(false); setSubmenu(null); }}>
+                        {t("profile.light")}
                       </button>
 
-                      <button type="button" onClick={() => openSoonMessage("Dark Theme")}>
-                        Dark
+                      <button type="button" onClick={() => { toggleTheme(); setMenuOpen(false); setSubmenu(null); }}>
+                        {t("profile.dark")}
                       </button>
                     </div>
                   )}
@@ -521,16 +515,16 @@ function UserProfile() {
 
           <div className="profile-info">
             <p>
-              <b>Email:</b> {profile.email || "-"}
+              <b>{t("profile.emailLabel")}:</b> {profile.email || "-"}
             </p>
             <p>
-              <b>Phone:</b> {profile.phone || "-"}
+              <b>{t("profile.phoneLabel")}:</b> {profile.phone || "-"}
             </p>
             <p>
-              <b>City:</b> {profile.city || "-"}
+              <b>{t("profile.cityLabel")}:</b> {profile.city || "-"}
             </p>
             <p>
-              <b>Birth Date:</b> {formatDate(profile.dob) || "-"}
+              <b>{t("profile.birthDateLabel")}:</b> {formatDate(profile.dob) || "-"}
             </p>
           </div>
 
@@ -540,10 +534,9 @@ function UserProfile() {
                 <TechnicianProfileGallery technicianId={technicianGalleryId} />
               ) : (
                 <div className="message-box-card warning">
-                  <div className="message-box-title">Gallery</div>
+                  <div className="message-box-title">{t("profile.gallery")}</div>
                   <div className="message-box-body">
-                    Technician gallery id is missing. Please make sure the backend
-                    returns technician_id for this technician user.
+                    {t("profile.galleryIdMissing")}
                   </div>
                 </div>
               )}
@@ -555,25 +548,25 @@ function UserProfile() {
       {showEditModal && (
         <div className="modal-overlay">
           <div className="modal">
-            <h3>Update Contact</h3>
+            <h3>{t("profile.updateContact")}</h3>
 
             <div className="input-group">
-              <label>Email</label>
+              <label>{t("profile.emailLabel")}</label>
               <input value={email} onChange={(e) => setEmail(e.target.value)} />
             </div>
 
             <div className="input-group">
-              <label>Phone</label>
+              <label>{t("profile.phoneLabel")}</label>
               <input value={phone} onChange={(e) => setPhone(e.target.value)} />
             </div>
 
             <div className="input-group">
-              <label>City</label>
+              <label>{t("profile.cityLabel")}</label>
               <input value={city} onChange={(e) => setCity(e.target.value)} />
             </div>
 
             <div className="input-group">
-              <label>Birth Date</label>
+              <label>{t("profile.birthDateLabel")}</label>
               <input
                 type="date"
                 value={dob}
@@ -587,11 +580,11 @@ function UserProfile() {
                 type="button"
                 onClick={() => setShowEditModal(false)}
               >
-                Cancel
+                {t("profile.cancel")}
               </button>
 
               <button className="primary" type="button" onClick={handleSaveProfile}>
-                Save
+                {t("profile.save")}
               </button>
             </div>
           </div>
@@ -601,7 +594,7 @@ function UserProfile() {
       {showPhotoModal && (
         <div className="modal-overlay">
           <div className="modal">
-            <h3>Update Photo</h3>
+            <h3>{t("profile.updatePhoto")}</h3>
 
             <div className="profile-photo-preview-wrap">
               <div className="avatar profile-avatar-large">
@@ -614,7 +607,7 @@ function UserProfile() {
             </div>
 
             <div className="input-group">
-              <label>Select Image</label>
+              <label>{t("profile.selectImage")}</label>
               <input
                 ref={fileInputRef}
                 type="file"
@@ -629,7 +622,7 @@ function UserProfile() {
                 type="button"
                 onClick={() => setShowPhotoModal(false)}
               >
-                Cancel
+                {t("profile.cancel")}
               </button>
             </div>
           </div>
@@ -639,10 +632,10 @@ function UserProfile() {
       {showPaymentModal && (
         <div className="modal-overlay">
           <div className="modal">
-            <h3>Mock Payment Info</h3>
+            <h3>{t("profile.mockPaymentInfo")}</h3>
 
             <div className="input-group">
-              <label>Account Holder</label>
+              <label>{t("profile.accountHolder")}</label>
               <input
                 value={paymentInfo.account_holder}
                 onChange={(e) =>
@@ -651,12 +644,12 @@ function UserProfile() {
                     account_holder: e.target.value,
                   })
                 }
-                placeholder="Technician name"
+                placeholder={t("profile.technicianName")}
               />
             </div>
 
             <div className="input-group">
-              <label>Wallet Name</label>
+              <label>{t("profile.walletName")}</label>
               <input
                 value={paymentInfo.wallet_name}
                 onChange={(e) =>
@@ -665,12 +658,12 @@ function UserProfile() {
                     wallet_name: e.target.value,
                   })
                 }
-                placeholder="Example: CliQ / Zain Cash"
+                placeholder="CliQ / Zain Cash"
               />
             </div>
 
             <div className="input-group">
-              <label>Wallet Number</label>
+              <label>{t("profile.walletNumber")}</label>
               <input
                 value={paymentInfo.wallet_number}
                 onChange={(e) =>
@@ -684,7 +677,7 @@ function UserProfile() {
             </div>
 
             <div className="input-group">
-              <label>Mock Account Number</label>
+              <label>{t("profile.mockAccountNumber")}</label>
               <input
                 value={paymentInfo.mock_account_number}
                 onChange={(e) =>
@@ -703,7 +696,7 @@ function UserProfile() {
                 type="button"
                 onClick={() => setShowPaymentModal(false)}
               >
-                Cancel
+                {t("profile.cancel")}
               </button>
 
               <button
@@ -711,7 +704,7 @@ function UserProfile() {
                 type="button"
                 onClick={handleSavePaymentInfo}
               >
-                Save
+                {t("profile.save")}
               </button>
             </div>
           </div>

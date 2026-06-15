@@ -6,6 +6,7 @@
 
   // React library
 import React from "react";
+import { useTranslation } from "react-i18next";
 
  // Hook for page navigation
 import { useNavigate } from "react-router-dom";
@@ -15,6 +16,7 @@ function StoreCard({ store }) {
 
     // Initialize navigation
   const navigate = useNavigate();
+  const { t } = useTranslation();
 
   return (
     <div className="card">
@@ -32,7 +34,7 @@ function StoreCard({ store }) {
         className="primary"
         onClick={() => navigate(`/request/${store.storeId}`)}
       >
-        Booking
+        {t("cards.booking")}
       </button>
 
         {/* Navigate to store profile page */}
@@ -40,7 +42,7 @@ function StoreCard({ store }) {
         className="secondary"
         onClick={() => navigate(`/store/${store.storeId}`)}
       >
-        View Profile
+        {t("cards.viewProfile")}
       </button>
     </div>
   );

@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams, useLocation } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import Header from "../../components/common/Header";
 import { createMaintenanceRequest } from "../../services/maintenanceService.jsx";
 import {
@@ -11,6 +12,7 @@ function MaintenanceRequest() {
   const navigate = useNavigate();
   const params = useParams();
   const location = useLocation();
+  const { t } = useTranslation();
 
   const stateTech = location.state?.technician || location.state?.tech || {};
 
@@ -114,8 +116,8 @@ function MaintenanceRequest() {
       setLocationLoading(false);
       setMessage({
         type: "error",
-        title: "Location Error",
-        body: "Geolocation is not supported by this browser.",
+        title: t("request.locationError"),
+        body: t("request.geolocationNotSupported"),
       });
       return;
     }
@@ -133,8 +135,8 @@ function MaintenanceRequest() {
 
         setMessage({
           type: "success",
-          title: "Location Added",
-          body: "Your location has been added to this request.",
+          title: t("request.locationAdded"),
+          body: t("request.locationAddedBody"),
         });
 
         setLocationLoading(false);
@@ -142,8 +144,8 @@ function MaintenanceRequest() {
       () => {
         setMessage({
           type: "error",
-          title: "Location Error",
-          body: "Please allow location access and try again.",
+          title: t("request.locationError"),
+          body: t("request.locationAccessDenied"),
         });
 
         setLocationLoading(false);
@@ -164,8 +166,8 @@ function MaintenanceRequest() {
         if (!selectedTechnicianId) {
           setMessage({
             type: "error",
-            title: "Missing Technician",
-            body: "Please choose a technician first.",
+            title: t("request.missingTechnician"),
+            body: t("request.chooseTechnicianFirst"),
           });
           return;
         }
@@ -186,8 +188,8 @@ function MaintenanceRequest() {
         console.error("load technician error:", err);
         setMessage({
           type: "error",
-          title: "Error",
-          body: "Failed to load technician information.",
+          title: t("request.error"),
+          body: t("request.failedToLoadTechnician"),
         });
       }
     };
@@ -260,8 +262,8 @@ function MaintenanceRequest() {
         if (uniqueTimes.length === 0) {
           setMessage({
             type: "error",
-            title: "No Available Times",
-            body: "No available times were found for this date. Please choose another date.",
+            title: t("request.noAvailableTimes"),
+            body: t("request.noTimesFoundBody"),
           });
         }
       } catch (err) {
@@ -272,10 +274,10 @@ function MaintenanceRequest() {
         setForm((prev) => ({ ...prev, scheduled_time: "" }));
         setMessage({
           type: "error",
-          title: "Error",
+          title: t("request.error"),
           body:
             err.response?.data?.message ||
-            "Failed to load available times for this date.",
+            t("request.failedToLoadTimes"),
         });
       } finally {
         if (!ignore) {
@@ -300,8 +302,8 @@ function MaintenanceRequest() {
       if (!selectedTechnicianId) {
         setMessage({
           type: "error",
-          title: "Missing Technician",
-          body: "Please choose a technician first.",
+          title: t("request.missingTechnician"),
+          body: t("request.chooseTechnicianFirst"),
         });
         return;
       }
@@ -309,8 +311,8 @@ function MaintenanceRequest() {
       if (!form.scheduled_date) {
         setMessage({
           type: "error",
-          title: "Missing Date",
-          body: "Please choose a date.",
+          title: t("request.missingDate"),
+          body: t("request.pleaseChooseDate"),
         });
         return;
       }
@@ -318,8 +320,8 @@ function MaintenanceRequest() {
       if (!form.scheduled_time) {
         setMessage({
           type: "error",
-          title: "Unavailable Time",
-          body: "Please choose an available time.",
+          title: t("request.unavailableTime"),
+          body: t("request.pleaseChooseTime"),
         });
         return;
       }
@@ -327,8 +329,8 @@ function MaintenanceRequest() {
       if (!form.description.trim()) {
         setMessage({
           type: "error",
-          title: "Error",
-          body: "Please enter description.",
+          title: t("request.error"),
+          body: t("request.pleaseEnterDescription"),
         });
         return;
       }
@@ -340,8 +342,8 @@ function MaintenanceRequest() {
       if (!selectedTimeExists) {
         setMessage({
           type: "error",
-          title: "Unavailable Time",
-          body: "Please choose one of the available times.",
+          title: t("request.unavailableTime"),
+          body: t("request.pleaseChooseAvailableTime"),
         });
         return;
       }
@@ -385,10 +387,10 @@ function MaintenanceRequest() {
       console.error("submit request error:", err);
       setMessage({
         type: "error",
-        title: "Error",
+        title: t("request.error"),
         body:
           err.response?.data?.message ||
-          "This time slot is no longer available. Please choose another time.",
+          t("request.timeSlotUnavailable"),
       });
     }
   };
@@ -399,10 +401,9 @@ function MaintenanceRequest() {
 
       <main className="request-container">
         <section className="page-hero">
-          <h1>Maintenance Request</h1>
+          <h1>{t("request.title")}</h1>
           <p>
-            Choose an available time, share your location, and submit your
-            request.
+            {t("request.subtitle")}
           </p>
         </section>
 
@@ -421,19 +422,19 @@ function MaintenanceRequest() {
           <form className="form-container" onSubmit={handleSubmit}>
             <div className="form-row">
               <div>
-                <label>Service</label>
+                <label>{t("request.service")}</label>
                 <input value={form.service} readOnly />
               </div>
 
               <div>
-                <label>Technician</label>
+                <label>{t("request.technician")}</label>
                 <input value={form.technician_name} readOnly />
               </div>
             </div>
 
             <div className="form-row">
               <div>
-                <label>Date</label>
+                <label>{t("request.date")}</label>
                 <select
                   value={form.scheduled_date}
                   onChange={(e) =>
@@ -444,7 +445,7 @@ function MaintenanceRequest() {
                     })
                   }
                 >
-                  <option value="">Choose a date</option>
+                  <option value="">{t("request.chooseDatePlaceholder")}</option>
                   {dateOptions.map((date) => (
                     <option key={date} value={date}>
                       {date}
@@ -454,7 +455,7 @@ function MaintenanceRequest() {
               </div>
 
               <div>
-                <label>Time Slot</label>
+                <label>{t("request.timeSlot")}</label>
                 <select
                   value={form.scheduled_time}
                   disabled={!form.scheduled_date || timesLoading}
@@ -463,11 +464,11 @@ function MaintenanceRequest() {
                   }
                 >
                   {!form.scheduled_date ? (
-                    <option value="">Choose a date first</option>
+                    <option value="">{t("request.chooseDateFirst")}</option>
                   ) : timesLoading ? (
-                    <option value="">Loading available times...</option>
+                    <option value="">{t("request.loadingTimes")}</option>
                   ) : availableTimes.length === 0 ? (
-                    <option value="">No available times</option>
+                    <option value="">{t("request.noAvailableTimes")}</option>
                   ) : (
                     availableTimes.map((time) => (
                       <option key={time.id || time.value} value={time.value}>
@@ -479,7 +480,7 @@ function MaintenanceRequest() {
               </div>
 
               <div>
-                <label>Estimated Hours</label>
+                <label>{t("request.estimatedHours")}</label>
                 <input
                   type="number"
                   min="1"
@@ -493,20 +494,20 @@ function MaintenanceRequest() {
 
             <div className="form-row">
               <div>
-                <label>Payment Method</label>
+                <label>{t("request.paymentMethod")}</label>
                 <select
                   value={form.payment_method}
                   onChange={(e) =>
                     setForm({ ...form, payment_method: e.target.value })
                   }
                 >
-                  <option value="cash">Cash</option>
-                  <option value="online">Online</option>
+                  <option value="cash">{t("request.cash")}</option>
+                  <option value="online">{t("request.online")}</option>
                 </select>
               </div>
 
               <div>
-                <label>Price Summary</label>
+                <label>{t("request.priceSummary")}</label>
                 <input
                   value={`${Number(form.price_per_hour || 0).toFixed(
                     2
@@ -518,13 +519,13 @@ function MaintenanceRequest() {
               </div>
             </div>
 
-            <label>Location Note</label>
+            <label>{t("request.locationNote")}</label>
             <input
               value={form.location_note}
               onChange={(e) =>
                 setForm({ ...form, location_note: e.target.value })
               }
-              placeholder="Example: Irbid, near Yarmouk University"
+              placeholder={t("request.locationPlaceholder")}
             />
 
             <button
@@ -533,12 +534,12 @@ function MaintenanceRequest() {
               onClick={getCurrentUserLocation}
               disabled={locationLoading}
             >
-              {locationLoading ? "Getting Location..." : "Use My Location"}
+              {locationLoading ? t("request.gettingLocation") : t("request.useMyLocation")}
             </button>
 
             {userLocation && (
               <div className="map-card">
-                <h3>Your Request Location</h3>
+                <h3>{t("request.yourRequestLocation")}</h3>
                 <iframe
                   title="user-location"
                   src={userMapSrc}
@@ -547,17 +548,17 @@ function MaintenanceRequest() {
                   style={{ border: 0 }}
                   loading="lazy"
                 />
-                <p>This static location will be shared with the technician.</p>
+                <p>{t("request.locationStaticNote")}</p>
               </div>
             )}
 
-            <label>Description</label>
+            <label>{t("request.description")}</label>
             <textarea
               value={form.description}
               onChange={(e) =>
                 setForm({ ...form, description: e.target.value })
               }
-              placeholder="Describe the problem..."
+              placeholder={t("request.descriptionPlaceholder")}
               rows="5"
             />
 
@@ -567,8 +568,8 @@ function MaintenanceRequest() {
               disabled={timesLoading}
             >
               {form.payment_method === "online"
-                ? "Continue to Payment"
-                : "Submit Request"}
+                ? t("request.continueToPayment")
+                : t("request.submitRequest")}
             </button>
           </form>
         </section>

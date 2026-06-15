@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 import Header from "../../components/common/Header";
 import {
   getAdminUsers,
@@ -40,6 +41,7 @@ function formatDate(value) {
 }
 
 function AdminDashboard() {
+  const { t } = useTranslation();
   const emptyForm = {
     name: "",
     email: "",
@@ -172,14 +174,14 @@ function AdminDashboard() {
       resetForm();
       await loadData();
       await loadServices();
-      alert("Added successfully.");
+      alert(t("admin.addedSuccess"));
     } catch (err) {
       alert(err?.response?.data?.message || err.message);
     }
   };
 
   const handleDelete = async (type, id) => {
-    if (!window.confirm("Are you sure?")) return;
+    if (!window.confirm(t("admin.areYouSure"))) return;
 
     try {
       if (type === "user") await deleteAdminUser(id);
@@ -205,7 +207,7 @@ function AdminDashboard() {
 
   const CitySelect = ({ value, onChange }) => (
     <select value={value} onChange={(e) => onChange(e.target.value)}>
-      <option value="">Select city</option>
+      <option value="">{t("admin.selectCity")}</option>
       {JORDAN_CITIES.map((city) => (
         <option key={city} value={city}>
           {city}
@@ -214,9 +216,9 @@ function AdminDashboard() {
     </select>
   );
 
-  const ServiceSelect = ({ value, onChange, placeholder = "Select service" }) => (
+  const ServiceSelect = ({ value, onChange, placeholder }) => (
     <select value={value} onChange={(e) => onChange(e.target.value)}>
-      <option value="">{placeholder}</option>
+      <option value="">{placeholder || t("admin.selectService")}</option>
       {services.map((s) => (
         <option key={s.id} value={s.id}>
           {s.name}
@@ -230,52 +232,52 @@ function AdminDashboard() {
       <Header />
 
       <div className="container">
-        <h2>Admin Dashboard</h2>
+        <h2>{t("admin.title")}</h2>
 
         <div className="admin-actions">
           <button
             className={activeClass("users")}
             onClick={() => changeView("users")}
           >
-            Manage Users
+            {t("admin.manageUsers")}
           </button>
 
           <button
             className={activeClass("technicians")}
             onClick={() => changeView("technicians")}
           >
-            Manage Technicians
+            {t("admin.manageTechnicians")}
           </button>
 
           <button
             className={activeClass("stores")}
             onClick={() => changeView("stores")}
           >
-            Manage Stores
+            {t("admin.manageStores")}
           </button>
 
           <button
             className={activeClass("services")}
             onClick={() => changeView("services")}
           >
-            Manage Services
+            {t("admin.manageServices")}
           </button>
         </div>
 
-        {loading ? <div className="panel">Loading...</div> : null}
+        {loading ? <div className="panel">{t("admin.loading")}</div> : null}
 
         {view === "users" && (
           <table className="admin-table">
             <thead>
               <tr>
-                <th>Name</th>
-                <th>Email</th>
-                <th>Phone</th>
-                <th>Birth Date</th>
-                <th>City</th>
-                <th>Role</th>
-                <th>View</th>
-                <th>Delete</th>
+                <th>{t("admin.name")}</th>
+                <th>{t("admin.email")}</th>
+                <th>{t("admin.phone")}</th>
+                <th>{t("admin.birthDate")}</th>
+                <th>{t("admin.city")}</th>
+                <th>{t("admin.role")}</th>
+                <th>{t("admin.view")}</th>
+                <th>{t("admin.delete")}</th>
               </tr>
             </thead>
 
@@ -295,7 +297,7 @@ function AdminDashboard() {
                         setSelectedProfile({ type: "user", data: u })
                       }
                     >
-                      View
+                      {t("admin.view")}
                     </button>
                   </td>
                   <td>
@@ -303,7 +305,7 @@ function AdminDashboard() {
                       className="btn-outline"
                       onClick={() => handleDelete("user", u.id)}
                     >
-                      Delete
+                      {t("admin.delete")}
                     </button>
                   </td>
                 </tr>
@@ -316,51 +318,51 @@ function AdminDashboard() {
           <table className="admin-table">
             <thead>
               <tr>
-                <th>Name</th>
-                <th>Email</th>
-                <th>Phone</th>
-                <th>Birth Date</th>
-                <th>City</th>
-                <th>Service</th>
-                <th>Exp</th>
-                <th>Price/hr</th>
-                <th>View</th>
-                <th>Delete</th>
+                <th>{t("admin.name")}</th>
+                <th>{t("admin.email")}</th>
+                <th>{t("admin.phone")}</th>
+                <th>{t("admin.birthDate")}</th>
+                <th>{t("admin.city")}</th>
+                <th>{t("admin.service")}</th>
+                <th>{t("admin.experience")}</th>
+                <th>{t("admin.pricePerHour")}</th>
+                <th>{t("admin.view")}</th>
+                <th>{t("admin.delete")}</th>
               </tr>
             </thead>
 
             <tbody>
-              {technicians.map((t) => (
-                <tr key={t.technicianId}>
-                  <td>{t.name}</td>
-                  <td>{t.email}</td>
-                  <td>{t.phone || "-"}</td>
-                  <td>{formatDate(t.dob) || "-"}</td>
-                  <td>{t.city || "-"}</td>
-                  <td>{t.service || t.service_name || "-"}</td>
-                  <td>{t.experience || 0}</td>
-                  <td>{Number(t.price_per_hour || 0).toFixed(2)}</td>
+              {technicians.map((tech) => (
+                <tr key={tech.technicianId}>
+                  <td>{tech.name}</td>
+                  <td>{tech.email}</td>
+                  <td>{tech.phone || "-"}</td>
+                  <td>{formatDate(tech.dob) || "-"}</td>
+                  <td>{tech.city || "-"}</td>
+                  <td>{tech.service || tech.service_name || "-"}</td>
+                  <td>{tech.experience || 0}</td>
+                  <td>{Number(tech.price_per_hour || 0).toFixed(2)}</td>
                   <td>
                     <button
                       className="btn-outline"
                       onClick={() =>
                         setSelectedProfile({
                           type: "technician",
-                          data: t,
+                          data: tech,
                         })
                       }
                     >
-                      View
+                      {t("admin.view")}
                     </button>
                   </td>
                   <td>
                     <button
                       className="btn-outline"
                       onClick={() =>
-                        handleDelete("technician", t.technicianId)
+                        handleDelete("technician", tech.technicianId)
                       }
                     >
-                      Delete
+                      {t("admin.delete")}
                     </button>
                   </td>
                 </tr>
@@ -373,12 +375,12 @@ function AdminDashboard() {
           <table className="admin-table">
             <thead>
               <tr>
-                <th>Store</th>
-                <th>Category</th>
-                <th>City</th>
-                <th>Address</th>
-                <th>Owner</th>
-                <th>Delete</th>
+                <th>{t("admin.store")}</th>
+                <th>{t("admin.category")}</th>
+                <th>{t("admin.city")}</th>
+                <th>{t("admin.address")}</th>
+                <th>{t("admin.owner")}</th>
+                <th>{t("admin.delete")}</th>
               </tr>
             </thead>
 
@@ -395,7 +397,7 @@ function AdminDashboard() {
                       className="btn-outline"
                       onClick={() => handleDelete("store", s.id)}
                     >
-                      Delete
+                      {t("admin.delete")}
                     </button>
                   </td>
                 </tr>
@@ -408,10 +410,10 @@ function AdminDashboard() {
           <table className="admin-table">
             <thead>
               <tr>
-                <th>Image</th>
-                <th>Service Name</th>
-                <th>Image URL</th>
-                <th>Delete</th>
+                <th>{t("admin.image")}</th>
+                <th>{t("admin.serviceName")}</th>
+                <th>{t("admin.imageUrl")}</th>
+                <th>{t("admin.delete")}</th>
               </tr>
             </thead>
 
@@ -441,7 +443,7 @@ function AdminDashboard() {
                       className="btn-outline"
                       onClick={() => handleDelete("service", s.id)}
                     >
-                      Delete
+                      {t("admin.delete")}
                     </button>
                   </td>
                 </tr>
@@ -453,18 +455,18 @@ function AdminDashboard() {
         <div className="panel admin-form">
           <h3>
             {view === "users"
-              ? "Add User"
+              ? t("admin.addUser")
               : view === "technicians"
-              ? "Add Technician"
+              ? t("admin.addTechnician")
               : view === "stores"
-              ? "Add Store"
-              : "Add Service"}
+              ? t("admin.addStore")
+              : t("admin.addService")}
           </h3>
 
           {(view === "users" || view === "technicians") && (
             <>
               <div className="input-group">
-                <label>Name</label>
+                <label>{t("admin.name")}</label>
                 <input
                   value={form.name}
                   onChange={(e) => setForm({ ...form, name: e.target.value })}
@@ -472,7 +474,7 @@ function AdminDashboard() {
               </div>
 
               <div className="input-group">
-                <label>Email</label>
+                <label>{t("admin.email")}</label>
                 <input
                   value={form.email}
                   onChange={(e) => setForm({ ...form, email: e.target.value })}
@@ -480,7 +482,7 @@ function AdminDashboard() {
               </div>
 
               <div className="input-group">
-                <label>Phone</label>
+                <label>{t("admin.phone")}</label>
                 <input
                   value={form.phone}
                   onChange={(e) => setForm({ ...form, phone: e.target.value })}
@@ -488,7 +490,7 @@ function AdminDashboard() {
               </div>
 
               <div className="input-group">
-                <label>Birth Date</label>
+                <label>{t("admin.birthDate")}</label>
                 <input
                   type="date"
                   value={form.dob}
@@ -497,7 +499,7 @@ function AdminDashboard() {
               </div>
 
               <div className="input-group">
-                <label>City</label>
+                <label>{t("admin.city")}</label>
                 <CitySelect
                   value={form.city}
                   onChange={(city) => setForm({ ...form, city })}
@@ -505,7 +507,7 @@ function AdminDashboard() {
               </div>
 
               <div className="input-group">
-                <label>Password</label>
+                <label>{t("admin.password")}</label>
                 <input
                   type="password"
                   value={form.password}
@@ -520,7 +522,7 @@ function AdminDashboard() {
           {view === "technicians" && (
             <>
               <div className="input-group">
-                <label>Service</label>
+                <label>{t("admin.service")}</label>
                 <ServiceSelect
                   value={form.service_id}
                   onChange={(service_id) =>
@@ -530,7 +532,7 @@ function AdminDashboard() {
               </div>
 
               <div className="input-group">
-                <label>Experience</label>
+                <label>{t("admin.experienceFull")}</label>
                 <input
                   type="number"
                   value={form.experience}
@@ -541,7 +543,7 @@ function AdminDashboard() {
               </div>
 
               <div className="input-group">
-                <label>Price Per Hour</label>
+                <label>{t("admin.pricePerHourFull")}</label>
                 <input
                   type="number"
                   value={form.price_per_hour}
@@ -556,7 +558,7 @@ function AdminDashboard() {
           {view === "stores" && (
             <>
               <div className="input-group">
-                <label>Store Name</label>
+                <label>{t("admin.storeName")}</label>
                 <input
                   value={form.store_name}
                   onChange={(e) =>
@@ -566,18 +568,18 @@ function AdminDashboard() {
               </div>
 
               <div className="input-group">
-                <label>Category</label>
+                <label>{t("admin.category")}</label>
                 <ServiceSelect
                   value={form.category}
                   onChange={(category) =>
                     setForm({ ...form, category })
                   }
-                  placeholder="Select category"
+                  placeholder={t("admin.selectCategory")}
                 />
               </div>
 
               <div className="input-group">
-                <label>City</label>
+                <label>{t("admin.city")}</label>
                 <CitySelect
                   value={form.city}
                   onChange={(city) => setForm({ ...form, city })}
@@ -585,7 +587,7 @@ function AdminDashboard() {
               </div>
 
               <div className="input-group">
-                <label>Address</label>
+                <label>{t("admin.address")}</label>
                 <input
                   value={form.address}
                   onChange={(e) =>
@@ -595,7 +597,7 @@ function AdminDashboard() {
               </div>
 
               <div className="input-group">
-                <label>Owner User ID</label>
+                <label>{t("admin.ownerUserId")}</label>
                 <input
                   value={form.owner_id}
                   onChange={(e) =>
@@ -609,7 +611,7 @@ function AdminDashboard() {
           {view === "services" && (
             <>
               <div className="input-group">
-                <label>Service Name</label>
+                <label>{t("admin.serviceName")}</label>
                 <input
                   value={form.service_name}
                   onChange={(e) =>
@@ -619,7 +621,7 @@ function AdminDashboard() {
               </div>
 
               <div className="input-group">
-                <label>Service Image</label>
+                <label>{t("admin.serviceImage")}</label>
                 <input
                   type="file"
                   accept="image/*"
@@ -646,7 +648,7 @@ function AdminDashboard() {
           )}
 
           <button className="primary" onClick={handleAdd}>
-            Add
+            {t("admin.add")}
           </button>
         </div>
       </div>
@@ -658,8 +660,8 @@ function AdminDashboard() {
               <div>
                 <h3>
                   {selectedProfile.type === "user"
-                    ? "User Profile"
-                    : "Technician Profile"}
+                    ? t("admin.userProfile")
+                    : t("admin.technicianProfile")}
                 </h3>
                 <p>{selectedProfile.data.role || selectedProfile.type}</p>
               </div>
@@ -668,54 +670,54 @@ function AdminDashboard() {
                 className="btn-outline"
                 onClick={() => setSelectedProfile(null)}
               >
-                Close
+                {t("admin.close")}
               </button>
             </div>
 
             <div className="admin-profile-grid">
               <div className="admin-profile-item">
-                <b>Name</b>
+                <b>{t("admin.name")}</b>
                 {selectedProfile.data.name || "-"}
               </div>
 
               <div className="admin-profile-item">
-                <b>Email</b>
+                <b>{t("admin.email")}</b>
                 {selectedProfile.data.email || "-"}
               </div>
 
               <div className="admin-profile-item">
-                <b>Phone</b>
+                <b>{t("admin.phone")}</b>
                 {selectedProfile.data.phone || "-"}
               </div>
 
               <div className="admin-profile-item">
-                <b>Birth Date</b>
+                <b>{t("admin.birthDate")}</b>
                 {formatDate(selectedProfile.data.dob) || "-"}
               </div>
 
               <div className="admin-profile-item">
-                <b>City</b>
+                <b>{t("admin.city")}</b>
                 {selectedProfile.data.city || "-"}
               </div>
 
               {selectedProfile.type === "technician" ? (
                 <>
                   <div className="admin-profile-item">
-                    <b>Service</b>
+                    <b>{t("admin.service")}</b>
                     {selectedProfile.data.service || "-"}
                   </div>
 
                   <div className="admin-profile-item">
-                    <b>Experience</b>
-                    {selectedProfile.data.experience || 0} years
+                    <b>{t("admin.experienceFull")}</b>
+                    {selectedProfile.data.experience || 0} {t("admin.yearsUnit")}
                   </div>
 
                   <div className="admin-profile-item">
-                    <b>Price/hr</b>
+                    <b>{t("admin.pricePerHour")}</b>
                     {Number(selectedProfile.data.price_per_hour || 0).toFixed(
                       2
                     )}{" "}
-                    JOD
+                    {t("admin.jodUnit")}
                   </div>
                 </>
               ) : null}

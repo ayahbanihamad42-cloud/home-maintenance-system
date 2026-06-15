@@ -1,14 +1,16 @@
 import React, { useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 import Header from "../components/common/Header";
 import { chatWithAI } from "../services/aiService";
 
 function AIChat() {
+  const { t } = useTranslation();
   const fileRef = useRef(null);
 
   const [messages, setMessages] = useState([
     {
       role: "ai",
-      text: "Hello! I'm your خدمة AI assistant. You can ask about repairs, decoration ideas, services, or send an image.",
+      text: t("aiChat.greeting"),
     },
   ]);
 
@@ -36,7 +38,7 @@ function AIChat() {
 
     const userMessage = {
       role: "user",
-      text: cleanInput || "Sent an image",
+      text: cleanInput || t("aiChat.sentImage"),
       image,
     };
 
@@ -61,7 +63,7 @@ function AIChat() {
         ...prev,
         {
           role: "ai",
-          text: res.reply || "AI assistant is not available right now.",
+          text: res.reply || t("aiChat.notAvailable"),
           image: res.image || res.url || null,
         },
       ]);
@@ -72,7 +74,7 @@ function AIChat() {
           role: "ai",
           text:
             err.response?.data?.reply ||
-            "Sorry, something went wrong. Please try again.",
+            t("aiChat.error"),
         },
       ]);
     } finally {
@@ -105,7 +107,7 @@ function AIChat() {
             </div>
           ))}
 
-          {loading && <div className="ai-message">Thinking...</div>}
+          {loading && <div className="ai-message">{t("aiChat.thinking")}</div>}
         </section>
 
         {image && (
@@ -113,7 +115,7 @@ function AIChat() {
             <img src={image} alt="selected" />
 
             <button className="secondary-btn" onClick={() => setImage(null)}>
-              Remove
+              {t("aiChat.remove")}
             </button>
           </div>
         )}
@@ -132,7 +134,7 @@ function AIChat() {
             type="button"
             onClick={() => fileRef.current?.click()}
           >
-            📷 Image
+            {t("chat.image")}
           </button>
         </div>
 
@@ -140,14 +142,14 @@ function AIChat() {
           <input
             value={input}
             onChange={(e) => setInput(e.target.value)}
-            placeholder="Ask anything..."
+            placeholder={t("aiChat.askPlaceholder")}
             onKeyDown={(e) => {
               if (e.key === "Enter") send();
             }}
           />
 
           <button className="primary" onClick={send}>
-            Send
+            {t("aiChat.send")}
           </button>
         </div>
       </main>

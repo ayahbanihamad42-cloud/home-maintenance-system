@@ -1,5 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { useTranslation } from "react-i18next";
+import { useTheme } from "../../Context/ThemeContext";
 import {
   getNotificationFeed,
   markNotificationAsRead,
@@ -13,6 +15,8 @@ import { chatWithAI } from "../../services/aiService";
 
 function Header() {
   const navigate = useNavigate();
+  const { t, i18n } = useTranslation();
+  const { theme, toggleTheme } = useTheme();
   const user = JSON.parse(localStorage.getItem("user") || "{}");
   const role = String(user.role || "").toLowerCase();
 
@@ -27,7 +31,7 @@ function Header() {
   const chatFileRef = useRef(null);
 
   const [aiMessages, setAiMessages] = useState([
-    { role: "ai", text: "Hello! I'm your خدمة AI assistant. How can I help?" },
+    { role: "ai", text: t("aiChat.greeting") },
   ]);
   const [aiText, setAiText] = useState("");
   const [aiImage, setAiImage] = useState(null);
@@ -35,6 +39,20 @@ function Header() {
   const aiFileRef = useRef(null);
 
   const unreadCount = useMemo(() => notifications.length, [notifications]);
+
+  const currentLang = i18n.language?.startsWith("ar") ? "ar" : "en";
+
+  const changeLanguage = (lang) => {
+    i18n.changeLanguage(lang);
+    document.documentElement.setAttribute("dir", lang === "ar" ? "rtl" : "ltr");
+    document.documentElement.setAttribute("lang", lang);
+  };
+
+  useEffect(() => {
+    const lang = i18n.language?.startsWith("ar") ? "ar" : "en";
+    document.documentElement.setAttribute("dir", lang === "ar" ? "rtl" : "ltr");
+    document.documentElement.setAttribute("lang", lang);
+  }, [i18n.language]);
 
   const loadNotifications = async () => {
     try {
@@ -207,7 +225,7 @@ function Header() {
     if (msg.type === "location") {
       return (
         <a href={msg.message} target="_blank" rel="noreferrer">
-          Open Location
+          {t("chat.openSharedLocation")}
         </a>
       );
     }
@@ -230,7 +248,7 @@ function Header() {
 
     const userMessage = {
       role: "user",
-      text: cleanText || "Sent an image",
+      text: cleanText || t("aiChat.sentImage"),
       image: aiImage,
     };
 
@@ -250,7 +268,7 @@ function Header() {
         ...prev,
         {
           role: "ai",
-          text: res.reply || "AI assistant is not available right now.",
+          text: res.reply || t("aiChat.notAvailable"),
           image: res.image || res.url || null,
         },
       ]);
@@ -260,8 +278,7 @@ function Header() {
         {
           role: "ai",
           text:
-            err.response?.data?.reply ||
-            "Sorry, something went wrong. Please try again.",
+            err.response?.data?.reply || t("aiChat.error"),
         },
       ]);
     } finally {
@@ -273,56 +290,90 @@ function Header() {
     <>
       <div className="navbar">
         <button className="navbar-brand link-button" onClick={goHome}>
-          خدمة
+          {t("brand")}
         </button>
 
         <div className="navbar-links">
           {role === "technician" ? (
             <>
               <button className="link-button" onClick={() => navigate("/technician-dashboard")}>
-                Dashboard
+                {t("nav.dashboard")}
               </button>
               <button className="link-button" onClick={() => navigate("/technician/requests")}>
-                Requests
+                {t("nav.requests")}
               </button>
               <button className="link-button" onClick={() => navigate("/profile")}>
-                Profile
+                {t("nav.profile")}
               </button>
               <button className="link-button" onClick={() => setOpenWidget("ai")}>
-                AI Assistant
+                {t("nav.aiAssistant")}
               </button>
               <button className="link-button" onClick={() => setOpenWidget("chat")}>
-                Chat
+                {t("nav.chat")}
               </button>
             </>
           ) : role === "admin" ? (
             <>
               <button className="link-button" onClick={() => navigate("/admin")}>
-                Dashboard
+                {t("nav.dashboard")}
               </button>
             </>
           ) : (
             <>
               <button className="link-button" onClick={() => navigate("/home")}>
-                Home
+                {t("nav.home")}
               </button>
               <button className="link-button" onClick={() => navigate("/history")}>
-                Requests
+                {t("nav.requests")}
               </button>
               <button className="link-button" onClick={() => navigate("/profile")}>
-                Profile
+                {t("nav.profile")}
               </button>
               <button className="link-button" onClick={() => setOpenWidget("ai")}>
-                AI Assistant
+                {t("nav.aiAssistant")}
               </button>
               <button className="link-button" onClick={() => setOpenWidget("chat")}>
-                Chat
+                {t("nav.chat")}
               </button>
             </>
           )}
         </div>
 
         <div className="navbar-actions">
+          <div className="settings-toggles">
+            <div className="toggle-group">
+              <button
+                className={`toggle-btn ${currentLang === "en" ? "active" : ""}`}
+                onClick={() => changeLanguage("en")}
+              >
+                EN
+              </button>
+              <button
+                className={`toggle-btn ${currentLang === "ar" ? "active" : ""}`}
+                onClick={() => changeLanguage("ar")}
+              >
+                عربي
+              </button>
+            </div>
+
+            <div className="toggle-divider" />
+
+            <div className="toggle-group">
+              <button
+                className={`toggle-btn ${theme === "light" ? "active" : ""}`}
+                onClick={() => theme !== "light" && toggleTheme()}
+              >
+                ☀️
+              </button>
+              <button
+                className={`toggle-btn ${theme === "dark" ? "active" : ""}`}
+                onClick={() => theme !== "dark" && toggleTheme()}
+              >
+                🌙
+              </button>
+            </div>
+          </div>
+
           <div className="notification-wrapper">
             <button
               className="icon-button"
@@ -336,10 +387,10 @@ function Header() {
 
             {showNotifications && (
               <div className="notification-dropdown">
-                <div className="notification-title">Notifications</div>
+                <div className="notification-title">{t("nav.notifications")}</div>
 
                 {notifications.length === 0 ? (
-                  <div className="notification-empty">No notifications.</div>
+                  <div className="notification-empty">{t("nav.noNotifications")}</div>
                 ) : (
                   <ul>
                     {notifications.map((n) => (
@@ -350,7 +401,7 @@ function Header() {
                           onClick={() => handleNotificationClick(n)}
                         >
                           <div className="notification-item-title">
-                            {n.title || "Notification"}
+                            {n.title || t("nav.notification")}
                           </div>
                           <div className="notification-item-body">
                             {n.body || n.message || ""}
@@ -365,7 +416,7 @@ function Header() {
           </div>
 
           <button className="logout-btn" onClick={logout}>
-            Log Out
+            {t("nav.logout")}
           </button>
         </div>
       </div>
@@ -394,7 +445,7 @@ function Header() {
       {openWidget === "chat" && (
         <div className="khidma-popup khidma-chat-popup">
           <div className="khidma-popup-header">
-            <h3>{selectedChatUser ? selectedChatUser.name : "Chat"}</h3>
+            <h3>{selectedChatUser ? selectedChatUser.name : t("nav.chat")}</h3>
             <button className="link-button" onClick={() => setOpenWidget("")}>
               ✕
             </button>
@@ -403,10 +454,10 @@ function Header() {
           <div className="khidma-popup-body">
             {!selectedChatUser ? (
               <>
-                <p className="khidma-popup-text">Choose a conversation.</p>
+                <p className="khidma-popup-text">{t("chat.chooseConversation")}</p>
 
                 {conversations.length === 0 ? (
-                  <div className="notification-empty">No conversations yet.</div>
+                  <div className="notification-empty">{t("chat.noConversations")}</div>
                 ) : (
                   conversations.map((item) => (
                     <button
@@ -416,10 +467,10 @@ function Header() {
                     >
                       {item.name || "User"} —{" "}
                       {item.lastMessageType === "image"
-                        ? "Image"
+                        ? t("chat.image")
                         : item.lastMessageType === "location"
-                        ? "Location"
-                        : item.lastMessage || "No messages yet"}
+                        ? t("chat.location")
+                        : item.lastMessage || t("chat.noMessages")}
                     </button>
                   ))
                 )}
@@ -428,7 +479,7 @@ function Header() {
               <>
                 <div className="popup-messages">
                   {chatMessages.length === 0 ? (
-                    <div className="notification-empty">No messages yet.</div>
+                    <div className="notification-empty">{t("chat.noMessages")}</div>
                   ) : (
                     chatMessages.map((msg, index) => {
                       const mine = Number(msg.sender_id) === Number(user.id);
@@ -458,7 +509,7 @@ function Header() {
                     type="button"
                     onClick={() => chatFileRef.current?.click()}
                   >
-                    📷 Image
+                    📷 {t("chat.image")}
                   </button>
 
                   <button
@@ -466,7 +517,7 @@ function Header() {
                     type="button"
                     onClick={handleChatLocation}
                   >
-                    📍 Location
+                    📍 {t("chat.location")}
                   </button>
                 </div>
 
@@ -474,13 +525,13 @@ function Header() {
                   <input
                     value={chatText}
                     onChange={(e) => setChatText(e.target.value)}
-                    placeholder="Type a message..."
+                    placeholder={t("chat.typePlaceholder")}
                     onKeyDown={(e) => {
                       if (e.key === "Enter") sendChat();
                     }}
                   />
                   <button className="primary" onClick={() => sendChat()}>
-                    Send
+                    {t("chat.send")}
                   </button>
                 </div>
               </>
@@ -492,7 +543,7 @@ function Header() {
       {openWidget === "ai" && (
         <div className="khidma-popup khidma-chat-popup">
           <div className="khidma-popup-header">
-            <h3>AI Assistant</h3>
+            <h3>{t("nav.aiAssistant")}</h3>
             <button className="link-button" onClick={() => setOpenWidget("")}>
               ✕
             </button>
@@ -512,7 +563,7 @@ function Header() {
                 </div>
               ))}
 
-              {aiLoading && <div className="popup-message">Thinking...</div>}
+              {aiLoading && <div className="popup-message">{t("aiChat.thinking")}</div>}
             </div>
 
             {aiImage && (
@@ -522,7 +573,7 @@ function Header() {
                   className="secondary-btn"
                   onClick={() => setAiImage(null)}
                 >
-                  Remove
+                  {t("aiChat.remove")}
                 </button>
               </div>
             )}
@@ -541,7 +592,7 @@ function Header() {
                 type="button"
                 onClick={() => aiFileRef.current?.click()}
               >
-                📷 Image
+                📷 {t("chat.image")}
               </button>
             </div>
 
@@ -549,13 +600,13 @@ function Header() {
               <input
                 value={aiText}
                 onChange={(e) => setAiText(e.target.value)}
-                placeholder="Ask anything..."
+                placeholder={t("aiChat.askPlaceholder")}
                 onKeyDown={(e) => {
                   if (e.key === "Enter") sendAI();
                 }}
               />
               <button className="primary" onClick={sendAI}>
-                Ask
+                {t("aiChat.ask")}
               </button>
             </div>
           </div>

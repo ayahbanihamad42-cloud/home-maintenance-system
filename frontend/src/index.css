@@ -11,6 +11,118 @@
   --shadow: 0 18px 45px rgba(91, 33, 182, 0.12);
   --shadow-strong: 0 28px 75px rgba(91, 33, 182, 0.18);
   --radius: 26px;
+  --input-bg: #ffffff;
+  --hover-bg: rgba(124, 58, 237, 0.06);
+  --body-gradient: radial-gradient(circle at 12% 10%, rgba(124, 58, 237, 0.17), transparent 34%),
+    radial-gradient(circle at 92% 8%, rgba(236, 72, 153, 0.16), transparent 31%),
+    linear-gradient(180deg, #fbfaff 0%, #fff7fd 100%);
+  --auth-gradient: radial-gradient(circle at 16% 14%, rgba(124, 58, 237, 0.2), transparent 33%),
+    radial-gradient(circle at 90% 18%, rgba(236, 72, 153, 0.18), transparent 30%),
+    radial-gradient(circle at 50% 92%, rgba(124, 58, 237, 0.1), transparent 28%),
+    #fbfaff;
+  --navbar-bg: rgba(255, 255, 255, 0.92);
+  --card-border: rgba(234, 220, 251, 0.95);
+  --card-bg: rgba(255, 255, 255, 0.94);
+  --popup-bg: #ffffff;
+  --table-header-bg: #f8f4ff;
+  --table-row-hover: #f3eeff;
+  --success-bg: #f0fdf4;
+  --success-text: #15803d;
+  --danger-bg: #fef2f2;
+  --danger-text: #b91c1c;
+}
+
+[data-theme="dark"] {
+  --bg: #0f0d1a;
+  --card: #1a1726;
+  --text: #e8e0f0;
+  --muted: #9b8fb5;
+  --border: #2d2640;
+  --primary-soft: #1e1535;
+  --shadow: 0 18px 45px rgba(0, 0, 0, 0.35);
+  --shadow-strong: 0 28px 75px rgba(0, 0, 0, 0.45);
+  --input-bg: #1e1a2e;
+  --hover-bg: rgba(124, 58, 237, 0.15);
+  --body-gradient: radial-gradient(circle at 12% 10%, rgba(124, 58, 237, 0.12), transparent 34%),
+    radial-gradient(circle at 92% 8%, rgba(236, 72, 153, 0.08), transparent 31%),
+    linear-gradient(180deg, #0f0d1a 0%, #130f20 100%);
+  --auth-gradient: radial-gradient(circle at 16% 14%, rgba(124, 58, 237, 0.15), transparent 33%),
+    radial-gradient(circle at 90% 18%, rgba(236, 72, 153, 0.1), transparent 30%),
+    radial-gradient(circle at 50% 92%, rgba(124, 58, 237, 0.08), transparent 28%),
+    #0f0d1a;
+  --navbar-bg: rgba(26, 23, 38, 0.95);
+  --card-border: rgba(45, 38, 64, 0.95);
+  --card-bg: rgba(26, 23, 38, 0.94);
+  --popup-bg: #1a1726;
+  --table-header-bg: #1e1a2e;
+  --table-row-hover: #241f35;
+  --success-bg: #052e16;
+  --success-text: #4ade80;
+  --danger-bg: #2d0a0a;
+  --danger-text: #f87171;
+}
+
+/* ================= RTL SUPPORT ================= */
+[dir="rtl"] {
+  text-align: right;
+}
+[dir="rtl"] .navbar-links {
+  flex-direction: row-reverse;
+}
+[dir="rtl"] .navbar-actions {
+  flex-direction: row-reverse;
+}
+[dir="rtl"] .notification-dropdown {
+  right: auto;
+  left: 0;
+}
+
+/* ================= THEME & LANGUAGE TOGGLE ================= */
+.settings-toggles {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.toggle-group {
+  display: flex;
+  align-items: center;
+  background: var(--primary-soft);
+  border-radius: 12px;
+  padding: 3px;
+  gap: 2px;
+}
+
+.toggle-btn {
+  border: none;
+  background: transparent;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 700;
+  padding: 6px 12px;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: all 0.25s ease;
+  white-space: nowrap;
+  line-height: 1.2;
+}
+
+.toggle-btn.active {
+  background: var(--primary);
+  color: #fff;
+  box-shadow: 0 2px 8px rgba(124, 58, 237, 0.3);
+}
+
+.toggle-btn:hover:not(.active) {
+  background: var(--hover-bg);
+  color: var(--text);
+}
+
+.toggle-divider {
+  width: 1px;
+  height: 24px;
+  background: var(--border);
+  margin: 0 4px;
 }
 
 * {
@@ -25,12 +137,10 @@ body {
   margin: 0;
   min-height: 100vh;
   overflow-x: hidden;
-  background:
-    radial-gradient(circle at 12% 10%, rgba(124, 58, 237, 0.17), transparent 34%),
-    radial-gradient(circle at 92% 8%, rgba(236, 72, 153, 0.16), transparent 31%),
-    linear-gradient(180deg, #fbfaff 0%, #fff7fd 100%);
+  background: var(--body-gradient);
   color: var(--text);
   font-family: Inter, "Segoe UI", Arial, sans-serif;
+  transition: background 0.3s ease, color 0.3s ease;
 }
 
 button,
@@ -56,11 +166,7 @@ img {
   display: grid;
   place-items: center;
   padding: 28px;
-  background:
-    radial-gradient(circle at 16% 14%, rgba(124, 58, 237, 0.2), transparent 33%),
-    radial-gradient(circle at 90% 18%, rgba(236, 72, 153, 0.18), transparent 30%),
-    radial-gradient(circle at 50% 92%, rgba(124, 58, 237, 0.1), transparent 28%),
-    #fbfaff;
+  background: var(--auth-gradient);
   overflow: auto;
 }
 
@@ -69,8 +175,8 @@ img {
   min-height: 760px;
   display: grid;
   grid-template-columns: 1.04fr 0.96fr;
-  background: rgba(255, 255, 255, 0.94);
-  border: 1px solid rgba(234, 220, 251, 0.95);
+  background: var(--card-bg);
+  border: 1px solid var(--card-border);
   border-radius: 42px;
   overflow: hidden;
   box-shadow:
@@ -402,7 +508,7 @@ label {
   min-height: 76px;
   margin: 18px auto 38px;
   padding: 12px 22px;
-  background: rgba(255, 255, 255, 0.92);
+  background: var(--navbar-bg);
   backdrop-filter: blur(18px);
   border: 1px solid var(--border);
   border-radius: 26px;
@@ -413,6 +519,7 @@ label {
   position: sticky;
   top: 14px;
   z-index: 1000;
+  transition: background 0.3s ease, border-color 0.3s ease;
 }
 
 .navbar-brand {
@@ -2784,4 +2891,169 @@ body > #root > .page-hero {
 /* لا تخلي payment-card نفسه ينزل 132px لأنه أصلاً داخل payment-container */
 .payment-card {
   margin-top: 0 !important;
+}
+
+/* ================= DARK MODE OVERRIDES ================= */
+[data-theme="dark"] .split-card,
+[data-theme="dark"] .form-card,
+[data-theme="dark"] .payment-card,
+[data-theme="dark"] .dashboard-card,
+[data-theme="dark"] .card,
+[data-theme="dark"] .profile-container,
+[data-theme="dark"] .popup-container,
+[data-theme="dark"] .khidma-popup,
+[data-theme="dark"] .notification-dropdown,
+[data-theme="dark"] .review-card,
+[data-theme="dark"] .technician-card,
+[data-theme="dark"] .maintenance-card,
+[data-theme="dark"] .store-card,
+[data-theme="dark"] .chat-container,
+[data-theme="dark"] .gallery-card,
+[data-theme="dark"] .availability-card,
+[data-theme="dark"] .admin-table,
+[data-theme="dark"] .modal-content {
+  background: var(--card) !important;
+  border-color: var(--border) !important;
+  color: var(--text) !important;
+}
+
+[data-theme="dark"] input,
+[data-theme="dark"] textarea,
+[data-theme="dark"] select {
+  background: var(--input-bg) !important;
+  color: var(--text) !important;
+  border-color: var(--border) !important;
+}
+
+[data-theme="dark"] input::placeholder,
+[data-theme="dark"] textarea::placeholder {
+  color: var(--muted) !important;
+}
+
+[data-theme="dark"] .link-button,
+[data-theme="dark"] .navbar-brand {
+  color: var(--text) !important;
+}
+
+[data-theme="dark"] .page-hero h2,
+[data-theme="dark"] .page-hero p,
+[data-theme="dark"] h1, [data-theme="dark"] h2,
+[data-theme="dark"] h3, [data-theme="dark"] h4 {
+  color: var(--text) !important;
+}
+
+[data-theme="dark"] .khidma-popup-header {
+  background: var(--card) !important;
+  border-color: var(--border) !important;
+}
+
+[data-theme="dark"] .notification-item:hover,
+[data-theme="dark"] .khidma-chip:hover {
+  background: var(--hover-bg) !important;
+}
+
+[data-theme="dark"] .popup-message {
+  background: var(--input-bg) !important;
+  color: var(--text) !important;
+}
+
+[data-theme="dark"] .popup-message.mine {
+  background: var(--primary) !important;
+  color: #fff !important;
+}
+
+[data-theme="dark"] table th {
+  background: var(--table-header-bg) !important;
+  color: var(--text) !important;
+}
+
+[data-theme="dark"] table td {
+  border-color: var(--border) !important;
+  color: var(--text) !important;
+}
+
+[data-theme="dark"] table tr:hover td {
+  background: var(--table-row-hover) !important;
+}
+
+[data-theme="dark"] .logout-btn {
+  color: var(--text) !important;
+  border-color: var(--border) !important;
+}
+
+[data-theme="dark"] .logout-btn:hover {
+  background: var(--danger-bg) !important;
+  color: var(--danger-text) !important;
+}
+
+[data-theme="dark"] .secondary-btn {
+  background: var(--input-bg) !important;
+  color: var(--text) !important;
+  border-color: var(--border) !important;
+}
+
+[data-theme="dark"] .notification-empty,
+[data-theme="dark"] .notification-title {
+  color: var(--muted) !important;
+}
+
+[data-theme="dark"] .status-badge {
+  opacity: 0.9;
+}
+
+[data-theme="dark"] .icon-button {
+  color: var(--text) !important;
+}
+
+[data-theme="dark"] .chat-tools {
+  border-color: var(--border) !important;
+}
+
+[data-theme="dark"] .chat-tool-btn {
+  background: var(--input-bg) !important;
+  color: var(--text) !important;
+  border-color: var(--border) !important;
+}
+
+[data-theme="dark"] .khidma-fab {
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.4) !important;
+}
+
+[data-theme="dark"] .modal-overlay {
+  background: rgba(0, 0, 0, 0.7) !important;
+}
+
+[data-theme="dark"] .filter-bar,
+[data-theme="dark"] .filter-row {
+  background: var(--card) !important;
+  border-color: var(--border) !important;
+}
+
+[data-theme="dark"] .tab-btn {
+  color: var(--muted) !important;
+}
+
+[data-theme="dark"] .tab-btn.active {
+  color: var(--primary) !important;
+}
+
+[data-theme="dark"] a {
+  color: var(--primary);
+}
+
+[data-theme="dark"] .brand-panel {
+  background:
+    radial-gradient(circle at 70% 20%, rgba(255, 255, 255, 0.08), transparent 22%),
+    linear-gradient(135deg, #5b21b6 0%, #7c3aed 45%, #be185d 100%) !important;
+}
+
+[data-theme="dark"] .home-title::after {
+  color: rgba(255, 255, 255, 0.08) !important;
+}
+
+/* ================= TRANSITIONS ================= */
+.navbar, .split-card, .form-card, .card, .dashboard-card,
+.profile-container, .khidma-popup, input, textarea, select,
+.notification-dropdown, .link-button, .logout-btn, table th, table td {
+  transition: background 0.3s ease, color 0.3s ease, border-color 0.3s ease;
 }

@@ -1,30 +1,31 @@
 import React from "react";
 import { useNavigate } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import welcomeimage from "../../images/home.png";
 
 function Welcome() {
   const navigate = useNavigate();
+  const { t } = useTranslation();
 
   return (
     <div className="welcome-shell">
       <div className="split-card">
         <section className="brand-panel">
-          <h1 className="brand-logo-text">خدمة</h1>
+          <h1 className="brand-logo-text">{t("brand")}</h1>
 
-          <h2>Home services made simple.</h2>
+          <h2>{t("welcome.tagline")}</h2>
 
           <p>
-            Book trusted technicians, manage requests, chat instantly, use AI
-            assistance, and track your maintenance service from one modern platform.
+            {t("welcome.description")}
           </p>
 
           <div className="welcome-actions">
             <button className="primary" onClick={() => navigate("/register")}>
-              Register
+              {t("welcome.register")}
             </button>
 
             <button className="outline-btn" onClick={() => navigate("/login")}>
-              Login
+              {t("welcome.login")}
             </button>
           </div>
         </section>
@@ -32,11 +33,10 @@ function Welcome() {
         <section className="form-panel welcome-right-panel">
           <img className="brand-icon" src={welcomeimage} alt="Khidma" />
 
-          <h1>خدمة بيتك بسهولة وموثوقية</h1>
+          <h1>{t("welcome.subtitle")}</h1>
 
           <p>
-            A smart web and mobile platform for booking reliable home maintenance
-            technicians in a simple and modern way.
+            {t("welcome.longDescription")}
           </p>
         </section>
       </div>
