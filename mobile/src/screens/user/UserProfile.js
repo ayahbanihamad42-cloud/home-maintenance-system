@@ -11,6 +11,8 @@ import {
 } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as ImagePicker from "expo-image-picker";
+import { useTranslation } from "react-i18next";
+import { useTheme } from "../../context/ThemeContext";
 
 import Header from "../../components/Common/Header";
 import FloatingActions from "../../components/Common/FloatingActions";
@@ -24,7 +26,7 @@ import {
   getMyBalance,
 } from "../../services/paymentservice";
 
-import appStyles, { colors } from "../../styles/mobileStyles";
+import { getStyles } from "../../styles/mobileStyles";
 
 const jordanCities = [
   "Amman",
@@ -42,6 +44,10 @@ const jordanCities = [
 ];
 
 function UserProfile({ navigation }) {
+  const { t, i18n } = useTranslation();
+  const { c, toggleTheme } = useTheme();
+  const appStyles = getStyles(c);
+
   const [currentUser, setCurrentUser] = useState({});
   const [profile, setProfile] = useState(null);
   const [technicianGalleryId, setTechnicianGalleryId] = useState("");
@@ -177,8 +183,8 @@ function UserProfile({ navigation }) {
       if (!userData?.id) {
         setProfileMessage({
           type: "error",
-          title: "Error",
-          body: "User id is missing.",
+          title: t("common.error"),
+          body: t("profile.errors.missingUserId"),
         });
         return;
       }
@@ -212,8 +218,8 @@ function UserProfile({ navigation }) {
     } catch (err) {
       setProfileMessage({
         type: "error",
-        title: "Error",
-        body: "Failed to load profile.",
+        title: t("common.error"),
+        body: t("profile.errors.loadFailed"),
       });
     }
   };
@@ -266,8 +272,8 @@ function UserProfile({ navigation }) {
     } catch (err) {
       setProfileMessage({
         type: "error",
-        title: "Error",
-        body: err.response?.data?.message || "Failed to load balance.",
+        title: t("common.error"),
+        body: err.response?.data?.message || t("profile.errors.balanceFailed"),
       });
     }
   };
@@ -287,14 +293,14 @@ function UserProfile({ navigation }) {
 
       setProfileMessage({
         type: "success",
-        title: "Payment Info Saved",
-        body: "Your mock wallet information was saved successfully.",
+        title: t("profile.paymentInfoSavedTitle"),
+        body: t("profile.paymentInfoSavedBody"),
       });
     } catch (err) {
       setProfileMessage({
         type: "error",
-        title: "Error",
-        body: err.response?.data?.message || "Failed to save payment info.",
+        title: t("common.error"),
+        body: err.response?.data?.message || t("profile.errors.savePaymentFailed"),
       });
     }
   };
@@ -330,16 +336,16 @@ function UserProfile({ navigation }) {
 
       setProfileMessage({
         type: "success",
-        title: "Saved Successfully",
-        body: "Profile updated successfully and we sent an email.",
+        title: t("profile.savedTitle"),
+        body: t("profile.savedBody"),
       });
 
       await loadProfile();
     } catch (err) {
       setProfileMessage({
         type: "error",
-        title: "Error",
-        body: err.response?.data?.message || "Failed to update profile.",
+        title: t("common.error"),
+        body: err.response?.data?.message || t("profile.errors.updateFailed"),
       });
     }
   };
@@ -351,8 +357,8 @@ function UserProfile({ navigation }) {
       if (!permission.granted) {
         setProfileMessage({
           type: "error",
-          title: "Error",
-          body: "Please allow gallery access.",
+          title: t("common.error"),
+          body: t("profile.errors.galleryPermission"),
         });
         return;
       }
@@ -396,16 +402,16 @@ function UserProfile({ navigation }) {
 
       setProfileMessage({
         type: "success",
-        title: "Saved Successfully",
-        body: "Profile photo updated successfully.",
+        title: t("profile.savedTitle"),
+        body: t("profile.photoUpdated"),
       });
 
       await loadProfile();
     } catch (err) {
       setProfileMessage({
         type: "error",
-        title: "Error",
-        body: err.response?.data?.message || "Failed to update profile photo.",
+        title: t("common.error"),
+        body: err.response?.data?.message || t("profile.errors.photoFailed"),
       });
     }
   };
@@ -417,18 +423,18 @@ function UserProfile({ navigation }) {
     setProfileMessage({
       type: "warning",
       title: name,
-      body: "We will add this feature soon.",
+      body: t("profile.comingSoon"),
     });
   };
 
   if (!profile) {
     return (
       <SafeAreaView style={appStyles.safe}>
-        <Header navigation={navigation} title="Profile" />
+        <Header navigation={navigation} title={t("profile.headerTitle")} />
         <ScrollView contentContainerStyle={appStyles.pageContent}>
           <View style={appStyles.card}>
             <Text style={appStyles.text}>
-              {profileMessage?.body || "Loading..."}
+              {profileMessage?.body || t("common.loading")}
             </Text>
           </View>
         </ScrollView>
@@ -439,12 +445,12 @@ function UserProfile({ navigation }) {
 
   return (
     <SafeAreaView style={appStyles.safe}>
-      <Header navigation={navigation} title="Profile" />
+      <Header navigation={navigation} title={t("profile.headerTitle")} />
 
       <ScrollView contentContainerStyle={appStyles.pageContent}>
         <HeroSection
-          title={profile.name || "User Profile"}
-          subtitle={`${profile.role || "user"} account`}
+          title={profile.name || t("profile.defaultTitle")}
+          subtitle={`${profile.role || "user"} ${t("profile.account")}`}
         />
 
         <View style={appStyles.card}>
@@ -460,14 +466,14 @@ function UserProfile({ navigation }) {
                   width: 82,
                   height: 82,
                   borderRadius: 41,
-                  backgroundColor: colors.primarySoft,
+                  backgroundColor: c.primarySoft,
                   alignItems: "center",
                   justifyContent: "center",
                 }}
               >
                 <Text
                   style={{
-                    color: colors.primary,
+                    color: c.primary,
                     fontSize: 34,
                     fontWeight: "900",
                   }}
@@ -488,12 +494,12 @@ function UserProfile({ navigation }) {
           </View>
 
           <View style={{ marginTop: 18 }}>
-            <Text style={appStyles.sectionTitle}>Profile Information</Text>
-            <Text style={appStyles.text}>Email: {profile.email || "-"}</Text>
-            <Text style={appStyles.text}>Phone: {profile.phone || "-"}</Text>
-            <Text style={appStyles.text}>City: {profile.city || "-"}</Text>
+            <Text style={appStyles.sectionTitle}>{t("profile.profileInfo")}</Text>
+            <Text style={appStyles.text}>{t("profile.email")}: {profile.email || "-"}</Text>
+            <Text style={appStyles.text}>{t("profile.phone")}: {profile.phone || "-"}</Text>
+            <Text style={appStyles.text}>{t("profile.city")}: {profile.city || "-"}</Text>
             <Text style={appStyles.text}>
-              Birth Date: {formatDate(profile.dob) || "-"}
+              {t("profile.birthDate")}: {formatDate(profile.dob) || "-"}
             </Text>
           </View>
         </View>
@@ -533,7 +539,7 @@ function UserProfile({ navigation }) {
             ) : (
               <View style={appStyles.warningBox}>
                 <Text style={appStyles.text}>
-                  Gallery: Technician gallery id is missing.
+                  {t("profile.galleryMissing")}
                 </Text>
               </View>
             )}
@@ -544,7 +550,7 @@ function UserProfile({ navigation }) {
       <Modal transparent visible={settingsOpen} animationType="fade">
         <View style={appStyles.modalOverlay}>
           <View style={appStyles.modalBox}>
-            <Text style={appStyles.modalTitle}>Settings</Text>
+            <Text style={appStyles.modalTitle}>{t("profile.settings")}</Text>
 
             <TouchableOpacity
               style={appStyles.secondaryBtn}
@@ -554,7 +560,7 @@ function UserProfile({ navigation }) {
                 setSubmenu(null);
               }}
             >
-              <Text style={appStyles.secondaryBtnText}>Edit Contact</Text>
+              <Text style={appStyles.secondaryBtnText}>{t("profile.editContact")}</Text>
             </TouchableOpacity>
 
             <TouchableOpacity
@@ -565,7 +571,7 @@ function UserProfile({ navigation }) {
                 setSubmenu(null);
               }}
             >
-              <Text style={appStyles.secondaryBtnText}>Edit Photo</Text>
+              <Text style={appStyles.secondaryBtnText}>{t("profile.editPhoto")}</Text>
             </TouchableOpacity>
 
             {isTechnician ? (
@@ -574,14 +580,14 @@ function UserProfile({ navigation }) {
                   style={appStyles.secondaryBtn}
                   onPress={openPaymentModal}
                 >
-                  <Text style={appStyles.secondaryBtnText}>Payment Info</Text>
+                  <Text style={appStyles.secondaryBtnText}>{t("profile.paymentInfo")}</Text>
                 </TouchableOpacity>
 
                 <TouchableOpacity
                   style={appStyles.secondaryBtn}
                   onPress={handleShowBalance}
                 >
-                  <Text style={appStyles.secondaryBtnText}>My Balance</Text>
+                  <Text style={appStyles.secondaryBtnText}>{t("profile.myBalance")}</Text>
                 </TouchableOpacity>
               </>
             ) : null}
@@ -592,23 +598,31 @@ function UserProfile({ navigation }) {
                 setSubmenu(submenu === "language" ? null : "language")
               }
             >
-              <Text style={appStyles.secondaryBtnText}>Language ▸</Text>
+              <Text style={appStyles.secondaryBtnText}>{t("profile.language")} ▸</Text>
             </TouchableOpacity>
 
             {submenu === "language" ? (
               <View>
                 <TouchableOpacity
                   style={appStyles.secondaryBtn}
-                  onPress={() => openSoonMessage("Arabic")}
+                  onPress={() => {
+                    i18n.changeLanguage("ar");
+                    setSettingsOpen(false);
+                    setSubmenu(null);
+                  }}
                 >
-                  <Text style={appStyles.secondaryBtnText}>Arabic</Text>
+                  <Text style={appStyles.secondaryBtnText}>{t("profile.arabic")}</Text>
                 </TouchableOpacity>
 
                 <TouchableOpacity
                   style={appStyles.secondaryBtn}
-                  onPress={() => openSoonMessage("English")}
+                  onPress={() => {
+                    i18n.changeLanguage("en");
+                    setSettingsOpen(false);
+                    setSubmenu(null);
+                  }}
                 >
-                  <Text style={appStyles.secondaryBtnText}>English</Text>
+                  <Text style={appStyles.secondaryBtnText}>{t("profile.english")}</Text>
                 </TouchableOpacity>
               </View>
             ) : null}
@@ -617,23 +631,20 @@ function UserProfile({ navigation }) {
               style={appStyles.secondaryBtn}
               onPress={() => setSubmenu(submenu === "theme" ? null : "theme")}
             >
-              <Text style={appStyles.secondaryBtnText}>Theme ▸</Text>
+              <Text style={appStyles.secondaryBtnText}>{t("profile.theme")} ▸</Text>
             </TouchableOpacity>
 
             {submenu === "theme" ? (
               <View>
                 <TouchableOpacity
                   style={appStyles.secondaryBtn}
-                  onPress={() => openSoonMessage("Light Theme")}
+                  onPress={() => {
+                    toggleTheme();
+                    setSettingsOpen(false);
+                    setSubmenu(null);
+                  }}
                 >
-                  <Text style={appStyles.secondaryBtnText}>Light</Text>
-                </TouchableOpacity>
-
-                <TouchableOpacity
-                  style={appStyles.secondaryBtn}
-                  onPress={() => openSoonMessage("Dark Theme")}
-                >
-                  <Text style={appStyles.secondaryBtnText}>Dark</Text>
+                  <Text style={appStyles.secondaryBtnText}>{t("profile.toggleTheme")}</Text>
                 </TouchableOpacity>
               </View>
             ) : null}
@@ -645,7 +656,7 @@ function UserProfile({ navigation }) {
                 setSubmenu(null);
               }}
             >
-              <Text style={appStyles.primaryBtnText}>Close</Text>
+              <Text style={appStyles.primaryBtnText}>{t("common.close")}</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -654,9 +665,9 @@ function UserProfile({ navigation }) {
       <Modal transparent visible={showEditModal} animationType="fade">
         <View style={appStyles.modalOverlay}>
           <View style={appStyles.modalBox}>
-            <Text style={appStyles.modalTitle}>Update Contact</Text>
+            <Text style={appStyles.modalTitle}>{t("profile.updateContact")}</Text>
 
-            <Text style={appStyles.label}>Email</Text>
+            <Text style={appStyles.label}>{t("profile.email")}</Text>
             <TextInput
               style={appStyles.input}
               value={email}
@@ -664,7 +675,7 @@ function UserProfile({ navigation }) {
               keyboardType="email-address"
             />
 
-            <Text style={appStyles.label}>Phone</Text>
+            <Text style={appStyles.label}>{t("profile.phone")}</Text>
             <TextInput
               style={appStyles.input}
               value={phone}
@@ -672,15 +683,15 @@ function UserProfile({ navigation }) {
               keyboardType="phone-pad"
             />
 
-            <Text style={appStyles.label}>City</Text>
+            <Text style={appStyles.label}>{t("profile.city")}</Text>
             <TouchableOpacity
               style={appStyles.input}
               onPress={() => setCityOpen(true)}
             >
-              <Text style={appStyles.text}>{city || "Choose city"}</Text>
+              <Text style={appStyles.text}>{city || t("profile.chooseCity")}</Text>
             </TouchableOpacity>
 
-            <Text style={appStyles.label}>Birth Date</Text>
+            <Text style={appStyles.label}>{t("profile.birthDate")}</Text>
             <TextInput
               style={appStyles.input}
               value={dob}
@@ -692,14 +703,14 @@ function UserProfile({ navigation }) {
               style={appStyles.primaryBtn}
               onPress={handleSaveProfile}
             >
-              <Text style={appStyles.primaryBtnText}>Save</Text>
+              <Text style={appStyles.primaryBtnText}>{t("common.save")}</Text>
             </TouchableOpacity>
 
             <TouchableOpacity
               style={appStyles.secondaryBtn}
               onPress={() => setShowEditModal(false)}
             >
-              <Text style={appStyles.secondaryBtnText}>Cancel</Text>
+              <Text style={appStyles.secondaryBtnText}>{t("common.cancel")}</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -708,7 +719,7 @@ function UserProfile({ navigation }) {
       <Modal transparent visible={cityOpen} animationType="fade">
         <View style={appStyles.modalOverlay}>
           <View style={appStyles.modalBox}>
-            <Text style={appStyles.modalTitle}>Choose City</Text>
+            <Text style={appStyles.modalTitle}>{t("profile.chooseCity")}</Text>
 
             <ScrollView>
               {jordanCities.map((item) => (
@@ -729,7 +740,7 @@ function UserProfile({ navigation }) {
               style={appStyles.primaryBtn}
               onPress={() => setCityOpen(false)}
             >
-              <Text style={appStyles.primaryBtnText}>Close</Text>
+              <Text style={appStyles.primaryBtnText}>{t("common.close")}</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -738,7 +749,7 @@ function UserProfile({ navigation }) {
       <Modal transparent visible={showPhotoModal} animationType="fade">
         <View style={appStyles.modalOverlay}>
           <View style={appStyles.modalBox}>
-            <Text style={appStyles.modalTitle}>Update Photo</Text>
+            <Text style={appStyles.modalTitle}>{t("profile.updatePhoto")}</Text>
 
             {photoPreview ? (
               <Image
@@ -757,14 +768,14 @@ function UserProfile({ navigation }) {
               style={appStyles.primaryBtn}
               onPress={handlePhotoChange}
             >
-              <Text style={appStyles.primaryBtnText}>Select Image</Text>
+              <Text style={appStyles.primaryBtnText}>{t("profile.selectImage")}</Text>
             </TouchableOpacity>
 
             <TouchableOpacity
               style={appStyles.secondaryBtn}
               onPress={() => setShowPhotoModal(false)}
             >
-              <Text style={appStyles.secondaryBtnText}>Cancel</Text>
+              <Text style={appStyles.secondaryBtnText}>{t("common.cancel")}</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -773,29 +784,29 @@ function UserProfile({ navigation }) {
       <Modal transparent visible={showPaymentModal} animationType="fade">
         <View style={appStyles.modalOverlay}>
           <View style={appStyles.modalBox}>
-            <Text style={appStyles.modalTitle}>Mock Payment Info</Text>
+            <Text style={appStyles.modalTitle}>{t("profile.mockPaymentInfo")}</Text>
 
-            <Text style={appStyles.label}>Account Holder</Text>
+            <Text style={appStyles.label}>{t("profile.accountHolder")}</Text>
             <TextInput
               style={appStyles.input}
               value={paymentInfo.account_holder}
               onChangeText={(v) =>
                 setPaymentInfo({ ...paymentInfo, account_holder: v })
               }
-              placeholder="Technician name"
+              placeholder={t("profile.accountHolderPlaceholder")}
             />
 
-            <Text style={appStyles.label}>Wallet Name</Text>
+            <Text style={appStyles.label}>{t("profile.walletName")}</Text>
             <TextInput
               style={appStyles.input}
               value={paymentInfo.wallet_name}
               onChangeText={(v) =>
                 setPaymentInfo({ ...paymentInfo, wallet_name: v })
               }
-              placeholder="Example: CliQ / Zain Cash"
+              placeholder={t("profile.walletNamePlaceholder")}
             />
 
-            <Text style={appStyles.label}>Wallet Number</Text>
+            <Text style={appStyles.label}>{t("profile.walletNumber")}</Text>
             <TextInput
               style={appStyles.input}
               value={paymentInfo.wallet_number}
@@ -806,7 +817,7 @@ function UserProfile({ navigation }) {
               keyboardType="phone-pad"
             />
 
-            <Text style={appStyles.label}>Mock Account Number</Text>
+            <Text style={appStyles.label}>{t("profile.mockAccountNumber")}</Text>
             <TextInput
               style={appStyles.input}
               value={paymentInfo.mock_account_number}
@@ -820,14 +831,14 @@ function UserProfile({ navigation }) {
               style={appStyles.primaryBtn}
               onPress={handleSavePaymentInfo}
             >
-              <Text style={appStyles.primaryBtnText}>Save</Text>
+              <Text style={appStyles.primaryBtnText}>{t("common.save")}</Text>
             </TouchableOpacity>
 
             <TouchableOpacity
               style={appStyles.secondaryBtn}
               onPress={() => setShowPaymentModal(false)}
             >
-              <Text style={appStyles.secondaryBtnText}>Cancel</Text>
+              <Text style={appStyles.secondaryBtnText}>{t("common.cancel")}</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -836,26 +847,26 @@ function UserProfile({ navigation }) {
       <Modal transparent visible={showBalanceModal} animationType="fade">
         <View style={appStyles.modalOverlay}>
           <View style={appStyles.modalBox}>
-            <Text style={appStyles.modalTitle}>My Balance</Text>
+            <Text style={appStyles.modalTitle}>{t("profile.myBalance")}</Text>
 
             <Text style={appStyles.text}>
-              Total earnings: {Number(balance.totalEarnings || 0).toFixed(2)} JOD
+              {t("profile.totalEarnings")}: {Number(balance.totalEarnings || 0).toFixed(2)} JOD
             </Text>
             <Text style={appStyles.text}>
-              Payments: {balance.totalPayments || 0}
+              {t("profile.payments")}: {balance.totalPayments || 0}
             </Text>
             <Text style={appStyles.text}>
-              Wallet: {balance.paymentInfo?.wallet_name || "-"}
+              {t("profile.wallet")}: {balance.paymentInfo?.wallet_name || "-"}
             </Text>
             <Text style={appStyles.text}>
-              Wallet number: {balance.paymentInfo?.wallet_number || "-"}
+              {t("profile.walletNumber")}: {balance.paymentInfo?.wallet_number || "-"}
             </Text>
 
             <TouchableOpacity
               style={appStyles.primaryBtn}
               onPress={() => setShowBalanceModal(false)}
             >
-              <Text style={appStyles.primaryBtnText}>Close</Text>
+              <Text style={appStyles.primaryBtnText}>{t("common.close")}</Text>
             </TouchableOpacity>
           </View>
         </View>

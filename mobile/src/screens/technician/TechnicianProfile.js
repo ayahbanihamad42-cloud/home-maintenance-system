@@ -10,6 +10,8 @@ import {
 } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
+import { useTranslation } from "react-i18next";
+import { useTheme } from "../../context/ThemeContext";
 import Header from "../../components/Common/Header";
 import FloatingActions from "../../components/Common/FloatingActions";
 import HeroSection from "../../components/Common/HeroSection";
@@ -17,6 +19,8 @@ import API from "../../services/api";
 import appStyles from "../../styles/mobileStyles";
 
 function TechnicianProfile({ route, navigation }) {
+  const { t } = useTranslation();
+  const { c } = useTheme();
   const params = route?.params || {};
   const [user, setUser] = useState({});
   const [tech, setTech] = useState(null);
@@ -144,15 +148,15 @@ function TechnicianProfile({ route, navigation }) {
 
   if (!tech) {
     return (
-      <SafeAreaView style={appStyles.safe}>
-        <Header navigation={navigation} title="Technician" />
+      <SafeAreaView style={[appStyles.safe, { backgroundColor: c.bg }]}>
+        <Header navigation={navigation} title={t("techProfile.headerTitle")} />
         <ScrollView contentContainerStyle={appStyles.pageContent}>
           <HeroSection
-            title="Technician Profile"
-            subtitle="View technician details and work gallery."
+            title={t("techProfile.title")}
+            subtitle={t("techProfile.subtitle")}
           />
-          <View style={appStyles.card}>
-            <Text style={appStyles.text}>{message || "Loading..."}</Text>
+          <View style={[appStyles.card, { backgroundColor: c.card }]}>
+            <Text style={[appStyles.text, { color: c.text }]}>{message || t("techProfile.loading")}</Text>
           </View>
         </ScrollView>
         <FloatingActions navigation={navigation} />
@@ -161,13 +165,13 @@ function TechnicianProfile({ route, navigation }) {
   }
 
   return (
-    <SafeAreaView style={appStyles.safe}>
-      <Header navigation={navigation} title="Technician" />
+    <SafeAreaView style={[appStyles.safe, { backgroundColor: c.bg }]}>
+      <Header navigation={navigation} title={t("techProfile.headerTitle")} />
 
       <ScrollView contentContainerStyle={appStyles.pageContent}>
         <HeroSection
-          title={tech.name || "Technician"}
-          subtitle={`${tech.service || tech.service_name || "-"} Specialist`}
+          title={tech.name || t("techProfile.headerTitle")}
+          subtitle={`${tech.service || tech.service_name || "-"} ${t("techProfile.specialist")}`}
         />
 
         {message ? (
@@ -176,40 +180,40 @@ function TechnicianProfile({ route, navigation }) {
           </View>
         ) : null}
 
-        <View style={appStyles.card}>
-          <Text style={appStyles.sectionTitle}>Profile Information</Text>
+        <View style={[appStyles.card, { backgroundColor: c.card }]}>
+          <Text style={[appStyles.sectionTitle, { color: c.text }]}>{t("techProfile.profileInfo")}</Text>
 
-          <Text style={appStyles.text}>
-            Experience: {tech.experience || 0} Years
+          <Text style={[appStyles.text, { color: c.text }]}>
+            {t("techProfile.experience")} {tech.experience || 0} {t("techProfile.years")}
           </Text>
-          <Text style={appStyles.text}>
-            Rating: ⭐ {Number(tech.rating || 0).toFixed(1)}
+          <Text style={[appStyles.text, { color: c.text }]}>
+            {t("techProfile.rating")} ⭐ {Number(tech.rating || 0).toFixed(1)}
           </Text>
-          <Text style={appStyles.text}>
-            Price / hour: {Number(tech.price_per_hour || 0).toFixed(2)} JOD
+          <Text style={[appStyles.text, { color: c.text }]}>
+            {t("techProfile.pricePerHour")} {Number(tech.price_per_hour || 0).toFixed(2)} JOD
           </Text>
-          <Text style={appStyles.text}>City: {tech.city || "-"}</Text>
-          <Text style={appStyles.text}>Phone: {tech.phone || "-"}</Text>
-          <Text style={appStyles.text}>Email: {tech.email || "-"}</Text>
+          <Text style={[appStyles.text, { color: c.text }]}>{t("techProfile.city")} {tech.city || "-"}</Text>
+          <Text style={[appStyles.text, { color: c.text }]}>{t("techProfile.phone")} {tech.phone || "-"}</Text>
+          <Text style={[appStyles.text, { color: c.text }]}>{t("techProfile.email")} {tech.email || "-"}</Text>
 
-          <Text style={[appStyles.mutedText, { marginTop: 12 }]}>
-            {tech.bio || "Experienced technician ready to help."}
+          <Text style={[appStyles.mutedText, { marginTop: 12, color: c.muted }]}>
+            {tech.bio || t("techProfile.defaultBio")}
           </Text>
 
           <TouchableOpacity style={appStyles.primaryBtn} onPress={openChat}>
-            <Text style={appStyles.primaryBtnText}>Send Message</Text>
+            <Text style={appStyles.primaryBtnText}>{t("techProfile.sendMessage")}</Text>
           </TouchableOpacity>
 
           <TouchableOpacity style={appStyles.secondaryBtn} onPress={openBooking}>
-            <Text style={appStyles.secondaryBtnText}>Book Now</Text>
+            <Text style={appStyles.secondaryBtnText}>{t("techProfile.bookNow")}</Text>
           </TouchableOpacity>
         </View>
 
-        <Text style={appStyles.sectionTitle}>Work Gallery</Text>
+        <Text style={[appStyles.sectionTitle, { color: c.text }]}>{t("techProfile.workGallery")}</Text>
 
         {fixedGallery.length === 0 ? (
-          <View style={appStyles.card}>
-            <Text style={appStyles.mutedText}>No gallery posts yet.</Text>
+          <View style={[appStyles.card, { backgroundColor: c.card }]}>
+            <Text style={[appStyles.mutedText, { color: c.muted }]}>{t("techProfile.noGalleryPosts")}</Text>
           </View>
         ) : (
           fixedGallery.map((post, index) => {
@@ -218,7 +222,7 @@ function TechnicianProfile({ route, navigation }) {
             return (
               <TouchableOpacity
                 key={post.id || index}
-                style={appStyles.card}
+                style={[appStyles.card, { backgroundColor: c.card }]}
                 activeOpacity={0.9}
                 onPress={() => setViewPost(post)}
               >
@@ -235,12 +239,12 @@ function TechnicianProfile({ route, navigation }) {
                   />
                 ) : null}
 
-                <Text style={appStyles.text}>
-                  {post.description || post.caption || "No description"}
+                <Text style={[appStyles.text, { color: c.text }]}>
+                  {post.description || post.caption || t("techProfile.noDescription")}
                 </Text>
 
-                <Text style={appStyles.mutedText}>
-                  Location: {post.location_note || post.location || "Not provided"}
+                <Text style={[appStyles.mutedText, { color: c.muted }]}>
+                  {t("techProfile.locationLabel")} {post.location_note || post.location || t("techProfile.notProvided")}
                 </Text>
               </TouchableOpacity>
             );
@@ -249,12 +253,12 @@ function TechnicianProfile({ route, navigation }) {
       </ScrollView>
 
       <Modal transparent visible={!!viewPost} animationType="fade">
-        <View style={appStyles.modalOverlay}>
-          <View style={appStyles.modalBox}>
+        <View style={[appStyles.modalOverlay, { backgroundColor: c.overlay }]}>
+          <View style={[appStyles.modalBox, { backgroundColor: c.card }]}>
             <View style={appStyles.between}>
-              <Text style={appStyles.modalTitle}>Post Details</Text>
+              <Text style={[appStyles.modalTitle, { color: c.text }]}>{t("techProfile.postDetails")}</Text>
               <TouchableOpacity onPress={() => setViewPost(null)}>
-                <Text style={{ fontSize: 28, fontWeight: "900" }}>✕</Text>
+                <Text style={{ fontSize: 28, fontWeight: "900", color: c.text }}>✕</Text>
               </TouchableOpacity>
             </View>
 
@@ -273,11 +277,11 @@ function TechnicianProfile({ route, navigation }) {
                 />
               ))}
 
-              <Text style={appStyles.text}>
-                {viewPost?.description || viewPost?.caption || "No description"}
+              <Text style={[appStyles.text, { color: c.text }]}>
+                {viewPost?.description || viewPost?.caption || t("techProfile.noDescription")}
               </Text>
-              <Text style={appStyles.mutedText}>
-                Location: {viewPost?.location_note || viewPost?.location || "Not provided"}
+              <Text style={[appStyles.mutedText, { color: c.muted }]}>
+                {t("techProfile.locationLabel")} {viewPost?.location_note || viewPost?.location || t("techProfile.notProvided")}
               </Text>
             </ScrollView>
           </View>

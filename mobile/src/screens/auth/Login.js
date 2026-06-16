@@ -13,14 +13,20 @@ import {
   View,
 } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { useTranslation } from "react-i18next";
+import { useTheme } from "../../context/ThemeContext";
 import API from "../../services/api";
-import appStyles, { colors } from "../../styles/mobileStyles";
-import legohome from "../../assets/home.png"; 
+import appStyles, { colors, getStyles } from "../../styles/mobileStyles";
+import legohome from "../../assets/home.png";
 const heroImage = {
   uri: "https://images.unsplash.com/photo-1600585154340-be6161a56a0c?auto=format&fit=crop&w=1400&q=80",
 };
 
 function Login({ navigation }) {
+  const { t } = useTranslation();
+  const { c } = useTheme();
+  const appS = getStyles(c);
+
   const [form, setForm] = useState({
     email: "",
     password: "",
@@ -80,14 +86,14 @@ function Login({ navigation }) {
         });
       }
     } catch (err) {
-      setError(err.response?.data?.message || "Login failed.");
+      setError(err.response?.data?.message || t("login.failed"));
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <SafeAreaView style={styles.safe}>
+    <SafeAreaView style={[styles.safe, { backgroundColor: c.bg }]}>
       <KeyboardAvoidingView
         style={styles.flex}
         behavior={Platform.OS === "ios" ? "padding" : "height"}
@@ -97,19 +103,19 @@ function Login({ navigation }) {
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"
         >
-          <View style={styles.authCard}>
+          <View style={[styles.authCard, { backgroundColor: c.card, borderColor: c.border }]}>
             <ImageBackground
               source={heroImage}
               style={styles.leftSide}
               imageStyle={styles.leftImage}
             >
               <View style={styles.leftOverlay}>
-                <Text style={styles.brand}>خدمة</Text>
+                <Text style={styles.brand}>{t("brand")}</Text>
 
-                <Text style={styles.heroTitle}>Welcome back.</Text>
+                <Text style={styles.heroTitle}>{t("login.welcomeBack")}</Text>
 
                 <Text style={styles.heroText}>
-                  Sign in to manage your maintenance requests and continue your bookings.
+                  {t("login.description")}
                 </Text>
 
                 <View style={styles.iconCard}>
@@ -118,36 +124,36 @@ function Login({ navigation }) {
               </View>
             </ImageBackground>
 
-            <View style={styles.rightSide}>
-              <Text style={styles.title}>Login</Text>
-              <Text style={styles.subtitle}>
-                Enter your account information to continue.
+            <View style={[styles.rightSide, { backgroundColor: c.card }]}>
+              <Text style={[styles.title, { color: c.text }]}>{t("login.submit")}</Text>
+              <Text style={[styles.subtitle, { color: c.muted }]}>
+                {t("login.subtitle")}
               </Text>
 
               {error ? (
-                <View style={appStyles.errorBox}>
-                  <Text style={appStyles.errorText}>{error}</Text>
+                <View style={appS.errorBox}>
+                  <Text style={appS.errorText}>{error}</Text>
                 </View>
               ) : null}
 
-              <Text style={styles.label}>Email</Text>
+              <Text style={[styles.label, { color: c.text }]}>{t("login.email")}</Text>
               <TextInput
-                style={styles.input}
+                style={[styles.input, { color: c.text, backgroundColor: c.inputBg, borderColor: c.border }]}
                 value={form.email}
                 onChangeText={(value) => updateField("email", value)}
-                placeholder="example@email.com"
-                placeholderTextColor="#777"
+                placeholder={t("login.emailPlaceholder")}
+                placeholderTextColor={c.muted}
                 autoCapitalize="none"
                 keyboardType="email-address"
               />
 
-              <Text style={styles.label}>Password</Text>
+              <Text style={[styles.label, { color: c.text }]}>{t("login.password")}</Text>
               <TextInput
-                style={styles.input}
+                style={[styles.input, { color: c.text, backgroundColor: c.inputBg, borderColor: c.border }]}
                 value={form.password}
                 onChangeText={(value) => updateField("password", value)}
-                placeholder="Enter password"
-                placeholderTextColor="#777"
+                placeholder={t("login.passwordPlaceholder")}
+                placeholderTextColor={c.muted}
                 secureTextEntry
               />
 
@@ -157,21 +163,21 @@ function Login({ navigation }) {
                 disabled={loading}
               >
                 <Text style={styles.primaryText}>
-                  {loading ? "Logging in..." : "Login"}
+                  {loading ? t("login.submit") + "..." : t("login.submit")}
                 </Text>
               </TouchableOpacity>
 
               <View style={styles.linksContainer}>
                 <TouchableOpacity onPress={() => navigation.navigate("Register")}>
                   <Text style={styles.link}>
-                    Don&apos;t have an account? Register
+                    {t("login.noAccount")} {t("login.registerLink")}
                   </Text>
                 </TouchableOpacity>
 
                 <TouchableOpacity
                   onPress={() => navigation.navigate("ForgotPassword")}
                 >
-                  <Text style={styles.link}>Forgot password?</Text>
+                  <Text style={styles.link}>{t("login.forgotPassword")}</Text>
                 </TouchableOpacity>
               </View>
             </View>

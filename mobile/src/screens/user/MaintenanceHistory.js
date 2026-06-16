@@ -8,24 +8,30 @@ import {
   StyleSheet,
 } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { useTranslation } from "react-i18next";
+import { useTheme } from "../../context/ThemeContext";
 
 import Header from "../../components/Common/Header";
 import FloatingActions from "../../components/Common/FloatingActions";
 import HeroSection from "../../components/Common/HeroSection";
 import CustomDropdown from "../../components/Common/CustomDropdown";
 import API from "../../services/api";
-import appStyles, { colors } from "../../styles/mobileStyles";
-
-const statusOptions = [
-  { label: "All", value: "all" },
-  { label: "Pending", value: "pending" },
-  { label: "Accepted", value: "accepted" },
-  { label: "Completed", value: "completed" },
-  { label: "Rejected", value: "rejected" },
-  { label: "Cancelled", value: "cancelled" },
-];
+import { getStyles } from "../../styles/mobileStyles";
 
 function MaintenanceHistory({ navigation }) {
+  const { t } = useTranslation();
+  const { c } = useTheme();
+  const appStyles = getStyles(c);
+
+  const statusOptions = [
+    { label: t("history.statusAll"), value: "all" },
+    { label: t("history.statusPending"), value: "pending" },
+    { label: t("history.statusAccepted"), value: "accepted" },
+    { label: t("history.statusCompleted"), value: "completed" },
+    { label: t("history.statusRejected"), value: "rejected" },
+    { label: t("history.statusCancelled"), value: "cancelled" },
+  ];
+
   const [requests, setRequests] = useState([]);
   const [statusFilter, setStatusFilter] = useState("all");
   const [message, setMessage] = useState("");
@@ -42,7 +48,7 @@ function MaintenanceHistory({ navigation }) {
       setRequests(data);
     } catch (err) {
       setRequests([]);
-      setMessage(err.response?.data?.message || "Failed to load history.");
+      setMessage(err.response?.data?.message || t("history.loadFailed"));
     }
   };
 
@@ -75,12 +81,12 @@ function MaintenanceHistory({ navigation }) {
 
   return (
     <SafeAreaView style={appStyles.safe}>
-      <Header navigation={navigation} title="History" />
+      <Header navigation={navigation} title={t("history.headerTitle")} />
 
       <ScrollView contentContainerStyle={appStyles.pageContent}>
         <HeroSection
-          title="Maintenance History"
-          subtitle="Track your requests and add reviews after completion."
+          title={t("history.title")}
+          subtitle={t("history.subtitle")}
         />
 
         {message ? (
@@ -89,10 +95,10 @@ function MaintenanceHistory({ navigation }) {
           </View>
         ) : null}
 
-        <View style={styles.filterBox}>
+        <View style={[styles.filterBox, { backgroundColor: c.card, borderColor: c.border }]}>
           <View style={{ flex: 1 }}>
             <CustomDropdown
-              label="Status"
+              label={t("history.statusLabel")}
               value={statusFilter}
               options={statusOptions}
               onChange={setStatusFilter}
@@ -100,16 +106,16 @@ function MaintenanceHistory({ navigation }) {
           </View>
 
           <TouchableOpacity
-            style={styles.clearBtn}
+            style={[styles.clearBtn, { backgroundColor: c.primarySoft }]}
             onPress={() => setStatusFilter("all")}
           >
-            <Text style={styles.clearText}>Clear</Text>
+            <Text style={[styles.clearText, { color: c.primary }]}>{t("history.clear")}</Text>
           </TouchableOpacity>
         </View>
 
         {filteredRequests.length === 0 ? (
           <View style={appStyles.card}>
-            <Text style={appStyles.sectionTitle}>No requests found</Text>
+            <Text style={appStyles.sectionTitle}>{t("history.noRequests")}</Text>
           </View>
         ) : (
           filteredRequests.map((req) => {
@@ -119,32 +125,32 @@ function MaintenanceHistory({ navigation }) {
             return (
               <View style={appStyles.card} key={requestId}>
                 <View style={appStyles.between}>
-                  <Text style={appStyles.sectionTitle}>Request #{requestId}</Text>
+                  <Text style={appStyles.sectionTitle}>{t("history.requestNumber", { id: requestId })}</Text>
                   <View style={appStyles.statusBadge}>
                     <Text style={appStyles.statusText}>{status}</Text>
                   </View>
                 </View>
 
                 <Text style={appStyles.text}>
-                  Service: {req.service || req.service_type || "-"}
+                  {t("history.service")}: {req.service || req.service_type || "-"}
                 </Text>
                 <Text style={appStyles.text}>
-                  Technician: {req.technician_name || req.tech_name || "-"}
+                  {t("history.technician")}: {req.technician_name || req.tech_name || "-"}
                 </Text>
                 <Text style={appStyles.text}>
-                  Date: {formatDate(req.scheduled_date || req.date)}
+                  {t("history.date")}: {formatDate(req.scheduled_date || req.date)}
                 </Text>
                 <Text style={appStyles.text}>
-                  Time: {req.scheduled_time || req.time || "-"}
+                  {t("history.time")}: {req.scheduled_time || req.time || "-"}
                 </Text>
                 <Text style={appStyles.text}>
-                  Hours: {req.estimated_hours || "-"}
+                  {t("history.hours")}: {req.estimated_hours || "-"}
                 </Text>
                 <Text style={appStyles.text}>
-                  Payment: {req.payment_method || "-"}
+                  {t("history.payment")}: {req.payment_method || "-"}
                 </Text>
                 <Text style={appStyles.text}>
-                  Total: {req.total_price || req.amount || 0} JOD
+                  {t("history.total")}: {req.total_price || req.amount || 0} JOD
                 </Text>
 
                 {req.description ? (
@@ -156,7 +162,7 @@ function MaintenanceHistory({ navigation }) {
                   onPress={() => openReview(req)}
                 >
                   <Text style={appStyles.primaryBtnText}>
-                    {status === "completed" ? "Add Review" : "View Review"}
+                    {status === "completed" ? t("history.addReview") : t("history.viewReview")}
                   </Text>
                 </TouchableOpacity>
               </View>
@@ -172,9 +178,7 @@ function MaintenanceHistory({ navigation }) {
 
 const styles = StyleSheet.create({
   filterBox: {
-    backgroundColor: "#fff",
     borderWidth: 1,
-    borderColor: colors.border,
     borderRadius: 18,
     padding: 10,
     marginBottom: 14,
@@ -186,12 +190,10 @@ const styles = StyleSheet.create({
     height: 46,
     paddingHorizontal: 16,
     borderRadius: 14,
-    backgroundColor: colors.primarySoft,
     justifyContent: "center",
     marginTop: 18,
   },
   clearText: {
-    color: colors.primary,
     fontWeight: "900",
   },
 });

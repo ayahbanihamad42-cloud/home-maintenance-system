@@ -12,6 +12,8 @@ import {
 } from "react-native";
 import * as ImagePicker from "expo-image-picker";
 
+import { useTranslation } from "react-i18next";
+import { useTheme } from "../../context/ThemeContext";
 import Header from "../../components/Common/Header";
 import FloatingActions from "../../components/Common/FloatingActions";
 import {
@@ -27,6 +29,8 @@ function TechnicianGalleryManager({
   embedded = false,
   technicianId = "",
 }) {
+  const { t } = useTranslation();
+  const { c } = useTheme();
   const [posts, setPosts] = useState([]);
   const [message, setMessage] = useState(null);
   const [formOpen, setFormOpen] = useState(false);
@@ -96,7 +100,7 @@ function TechnicianGalleryManager({
       setPosts([]);
       setMessage({
         type: "error",
-        text: err.response?.data?.message || "Failed to load gallery.",
+        text: err.response?.data?.message || t("techGallery.failedLoad"),
       });
     }
   };
@@ -130,7 +134,7 @@ function TechnicianGalleryManager({
       if (!permission.granted) {
         setMessage({
           type: "error",
-          text: "Please allow gallery access.",
+          text: t("techGallery.allowGalleryAccess"),
         });
         return;
       }
@@ -156,7 +160,7 @@ function TechnicianGalleryManager({
     } catch {
       setMessage({
         type: "error",
-        text: "Failed to choose image.",
+        text: t("techGallery.failedChooseImage"),
       });
     }
   };
@@ -196,7 +200,7 @@ function TechnicianGalleryManager({
       if (!form.description.trim()) {
         setMessage({
           type: "error",
-          text: "Write a caption first.",
+          text: t("techGallery.writeCaptionFirst"),
         });
         return;
       }
@@ -204,7 +208,7 @@ function TechnicianGalleryManager({
       if (!form.images.length) {
         setMessage({
           type: "error",
-          text: "Choose at least one image.",
+          text: t("techGallery.chooseAtLeastOneImage"),
         });
         return;
       }
@@ -227,8 +231,8 @@ function TechnicianGalleryManager({
       setMessage({
         type: "success",
         text: isEditing
-          ? "Gallery post updated successfully."
-          : "Gallery post added successfully.",
+          ? t("techGallery.postUpdated")
+          : t("techGallery.postAdded"),
       });
 
       resetForm();
@@ -236,16 +240,16 @@ function TechnicianGalleryManager({
     } catch (err) {
       setMessage({
         type: "error",
-        text: err.response?.data?.message || "Failed to save gallery post.",
+        text: err.response?.data?.message || t("techGallery.failedSave"),
       });
     }
   };
 
   const deletePost = (postId) => {
-    Alert.alert("Delete", "Are you sure you want to delete this post?", [
-      { text: "Cancel", style: "cancel" },
+    Alert.alert(t("techGallery.deleteTitle"), t("techGallery.deleteConfirm"), [
+      { text: t("techGallery.cancel"), style: "cancel" },
       {
-        text: "Delete",
+        text: t("techGallery.delete"),
         style: "destructive",
         onPress: async () => {
           try {
@@ -254,14 +258,14 @@ function TechnicianGalleryManager({
 
             setMessage({
               type: "success",
-              text: "Gallery post deleted successfully.",
+              text: t("techGallery.postDeleted"),
             });
 
             await load();
           } catch (err) {
             setMessage({
               type: "error",
-              text: err.response?.data?.message || "Failed to delete post.",
+              text: err.response?.data?.message || t("techGallery.failedDelete"),
             });
           }
         },
@@ -273,9 +277,9 @@ function TechnicianGalleryManager({
     <>
       <View style={appStyles.between}>
         <View style={{ flex: 1 }}>
-          <Text style={appStyles.sectionTitle}>Work Gallery</Text>
-          <Text style={appStyles.mutedText}>
-            Add and manage your completed work posts.
+          <Text style={[appStyles.sectionTitle, { color: c.text }]}>{t("techGallery.workGallery")}</Text>
+          <Text style={[appStyles.mutedText, { color: c.muted }]}>
+            {t("techGallery.manageDesc")}
           </Text>
         </View>
 
@@ -285,7 +289,7 @@ function TechnicianGalleryManager({
             width: 48,
             height: 48,
             borderRadius: 24,
-            backgroundColor: colors.primary,
+            backgroundColor: c.primary,
             alignItems: "center",
             justifyContent: "center",
           }}
@@ -317,10 +321,10 @@ function TechnicianGalleryManager({
       ) : null}
 
       {fixedPosts.length === 0 ? (
-        <View style={appStyles.card}>
-          <Text style={appStyles.sectionTitle}>No posts yet</Text>
-          <Text style={appStyles.mutedText}>
-            Your work gallery posts will appear here.
+        <View style={[appStyles.card, { backgroundColor: c.card }]}>
+          <Text style={[appStyles.sectionTitle, { color: c.text }]}>{t("techGallery.noPosts")}</Text>
+          <Text style={[appStyles.mutedText, { color: c.muted }]}>
+            {t("techGallery.postsAppearHere")}
           </Text>
         </View>
       ) : (
@@ -330,12 +334,12 @@ function TechnicianGalleryManager({
           return (
             <TouchableOpacity
               key={post.id}
-              style={appStyles.card}
+              style={[appStyles.card, { backgroundColor: c.card }]}
               activeOpacity={0.9}
               onPress={() => setViewPost(post)}
             >
               <View style={appStyles.between}>
-                <Text style={appStyles.sectionTitle}>Post</Text>
+                <Text style={[appStyles.sectionTitle, { color: c.text }]}>{t("techGallery.post")}</Text>
 
                 <TouchableOpacity
                   onPress={() =>
@@ -345,12 +349,12 @@ function TechnicianGalleryManager({
                     width: 40,
                     height: 40,
                     borderRadius: 20,
-                    backgroundColor: "#111",
+                    backgroundColor: c.text,
                     alignItems: "center",
                     justifyContent: "center",
                   }}
                 >
-                  <Text style={{ color: "#fff", fontSize: 24, fontWeight: "900" }}>
+                  <Text style={{ color: c.card, fontSize: 24, fontWeight: "900" }}>
                     ⋮
                   </Text>
                 </TouchableOpacity>
@@ -359,9 +363,9 @@ function TechnicianGalleryManager({
               {openMenuId === post.id ? (
                 <View
                   style={{
-                    backgroundColor: "#fff9f3",
+                    backgroundColor: c.menuBg,
                     borderWidth: 1,
-                    borderColor: "#d8c8b8",
+                    borderColor: c.border,
                     borderRadius: 14,
                     padding: 10,
                     marginBottom: 12,
@@ -370,7 +374,7 @@ function TechnicianGalleryManager({
                   }}
                 >
                   <TouchableOpacity onPress={() => startEdit(post)}>
-                    <Text style={{ fontWeight: "900", padding: 8 }}>Edit</Text>
+                    <Text style={{ fontWeight: "900", padding: 8, color: c.text }}>{t("techGallery.edit")}</Text>
                   </TouchableOpacity>
 
                   <TouchableOpacity onPress={() => deletePost(post.id)}>
@@ -378,10 +382,10 @@ function TechnicianGalleryManager({
                       style={{
                         fontWeight: "900",
                         padding: 8,
-                        color: "#b00020",
+                        color: c.danger,
                       }}
                     >
-                      Delete
+                      {t("techGallery.delete")}
                     </Text>
                   </TouchableOpacity>
                 </View>
@@ -400,12 +404,12 @@ function TechnicianGalleryManager({
                 />
               ) : null}
 
-              <Text style={appStyles.text}>
-                {cleanDescription(post) || "No description"}
+              <Text style={[appStyles.text, { color: c.text }]}>
+                {cleanDescription(post) || t("techGallery.noDescription")}
               </Text>
 
               {getPostLocation(post) ? (
-                <Text style={appStyles.mutedText}>
+                <Text style={[appStyles.mutedText, { color: c.muted }]}>
                   📍 {getPostLocation(post)}
                 </Text>
               ) : null}
@@ -415,14 +419,14 @@ function TechnicianGalleryManager({
       )}
 
       <Modal transparent visible={formOpen} animationType="fade">
-        <View style={appStyles.modalOverlay}>
-          <View style={appStyles.modalBox}>
-            <Text style={appStyles.modalTitle}>
-              {isEditing ? "Edit Work Post" : "Create New Work Post"}
+        <View style={[appStyles.modalOverlay, { backgroundColor: c.overlay }]}>
+          <View style={[appStyles.modalBox, { backgroundColor: c.card }]}>
+            <Text style={[appStyles.modalTitle, { color: c.text }]}>
+              {isEditing ? t("techGallery.editPost") : t("techGallery.createPost")}
             </Text>
 
             <TouchableOpacity style={appStyles.secondaryBtn} onPress={chooseImages}>
-              <Text style={appStyles.secondaryBtnText}>Choose Images</Text>
+              <Text style={appStyles.secondaryBtnText}>{t("techGallery.chooseImages")}</Text>
             </TouchableOpacity>
 
             {form.images.length > 0 ? (
@@ -447,7 +451,7 @@ function TechnicianGalleryManager({
                         width: 28,
                         height: 28,
                         borderRadius: 14,
-                        backgroundColor: "#b00020",
+                        backgroundColor: c.danger,
                         alignItems: "center",
                         justifyContent: "center",
                       }}
@@ -459,44 +463,46 @@ function TechnicianGalleryManager({
               </ScrollView>
             ) : null}
 
-            <Text style={appStyles.label}>Caption</Text>
+            <Text style={[appStyles.label, { color: c.text }]}>{t("techGallery.captionLabel")}</Text>
             <TextInput
-              style={[appStyles.input, appStyles.textArea]}
+              style={[appStyles.input, appStyles.textArea, { backgroundColor: c.inputBg, borderColor: c.border, color: c.text }]}
               value={form.description}
               onChangeText={(v) => setForm({ ...form, description: v })}
-              placeholder="Write caption / work details..."
+              placeholder={t("techGallery.captionPlaceholder")}
+              placeholderTextColor={c.muted}
               multiline
             />
 
-            <Text style={appStyles.label}>Location / Work place</Text>
+            <Text style={[appStyles.label, { color: c.text }]}>{t("techGallery.locationLabel")}</Text>
             <TextInput
-              style={appStyles.input}
+              style={[appStyles.input, { backgroundColor: c.inputBg, borderColor: c.border, color: c.text }]}
               value={form.location}
               onChangeText={(v) => setForm({ ...form, location: v })}
-              placeholder="Example: Irbid, customer house..."
+              placeholder={t("techGallery.locationPlaceholder")}
+              placeholderTextColor={c.muted}
             />
 
             <TouchableOpacity style={appStyles.primaryBtn} onPress={submitPost}>
               <Text style={appStyles.primaryBtnText}>
-                {isEditing ? "Update Post" : "Post"}
+                {isEditing ? t("techGallery.updatePost") : t("techGallery.postBtn")}
               </Text>
             </TouchableOpacity>
 
             <TouchableOpacity style={appStyles.secondaryBtn} onPress={resetForm}>
-              <Text style={appStyles.secondaryBtnText}>Cancel</Text>
+              <Text style={appStyles.secondaryBtnText}>{t("techGallery.cancel")}</Text>
             </TouchableOpacity>
           </View>
         </View>
       </Modal>
 
       <Modal transparent visible={!!viewPost} animationType="fade">
-        <View style={appStyles.modalOverlay}>
-          <View style={appStyles.modalBox}>
+        <View style={[appStyles.modalOverlay, { backgroundColor: c.overlay }]}>
+          <View style={[appStyles.modalBox, { backgroundColor: c.card }]}>
             <View style={appStyles.between}>
-              <Text style={appStyles.modalTitle}>Post Details</Text>
+              <Text style={[appStyles.modalTitle, { color: c.text }]}>{t("techGallery.postDetails")}</Text>
 
               <TouchableOpacity onPress={() => setViewPost(null)}>
-                <Text style={{ fontSize: 28, fontWeight: "900" }}>✕</Text>
+                <Text style={{ fontSize: 28, fontWeight: "900", color: c.text }}>✕</Text>
               </TouchableOpacity>
             </View>
 
@@ -515,12 +521,12 @@ function TechnicianGalleryManager({
                 />
               ))}
 
-              <Text style={appStyles.text}>
+              <Text style={[appStyles.text, { color: c.text }]}>
                 {viewPost ? cleanDescription(viewPost) : ""}
               </Text>
 
               {viewPost && getPostLocation(viewPost) ? (
-                <Text style={appStyles.mutedText}>
+                <Text style={[appStyles.mutedText, { color: c.muted }]}>
                   📍 {getPostLocation(viewPost)}
                 </Text>
               ) : null}
@@ -536,8 +542,8 @@ function TechnicianGalleryManager({
   }
 
   return (
-    <SafeAreaView style={appStyles.safe}>
-      <Header navigation={navigation} title="Gallery" />
+    <SafeAreaView style={[appStyles.safe, { backgroundColor: c.bg }]}>
+      <Header navigation={navigation} title={t("techGallery.headerTitle")} />
 
       <ScrollView
         contentContainerStyle={appStyles.pageContent}

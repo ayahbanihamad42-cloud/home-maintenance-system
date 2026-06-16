@@ -10,14 +10,20 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import { useTranslation } from "react-i18next";
+import { useTheme } from "../../context/ThemeContext";
 
 import Header from "../../components/Common/Header";
 import FloatingActions from "../../components/Common/FloatingActions";
 import HeroSection from "../../components/Common/HeroSection";
 import API from "../../services/api";
-import appStyles from "../../styles/mobileStyles";
+import { getStyles } from "../../styles/mobileStyles";
 
 function PaymentForm({ route, navigation }) {
+  const { t } = useTranslation();
+  const { c } = useTheme();
+  const appStyles = getStyles(c);
+
   const params = route?.params || {};
   const requestDraft = params.requestDraft || null;
   const amount = Number(params.amount || requestDraft?.total_price || 0);
@@ -51,25 +57,25 @@ function PaymentForm({ route, navigation }) {
   const validate = () => {
     const name = form.cardName.trim();
 
-    if (!requestDraft) return "Request information is missing.";
-    if (name.length < 3) return "Name on card must be at least 3 characters.";
-    if (!/^[A-Za-z\s]+$/.test(name)) return "Name on card must contain letters only.";
-    if (cleanCardNumber.length !== 16) return "Card number must be 16 digits.";
-    if (!/^\d{2}\/\d{2}$/.test(form.expiry)) return "Expiry must be MM/YY.";
+    if (!requestDraft) return t("payment.errors.missingRequest");
+    if (name.length < 3) return t("payment.errors.nameTooShort");
+    if (!/^[A-Za-z\s]+$/.test(name)) return t("payment.errors.nameLettersOnly");
+    if (cleanCardNumber.length !== 16) return t("payment.errors.cardNumber16");
+    if (!/^\d{2}\/\d{2}$/.test(form.expiry)) return t("payment.errors.expiryFormat");
 
     const [month, year] = form.expiry.split("/").map(Number);
-    if (month < 1 || month > 12) return "Expiry month must be between 01 and 12.";
+    if (month < 1 || month > 12) return t("payment.errors.expiryMonth");
 
     const now = new Date();
     const currentYear = Number(String(now.getFullYear()).slice(2));
     const currentMonth = now.getMonth() + 1;
 
     if (year < currentYear || (year === currentYear && month < currentMonth)) {
-      return "Card is expired.";
+      return t("payment.errors.cardExpired");
     }
 
-    if (!/^\d{3,4}$/.test(form.cvv)) return "CVV must be 3 or 4 digits.";
-    if (!amount || amount <= 0) return "Invalid payment amount.";
+    if (!/^\d{3,4}$/.test(form.cvv)) return t("payment.errors.cvvDigits");
+    if (!amount || amount <= 0) return t("payment.errors.invalidAmount");
 
     return "";
   };
@@ -95,7 +101,7 @@ function PaymentForm({ route, navigation }) {
         createRes.data?.insertId;
 
       if (!requestId) {
-        throw new Error("Request id was not returned.");
+        throw new Error(t("payment.errors.noRequestId"));
       }
 
       await API.post(`/maintenance/${requestId}/online-payment`, {
@@ -106,7 +112,7 @@ function PaymentForm({ route, navigation }) {
         cvv: form.cvv,
       });
 
-      Alert.alert("Success", "Payment completed successfully.");
+      Alert.alert(t("common.success"), t("payment.paymentCompleted"));
 
       navigation.reset({
         index: 0,
@@ -121,7 +127,7 @@ function PaymentForm({ route, navigation }) {
       setError(
         err.response?.data?.message ||
           err.message ||
-          "Payment failed. Request was not completed."
+          t("payment.errors.paymentFailed")
       );
     } finally {
       setLoading(false);
@@ -130,7 +136,7 @@ function PaymentForm({ route, navigation }) {
 
   return (
     <SafeAreaView style={appStyles.safe}>
-      <Header navigation={navigation} title="Payment" />
+      <Header navigation={navigation} title={t("payment.headerTitle")} />
 
       <KeyboardAvoidingView
         style={{ flex: 1 }}
@@ -141,8 +147,8 @@ function PaymentForm({ route, navigation }) {
           keyboardShouldPersistTaps="handled"
         >
           <HeroSection
-            title="Payment"
-            subtitle="Complete your online payment securely."
+            title={t("payment.title")}
+            subtitle={t("payment.subtitle")}
           />
 
           {error ? (
@@ -153,25 +159,25 @@ function PaymentForm({ route, navigation }) {
 
           <View style={appStyles.card}>
             <Text style={appStyles.text}>
-              Request: Will be created after payment
+              {t("payment.requestNote")}
             </Text>
             <Text style={appStyles.text}>
-              Total Amount: {amount.toFixed(2)} JOD
+              {t("payment.totalAmount")}: {amount.toFixed(2)} JOD
             </Text>
 
-            <Text style={appStyles.label}>Name on Card</Text>
+            <Text style={appStyles.label}>{t("payment.nameOnCard")}</Text>
             <TextInput
               style={appStyles.input}
               value={form.cardName}
               onChangeText={(value) =>
                 setForm((prev) => ({ ...prev, cardName: value }))
               }
-              placeholder="Aya Bani Hamad"
+              placeholder={t("payment.nameOnCardPlaceholder")}
               autoCapitalize="words"
               keyboardType="default"
             />
 
-            <Text style={appStyles.label}>Card Number</Text>
+            <Text style={appStyles.label}>{t("payment.cardNumber")}</Text>
             <TextInput
               style={appStyles.input}
               value={form.cardNumber}
@@ -186,7 +192,7 @@ function PaymentForm({ route, navigation }) {
               maxLength={19}
             />
 
-            <Text style={appStyles.label}>Expiry</Text>
+            <Text style={appStyles.label}>{t("payment.expiry")}</Text>
             <TextInput
               style={appStyles.input}
               value={form.expiry}
@@ -198,7 +204,7 @@ function PaymentForm({ route, navigation }) {
               maxLength={5}
             />
 
-            <Text style={appStyles.label}>CVV</Text>
+            <Text style={appStyles.label}>{t("payment.cvv")}</Text>
             <TextInput
               style={appStyles.input}
               value={form.cvv}
@@ -220,7 +226,7 @@ function PaymentForm({ route, navigation }) {
               disabled={loading}
             >
               <Text style={appStyles.primaryBtnText}>
-                {loading ? "Processing..." : "Pay Now"}
+                {loading ? t("payment.processing") : t("payment.payNow")}
               </Text>
             </TouchableOpacity>
 
@@ -228,7 +234,7 @@ function PaymentForm({ route, navigation }) {
               style={appStyles.secondaryBtn}
               onPress={() => navigation.goBack()}
             >
-              <Text style={appStyles.secondaryBtnText}>Cancel</Text>
+              <Text style={appStyles.secondaryBtnText}>{t("common.cancel")}</Text>
             </TouchableOpacity>
           </View>
         </ScrollView>

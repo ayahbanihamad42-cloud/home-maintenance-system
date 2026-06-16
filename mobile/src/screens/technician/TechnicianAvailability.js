@@ -11,6 +11,8 @@ import {
 } from "react-native";
 import DateTimePicker from "@react-native-community/datetimepicker";
 
+import { useTranslation } from "react-i18next";
+import { useTheme } from "../../context/ThemeContext";
 import Header from "../../components/Common/Header";
 import FloatingActions from "../../components/Common/FloatingActions";
 import HeroSection from "../../components/Common/HeroSection";
@@ -20,6 +22,8 @@ import API from "../../services/api";
 const days = ["All", "Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
 
 function TechnicianAvailability({ navigation }) {
+  const { t } = useTranslation();
+  const { c } = useTheme();
   const [mode, setMode] = useState("one");
   const [oneTimeList, setOneTimeList] = useState([]);
   const [regularList, setRegularList] = useState([]);
@@ -98,7 +102,7 @@ function TechnicianAvailability({ navigation }) {
     } catch (err) {
       setMessage({
         type: "error",
-        text: err.response?.data?.message || "Failed to load availability.",
+        text: err.response?.data?.message || t("techAvailability.failedLoad"),
       });
     }
   };
@@ -138,22 +142,22 @@ function TechnicianAvailability({ navigation }) {
       setMessage(null);
 
       if (!oneForm.available_date || !oneForm.start_time || !oneForm.end_time) {
-        setMessage({ type: "error", text: "Please fill date, start time, and end time." });
+        setMessage({ type: "error", text: t("techAvailability.fillDateStartEnd") });
         return;
       }
 
       if (!validateTime(oneForm.start_time, oneForm.end_time)) {
-        setMessage({ type: "error", text: "Start time must be before end time." });
+        setMessage({ type: "error", text: t("techAvailability.startBeforeEnd") });
         return;
       }
 
       if (existsInOneTime(oneForm.available_date, oneForm.start_time, oneForm.end_time)) {
-        setMessage({ type: "error", text: "This one-time availability already overlaps with an existing one." });
+        setMessage({ type: "error", text: t("techAvailability.oneTimeOverlap") });
         return;
       }
 
       if (existsInRegular(oneForm.available_date, "All", oneForm.start_time, oneForm.end_time)) {
-        setMessage({ type: "error", text: "This time already overlaps with a regular availability." });
+        setMessage({ type: "error", text: t("techAvailability.regularOverlap") });
         return;
       }
 
@@ -164,10 +168,10 @@ function TechnicianAvailability({ navigation }) {
       });
 
       setOneForm({ available_date: "", start_time: "08:00", end_time: "12:00" });
-      setMessage({ type: "success", text: "Availability added successfully." });
+      setMessage({ type: "success", text: t("techAvailability.addedSuccess") });
       await load();
     } catch (err) {
-      setMessage({ type: "error", text: err.response?.data?.message || "Failed to add availability." });
+      setMessage({ type: "error", text: err.response?.data?.message || t("techAvailability.failedAdd") });
     }
   };
 
@@ -176,17 +180,17 @@ function TechnicianAvailability({ navigation }) {
       setMessage(null);
 
       if (!regularForm.month_start || !regularForm.month_end || !regularForm.start_time || !regularForm.end_time) {
-        setMessage({ type: "error", text: "Please fill all regular availability fields." });
+        setMessage({ type: "error", text: t("techAvailability.fillAllRegular") });
         return;
       }
 
       if (regularForm.month_start > regularForm.month_end) {
-        setMessage({ type: "error", text: "Month start must be before month end." });
+        setMessage({ type: "error", text: t("techAvailability.monthStartBeforeEnd") });
         return;
       }
 
       if (!validateTime(regularForm.start_time, regularForm.end_time)) {
-        setMessage({ type: "error", text: "Start time must be before end time." });
+        setMessage({ type: "error", text: t("techAvailability.startBeforeEnd") });
         return;
       }
 
@@ -205,7 +209,7 @@ function TechnicianAvailability({ navigation }) {
       });
 
       if (duplicateRegular) {
-        setMessage({ type: "error", text: "This regular availability overlaps with an existing regular availability." });
+        setMessage({ type: "error", text: t("techAvailability.regularDuplicate") });
         return;
       }
 
@@ -220,7 +224,7 @@ function TechnicianAvailability({ navigation }) {
       });
 
       if (overlapsOneTime) {
-        setMessage({ type: "error", text: "This regular availability overlaps with an existing one-time availability." });
+        setMessage({ type: "error", text: t("techAvailability.regularOverlapsOneTime") });
         return;
       }
 
@@ -242,18 +246,18 @@ function TechnicianAvailability({ navigation }) {
         slot_minutes: "60",
       });
 
-      setMessage({ type: "success", text: "Regular availability added successfully." });
+      setMessage({ type: "success", text: t("techAvailability.regularAddedSuccess") });
       await load();
     } catch (err) {
-      setMessage({ type: "error", text: err.response?.data?.message || "Failed to add regular availability." });
+      setMessage({ type: "error", text: err.response?.data?.message || t("techAvailability.failedAddRegular") });
     }
   };
 
   const deleteAvailability = (id, type) => {
-    Alert.alert("Delete", "Delete this availability?", [
-      { text: "Cancel", style: "cancel" },
+    Alert.alert(t("techAvailability.deleteTitle"), t("techAvailability.deleteConfirm"), [
+      { text: t("techAvailability.cancel"), style: "cancel" },
       {
-        text: "Delete",
+        text: t("techAvailability.delete"),
         style: "destructive",
         onPress: async () => {
           try {
@@ -264,7 +268,7 @@ function TechnicianAvailability({ navigation }) {
             }
             await load();
           } catch {
-            setMessage({ type: "error", text: "Failed to delete availability." });
+            setMessage({ type: "error", text: t("techAvailability.failedDelete") });
           }
         },
       },
@@ -293,11 +297,11 @@ function TechnicianAvailability({ navigation }) {
   );
 
   return (
-    <SafeAreaView style={appStyles.safe}>
-      <Header navigation={navigation} title="Availability" />
+    <SafeAreaView style={[appStyles.safe, { backgroundColor: c.bg }]}>
+      <Header navigation={navigation} title={t("techAvailability.headerTitle")} />
 
       <ScrollView contentContainerStyle={appStyles.pageContent} showsVerticalScrollIndicator={false}>
-        <HeroSection title="Availability" subtitle="Add one-time or regular working times." />
+        <HeroSection title={t("techAvailability.title")} subtitle={t("techAvailability.subtitle")} />
 
         {message ? (
           <View style={message.type === "success" ? appStyles.successBox : appStyles.errorBox}>
@@ -307,108 +311,108 @@ function TechnicianAvailability({ navigation }) {
 
         <View style={appStyles.row}>
           <TouchableOpacity
-            style={[appStyles.secondaryBtn, { flex: 1, backgroundColor: mode === "one" ? colors.primary : "#fff" }]}
+            style={[appStyles.secondaryBtn, { flex: 1, backgroundColor: mode === "one" ? c.primary : c.card }]}
             onPress={() => setMode("one")}
           >
-            <Text style={{ color: mode === "one" ? "#fff" : colors.primary, fontWeight: "900", textAlign: "center" }}>One Time</Text>
+            <Text style={{ color: mode === "one" ? "#fff" : c.primary, fontWeight: "900", textAlign: "center" }}>{t("techAvailability.oneTime")}</Text>
           </TouchableOpacity>
 
           <TouchableOpacity
-            style={[appStyles.secondaryBtn, { flex: 1, backgroundColor: mode === "regular" ? colors.primary : "#fff" }]}
+            style={[appStyles.secondaryBtn, { flex: 1, backgroundColor: mode === "regular" ? c.primary : c.card }]}
             onPress={() => setMode("regular")}
           >
-            <Text style={{ color: mode === "regular" ? "#fff" : colors.primary, fontWeight: "900", textAlign: "center" }}>Regular</Text>
+            <Text style={{ color: mode === "regular" ? "#fff" : c.primary, fontWeight: "900", textAlign: "center" }}>{t("techAvailability.regular")}</Text>
           </TouchableOpacity>
         </View>
 
         {mode === "one" ? (
-          <View style={appStyles.card}>
-            <Text style={appStyles.sectionTitle}>Add One Time Availability</Text>
+          <View style={[appStyles.card, { backgroundColor: c.card }]}>
+            <Text style={[appStyles.sectionTitle, { color: c.text }]}>{t("techAvailability.addOneTimeTitle")}</Text>
 
-            <Text style={appStyles.label}>Date</Text>
-            <TouchableOpacity style={appStyles.input} onPress={() => setShowPicker("one_date")}>
-              <Text style={appStyles.text}>{oneForm.available_date || "Choose date"}</Text>
+            <Text style={[appStyles.label, { color: c.text }]}>{t("techAvailability.dateLabel")}</Text>
+            <TouchableOpacity style={[appStyles.input, { backgroundColor: c.inputBg, borderColor: c.border }]} onPress={() => setShowPicker("one_date")}>
+              <Text style={[appStyles.text, { color: c.text }]}>{oneForm.available_date || t("techAvailability.chooseDate")}</Text>
             </TouchableOpacity>
 
-            <Text style={appStyles.label}>Start Time</Text>
-            <TextInput style={appStyles.input} value={oneForm.start_time} onChangeText={(v) => setOneForm((p) => ({ ...p, start_time: v }))} placeholder="08:00" />
+            <Text style={[appStyles.label, { color: c.text }]}>{t("techAvailability.startTime")}</Text>
+            <TextInput style={[appStyles.input, { backgroundColor: c.inputBg, borderColor: c.border, color: c.text }]} value={oneForm.start_time} onChangeText={(v) => setOneForm((p) => ({ ...p, start_time: v }))} placeholder="08:00" placeholderTextColor={c.muted} />
 
-            <Text style={appStyles.label}>End Time</Text>
-            <TextInput style={appStyles.input} value={oneForm.end_time} onChangeText={(v) => setOneForm((p) => ({ ...p, end_time: v }))} placeholder="12:00" />
+            <Text style={[appStyles.label, { color: c.text }]}>{t("techAvailability.endTime")}</Text>
+            <TextInput style={[appStyles.input, { backgroundColor: c.inputBg, borderColor: c.border, color: c.text }]} value={oneForm.end_time} onChangeText={(v) => setOneForm((p) => ({ ...p, end_time: v }))} placeholder="12:00" placeholderTextColor={c.muted} />
 
             <TouchableOpacity style={appStyles.primaryBtn} onPress={addOneTime}>
-              <Text style={appStyles.primaryBtnText}>Add Availability</Text>
+              <Text style={appStyles.primaryBtnText}>{t("techAvailability.addAvailability")}</Text>
             </TouchableOpacity>
           </View>
         ) : (
-          <View style={appStyles.card}>
-            <Text style={appStyles.sectionTitle}>Add Regular Availability</Text>
+          <View style={[appStyles.card, { backgroundColor: c.card }]}>
+            <Text style={[appStyles.sectionTitle, { color: c.text }]}>{t("techAvailability.addRegularTitle")}</Text>
 
-            <Text style={appStyles.label}>Day</Text>
+            <Text style={[appStyles.label, { color: c.text }]}>{t("techAvailability.dayLabel")}</Text>
             <ScrollView horizontal showsHorizontalScrollIndicator={false}>
               {days.map((day) => {
                 const active = regularForm.day_of_week === day;
                 return (
                   <TouchableOpacity
                     key={day}
-                    style={[appStyles.secondaryBtn, { marginRight: 8, paddingHorizontal: 18, backgroundColor: active ? colors.primary : colors.primarySoft }]}
+                    style={[appStyles.secondaryBtn, { marginRight: 8, paddingHorizontal: 18, backgroundColor: active ? c.primary : c.primarySoft }]}
                     onPress={() => setRegularForm((p) => ({ ...p, day_of_week: day }))}
                   >
-                    <Text style={{ color: active ? "#fff" : colors.primary, fontWeight: "900" }}>{day}</Text>
+                    <Text style={{ color: active ? "#fff" : c.primary, fontWeight: "900" }}>{day}</Text>
                   </TouchableOpacity>
                 );
               })}
             </ScrollView>
 
-            <Text style={appStyles.label}>Month Start</Text>
-            <TouchableOpacity style={appStyles.input} onPress={() => setShowPicker("regular_start")}>
-              <Text style={appStyles.text}>{regularForm.month_start || "Choose start date"}</Text>
+            <Text style={[appStyles.label, { color: c.text }]}>{t("techAvailability.monthStart")}</Text>
+            <TouchableOpacity style={[appStyles.input, { backgroundColor: c.inputBg, borderColor: c.border }]} onPress={() => setShowPicker("regular_start")}>
+              <Text style={[appStyles.text, { color: c.text }]}>{regularForm.month_start || t("techAvailability.chooseStartDate")}</Text>
             </TouchableOpacity>
 
-            <Text style={appStyles.label}>Month End</Text>
-            <TouchableOpacity style={appStyles.input} onPress={() => setShowPicker("regular_end")}>
-              <Text style={appStyles.text}>{regularForm.month_end || "Choose end date"}</Text>
+            <Text style={[appStyles.label, { color: c.text }]}>{t("techAvailability.monthEnd")}</Text>
+            <TouchableOpacity style={[appStyles.input, { backgroundColor: c.inputBg, borderColor: c.border }]} onPress={() => setShowPicker("regular_end")}>
+              <Text style={[appStyles.text, { color: c.text }]}>{regularForm.month_end || t("techAvailability.chooseEndDate")}</Text>
             </TouchableOpacity>
 
-            <Text style={appStyles.label}>Start Time</Text>
-            <TextInput style={appStyles.input} value={regularForm.start_time} onChangeText={(v) => setRegularForm((p) => ({ ...p, start_time: v }))} placeholder="08:00" />
+            <Text style={[appStyles.label, { color: c.text }]}>{t("techAvailability.startTime")}</Text>
+            <TextInput style={[appStyles.input, { backgroundColor: c.inputBg, borderColor: c.border, color: c.text }]} value={regularForm.start_time} onChangeText={(v) => setRegularForm((p) => ({ ...p, start_time: v }))} placeholder="08:00" placeholderTextColor={c.muted} />
 
-            <Text style={appStyles.label}>End Time</Text>
-            <TextInput style={appStyles.input} value={regularForm.end_time} onChangeText={(v) => setRegularForm((p) => ({ ...p, end_time: v }))} placeholder="12:00" />
+            <Text style={[appStyles.label, { color: c.text }]}>{t("techAvailability.endTime")}</Text>
+            <TextInput style={[appStyles.input, { backgroundColor: c.inputBg, borderColor: c.border, color: c.text }]} value={regularForm.end_time} onChangeText={(v) => setRegularForm((p) => ({ ...p, end_time: v }))} placeholder="12:00" placeholderTextColor={c.muted} />
 
             <TouchableOpacity style={appStyles.primaryBtn} onPress={addRegular}>
-              <Text style={appStyles.primaryBtnText}>Add Regular Availability</Text>
+              <Text style={appStyles.primaryBtnText}>{t("techAvailability.addRegularAvailability")}</Text>
             </TouchableOpacity>
           </View>
         )}
 
-        <Text style={appStyles.sectionTitle}>{mode === "one" ? "One Time Availability" : "Regular Availability"}</Text>
+        <Text style={[appStyles.sectionTitle, { color: c.text }]}>{mode === "one" ? t("techAvailability.oneTimeList") : t("techAvailability.regularList")}</Text>
 
         {mode === "one" ? (
           visibleOneTime.length === 0 ? (
-            <View style={appStyles.card}><Text style={appStyles.mutedText}>No one-time availability.</Text></View>
+            <View style={[appStyles.card, { backgroundColor: c.card }]}><Text style={[appStyles.mutedText, { color: c.muted }]}>{t("techAvailability.noOneTime")}</Text></View>
           ) : (
             visibleOneTime.map((item) => (
-              <View style={appStyles.card} key={item.id}>
-                <Text style={appStyles.sectionTitle}>{normalizeDate(item.available_date)}</Text>
-                <Text style={appStyles.text}>Time: {item.start_time} - {item.end_time}</Text>
+              <View style={[appStyles.card, { backgroundColor: c.card }]} key={item.id}>
+                <Text style={[appStyles.sectionTitle, { color: c.text }]}>{normalizeDate(item.available_date)}</Text>
+                <Text style={[appStyles.text, { color: c.text }]}>{t("techAvailability.timeLabel")} {item.start_time} - {item.end_time}</Text>
                 <TouchableOpacity style={appStyles.secondaryBtn} onPress={() => deleteAvailability(item.id, "one")}>
-                  <Text style={appStyles.secondaryBtnText}>Delete</Text>
+                  <Text style={appStyles.secondaryBtnText}>{t("techAvailability.delete")}</Text>
                 </TouchableOpacity>
               </View>
             ))
           )
         ) : visibleRegular.length === 0 ? (
-          <View style={appStyles.card}><Text style={appStyles.mutedText}>No regular availability.</Text></View>
+          <View style={[appStyles.card, { backgroundColor: c.card }]}><Text style={[appStyles.mutedText, { color: c.muted }]}>{t("techAvailability.noRegular")}</Text></View>
         ) : (
           visibleRegular.map((item) => (
-            <View style={appStyles.card} key={item.id}>
-              <Text style={appStyles.sectionTitle}>{item.day_of_week || "Regular"}</Text>
-              <Text style={appStyles.text}>From: {normalizeDate(item.month_start)}</Text>
-              <Text style={appStyles.text}>To: {normalizeDate(item.month_end)}</Text>
-              <Text style={appStyles.text}>Time: {item.start_time} - {item.end_time}</Text>
+            <View style={[appStyles.card, { backgroundColor: c.card }]} key={item.id}>
+              <Text style={[appStyles.sectionTitle, { color: c.text }]}>{item.day_of_week || t("techAvailability.regular")}</Text>
+              <Text style={[appStyles.text, { color: c.text }]}>{t("techAvailability.from")} {normalizeDate(item.month_start)}</Text>
+              <Text style={[appStyles.text, { color: c.text }]}>{t("techAvailability.to")} {normalizeDate(item.month_end)}</Text>
+              <Text style={[appStyles.text, { color: c.text }]}>{t("techAvailability.timeLabel")} {item.start_time} - {item.end_time}</Text>
               <TouchableOpacity style={appStyles.secondaryBtn} onPress={() => deleteAvailability(item.id, "regular")}>
-                <Text style={appStyles.secondaryBtnText}>Delete</Text>
+                <Text style={appStyles.secondaryBtnText}>{t("techAvailability.delete")}</Text>
               </TouchableOpacity>
             </View>
           ))

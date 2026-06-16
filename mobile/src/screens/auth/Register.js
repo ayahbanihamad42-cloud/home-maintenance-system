@@ -14,8 +14,10 @@ import {
   View,
 } from "react-native";
 import DateTimePicker from "@react-native-community/datetimepicker";
+import { useTranslation } from "react-i18next";
+import { useTheme } from "../../context/ThemeContext";
 import API from "../../services/api";
-import appStyles, { colors } from "../../styles/mobileStyles";
+import appStyles, { colors, getStyles } from "../../styles/mobileStyles";
 import CustomDropdown from "../../components/Common/CustomDropdown";
 
 const homeLogo = require("../../assets/home.png");
@@ -26,6 +28,10 @@ const cityOptions = [
 ].map((city) => ({ label: city, value: city }));
 
 function Register({ navigation }) {
+  const { t } = useTranslation();
+  const { c } = useTheme();
+  const appS = getStyles(c);
+
   const bubbleOne = useRef(new Animated.Value(0)).current;
   const bubbleTwo = useRef(new Animated.Value(0)).current;
 
@@ -123,7 +129,7 @@ function Register({ navigation }) {
     } catch (err) {
       setMessage({
         type: "error",
-        text: err.response?.data?.message || err.message || "Failed to create account.",
+        text: err.response?.data?.message || err.message || t("register.failed"),
       });
     } finally {
       setLoading(false);
@@ -131,7 +137,7 @@ function Register({ navigation }) {
   };
 
   return (
-    <SafeAreaView style={styles.safe}>
+    <SafeAreaView style={[styles.safe, { backgroundColor: c.bg }]}>
       <KeyboardAvoidingView
         style={styles.flex}
         behavior={Platform.OS === "ios" ? "padding" : "height"}
@@ -141,7 +147,7 @@ function Register({ navigation }) {
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"
         >
-          <View style={styles.authCard}>
+          <View style={[styles.authCard, { backgroundColor: c.card, borderColor: c.border }]}>
             <ImageBackground
               source={homeLogo}
               style={styles.leftSide}
@@ -166,66 +172,66 @@ function Register({ navigation }) {
                   ]}
                 />
 
-                <Text style={styles.brand}>خدمة</Text>
-                <Text style={styles.heroTitle}>Create your account.</Text>
+                <Text style={styles.brand}>{t("brand")}</Text>
+                <Text style={styles.heroTitle}>{t("register.tagline")}</Text>
                 <Text style={styles.heroText}>
-                  Join us to manage your home maintenance services easily.
+                  {t("register.description")}
                 </Text>
               </View>
             </ImageBackground>
 
-            <View style={styles.rightSide}>
-              <Text style={styles.title}>Register</Text>
-              <Text style={styles.subtitle}>
-                Create a customer account and start booking services.
+            <View style={[styles.rightSide, { backgroundColor: c.card }]}>
+              <Text style={[styles.title, { color: c.text }]}>{t("register.title")}</Text>
+              <Text style={[styles.subtitle, { color: c.muted }]}>
+                {t("register.subtitle")}
               </Text>
 
               {message ? (
-                <View style={message.type === "success" ? appStyles.successBox : appStyles.errorBox}>
-                  <Text style={message.type === "success" ? appStyles.successText : appStyles.errorText}>
+                <View style={message.type === "success" ? appS.successBox : appS.errorBox}>
+                  <Text style={message.type === "success" ? appS.successText : appS.errorText}>
                     {message.text}
                   </Text>
                 </View>
               ) : null}
 
-              <Text style={styles.label}>Name</Text>
+              <Text style={[styles.label, { color: c.text }]}>{t("register.name")}</Text>
               <TextInput
-                style={styles.input}
+                style={[styles.input, { color: c.text, backgroundColor: c.inputBg, borderColor: c.border }]}
                 value={form.name}
                 onChangeText={(value) => setField("name", value)}
-                placeholder="Full name"
-                placeholderTextColor="#777"
+                placeholder={t("register.namePlaceholder")}
+                placeholderTextColor={c.muted}
               />
 
-              <Text style={styles.label}>Email</Text>
+              <Text style={[styles.label, { color: c.text }]}>{t("register.email")}</Text>
               <TextInput
-                style={styles.input}
+                style={[styles.input, { color: c.text, backgroundColor: c.inputBg, borderColor: c.border }]}
                 value={form.email}
                 onChangeText={(value) => setField("email", value)}
-                placeholder="example@email.com"
-                placeholderTextColor="#777"
+                placeholder={t("register.emailPlaceholder")}
+                placeholderTextColor={c.muted}
                 autoCapitalize="none"
                 keyboardType="email-address"
               />
 
-              <Text style={styles.label}>Phone</Text>
+              <Text style={[styles.label, { color: c.text }]}>{t("register.phone")}</Text>
               <TextInput
-                style={styles.input}
+                style={[styles.input, { color: c.text, backgroundColor: c.inputBg, borderColor: c.border }]}
                 value={form.phone}
                 onChangeText={(value) => setField("phone", value.replace(/[^\d]/g, ""))}
-                placeholder="07XXXXXXXX"
-                placeholderTextColor="#777"
+                placeholder={t("register.phonePlaceholder")}
+                placeholderTextColor={c.muted}
                 keyboardType="phone-pad"
                 maxLength={10}
               />
 
-              <Text style={styles.label}>Date of Birth</Text>
+              <Text style={[styles.label, { color: c.text }]}>{t("register.dob")}</Text>
               <TouchableOpacity
-                style={styles.inputLike}
+                style={[styles.inputLike, { backgroundColor: c.inputBg, borderColor: c.border }]}
                 activeOpacity={0.85}
                 onPress={() => setShowDate(true)}
               >
-                <Text style={form.dob ? styles.inputLikeText : styles.placeholderText}>
+                <Text style={form.dob ? [styles.inputLikeText, { color: c.text }] : [styles.placeholderText, { color: c.muted }]}>
                   {form.dob || "Select date"}
                 </Text>
                 <Text style={styles.calendarIcon}>📅</Text>
@@ -247,21 +253,21 @@ function Register({ navigation }) {
               {/* الـ Dropdown يحتاج لمساحة مريحة أسفله */}
               <View style={{ marginTop: 10 }}>
                 <CustomDropdown
-                  label="City"
+                  label={t("register.city")}
                   value={form.city}
-                  placeholder="Select city..."
+                  placeholder={t("register.cityPlaceholder")}
                   options={cityOptions}
                   onChange={(value) => setField("city", value)}
                 />
               </View>
 
-              <Text style={styles.label}>Password</Text>
+              <Text style={[styles.label, { color: c.text }]}>{t("register.password")}</Text>
               <TextInput
-                style={styles.input}
+                style={[styles.input, { color: c.text, backgroundColor: c.inputBg, borderColor: c.border }]}
                 value={form.password}
                 onChangeText={(value) => setField("password", value)}
-                placeholder="Create password"
-                placeholderTextColor="#777"
+                placeholder={t("register.passwordPlaceholder")}
+                placeholderTextColor={c.muted}
                 secureTextEntry
               />
 
@@ -272,12 +278,12 @@ function Register({ navigation }) {
                 disabled={loading}
               >
                 <Text style={styles.primaryText}>
-                  {loading ? "Registering..." : "Register"}
+                  {loading ? t("register.submit") + "..." : t("register.submit")}
                 </Text>
               </TouchableOpacity>
 
               <TouchableOpacity onPress={() => navigation.navigate("Login")}>
-                <Text style={styles.link}>Already have an account? Login</Text>
+                <Text style={styles.link}>{t("register.hasAccount")} {t("register.loginLink")}</Text>
               </TouchableOpacity>
             </View>
           </View>

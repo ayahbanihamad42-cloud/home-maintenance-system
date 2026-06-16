@@ -9,6 +9,8 @@ import {
   Linking,
 } from "react-native";
 import MapView, { Marker } from "react-native-maps";
+import { useTranslation } from "react-i18next";
+import { useTheme } from "../../context/ThemeContext";
 import Header from "../../components/Common/Header";
 import FloatingActions from "../../components/Common/FloatingActions";
 import {
@@ -16,10 +18,14 @@ import {
   cancelMaintenanceRequest,
 } from "../../services/maintenanceService";
 import API from "../../services/api";
-import appStyles from "../../styles/mobileStyles";
+import { getStyles } from "../../styles/mobileStyles";
 import HeroSection from "../../components/Common/HeroSection";
 
 const Review = ({ route, navigation }) => {
+  const { t } = useTranslation();
+  const { c } = useTheme();
+  const appStyles = getStyles(c);
+
   const requestId = route?.params?.requestId;
   const [request, setRequest] = useState(null);
   const [existingReview, setExistingReview] = useState(null);
@@ -95,7 +101,7 @@ const Review = ({ route, navigation }) => {
       setRequest(null);
       setMessage({
         type: "error",
-        text: "Failed to load request details.",
+        text: t("review.errors.loadFailed"),
       });
     } finally {
       if (!silent) setLoading(false);
@@ -122,7 +128,7 @@ const Review = ({ route, navigation }) => {
 
       setMessage({
         type: "success",
-        text: "Request cancelled successfully.",
+        text: t("review.cancelSuccess"),
       });
 
       await load(true);
@@ -133,7 +139,7 @@ const Review = ({ route, navigation }) => {
         type: "error",
         text:
           err.response?.data?.message ||
-          "Failed to cancel request. This request may no longer be cancellable.",
+          t("review.errors.cancelFailed"),
       });
     }
   };
@@ -142,7 +148,7 @@ const Review = ({ route, navigation }) => {
     if (!completed) {
       setMessage({
         type: "error",
-        text: "Rating appears only after the request is completed.",
+        text: t("review.errors.notCompleted"),
       });
       return;
     }
@@ -150,7 +156,7 @@ const Review = ({ route, navigation }) => {
     if (existingReview) {
       setMessage({
         type: "error",
-        text: "You already reviewed this request.",
+        text: t("review.errors.alreadyReviewed"),
       });
       return;
     }
@@ -158,7 +164,7 @@ const Review = ({ route, navigation }) => {
     if (!comment.trim()) {
       setMessage({
         type: "error",
-        text: "Please enter a comment.",
+        text: t("review.errors.enterComment"),
       });
       return;
     }
@@ -168,7 +174,7 @@ const Review = ({ route, navigation }) => {
     if (!rate || rate < 1 || rate > 5) {
       setMessage({
         type: "error",
-        text: "Rating must be between 1 and 5.",
+        text: t("review.errors.ratingRange"),
       });
       return;
     }
@@ -185,14 +191,14 @@ const Review = ({ route, navigation }) => {
 
       setMessage({
         type: "success",
-        text: "Review submitted successfully.",
+        text: t("review.submitSuccess"),
       });
 
       setTimeout(() => navigation.navigate("MaintenanceHistory"), 800);
     } catch (err) {
       setMessage({
         type: "error",
-        text: err.response?.data?.message || "Failed to submit review.",
+        text: err.response?.data?.message || t("review.errors.submitFailed"),
       });
     }
   };
@@ -205,17 +211,17 @@ const Review = ({ route, navigation }) => {
 
   return (
     <SafeAreaView style={appStyles.safe}>
-      <Header navigation={navigation} title="Review" />
+      <Header navigation={navigation} title={t("review.headerTitle")} />
 
       <ScrollView
         contentContainerStyle={appStyles.pageContent}
         showsVerticalScrollIndicator={false}
       >
         <HeroSection
-          title="Request Details"
-          subtitle="View request information and submit a review after completion."
+          title={t("review.title")}
+          subtitle={t("review.subtitle")}
         />
-      
+
 
         {message ? (
           <View
@@ -239,18 +245,18 @@ const Review = ({ route, navigation }) => {
 
         {loading ? (
           <View style={appStyles.card}>
-            <Text style={appStyles.text}>Loading request...</Text>
+            <Text style={appStyles.text}>{t("review.loading")}</Text>
           </View>
         ) : !request ? (
           <View style={appStyles.card}>
-            <Text style={appStyles.sectionTitle}>No request found</Text>
+            <Text style={appStyles.sectionTitle}>{t("review.noRequest")}</Text>
           </View>
         ) : (
           <>
             <View style={appStyles.card}>
               <View style={appStyles.between}>
                 <Text style={appStyles.sectionTitle}>
-                  {request.service || "Request"}
+                  {request.service || t("review.request")}
                 </Text>
 
                 <View style={appStyles.statusBadge}>
@@ -261,33 +267,33 @@ const Review = ({ route, navigation }) => {
               </View>
 
               <Text style={appStyles.text}>
-                Description: {request.description || "-"}
+                {t("review.description")}: {request.description || "-"}
               </Text>
 
               <Text style={appStyles.text}>
-                Technician: {request.technician_name || "-"}
+                {t("review.technician")}: {request.technician_name || "-"}
               </Text>
 
               <Text style={appStyles.text}>
-                Date: {formatDate(request.scheduled_date)}
+                {t("review.date")}: {formatDate(request.scheduled_date)}
               </Text>
 
               <Text style={appStyles.text}>
-                Time: {formatTime(request.scheduled_time)}
+                {t("review.time")}: {formatTime(request.scheduled_time)}
               </Text>
 
               <Text style={appStyles.text}>
-                Payment: {request.payment_method || "-"}
+                {t("review.payment")}: {request.payment_method || "-"}
               </Text>
 
               <Text style={appStyles.text}>
-                Amount:{" "}
+                {t("review.amount")}:{" "}
                 {Number(request.total_price || request.amount || 0).toFixed(2)}{" "}
                 JOD
               </Text>
 
               <Text style={appStyles.text}>
-                Location Note: {request.location_note || request.city || "-"}
+                {t("review.locationNote")}: {request.location_note || request.city || "-"}
               </Text>
 
               {canCancel && (
@@ -295,7 +301,7 @@ const Review = ({ route, navigation }) => {
                   style={appStyles.dangerBtn}
                   onPress={cancelRequest}
                 >
-                  <Text style={appStyles.dangerBtnText}>Cancel Request</Text>
+                  <Text style={appStyles.dangerBtnText}>{t("review.cancelRequest")}</Text>
                 </TouchableOpacity>
               )}
             </View>
@@ -303,8 +309,7 @@ const Review = ({ route, navigation }) => {
             {waitingForLocation && (
               <View style={appStyles.successBox}>
                 <Text style={appStyles.successText}>
-                  The technician location will appear here when the status
-                  becomes On The Way.
+                  {t("review.waitingForLocation")}
                 </Text>
               </View>
             )}
@@ -312,7 +317,7 @@ const Review = ({ route, navigation }) => {
             {onTheWay && hasTechLocation && (
               <View style={appStyles.card}>
                 <Text style={appStyles.sectionTitle}>
-                  Technician Live Location
+                  {t("review.techLiveLocation")}
                 </Text>
 
                 <MapView
@@ -331,7 +336,7 @@ const Review = ({ route, navigation }) => {
                 >
                   <Marker
                     coordinate={{ latitude: techLat, longitude: techLng }}
-                    title="Technician Location"
+                    title={t("review.techLocationMarker")}
                   />
                 </MapView>
 
@@ -340,7 +345,7 @@ const Review = ({ route, navigation }) => {
                   onPress={openLocation}
                 >
                   <Text style={appStyles.secondaryBtnText}>
-                    Open in Google Maps
+                    {t("review.openInMaps")}
                   </Text>
                 </TouchableOpacity>
               </View>
@@ -349,8 +354,7 @@ const Review = ({ route, navigation }) => {
             {onTheWay && !hasTechLocation && (
               <View style={appStyles.errorBox}>
                 <Text style={appStyles.errorText}>
-                  Technician status is On The Way, but the live location has not
-                  been received yet.
+                  {t("review.noLiveLocation")}
                 </Text>
               </View>
             )}
@@ -358,8 +362,7 @@ const Review = ({ route, navigation }) => {
             {!completed && (
               <View style={appStyles.warningBox}>
                 <Text style={appStyles.warningText}>
-                  Rating appears only after the request status becomes
-                  completed.
+                  {t("review.ratingAfterComplete")}
                 </Text>
               </View>
             )}
@@ -367,17 +370,16 @@ const Review = ({ route, navigation }) => {
             {existingReview && (
               <View style={appStyles.successBox}>
                 <Text style={appStyles.successText}>
-                  Already reviewed. Rating: {existingReview.rating} | Comment:{" "}
-                  {existingReview.comment || "-"}
+                  {t("review.alreadyReviewed", { rating: existingReview.rating, comment: existingReview.comment || "-" })}
                 </Text>
               </View>
             )}
 
             {canReview && (
               <View style={appStyles.card}>
-                <Text style={appStyles.sectionTitle}>Submit Review</Text>
+                <Text style={appStyles.sectionTitle}>{t("review.submitReview")}</Text>
 
-                <Text style={appStyles.label}>Rating</Text>
+                <Text style={appStyles.label}>{t("review.ratingLabel")}</Text>
                 <TextInput
                   style={appStyles.input}
                   value={rating}
@@ -387,17 +389,17 @@ const Review = ({ route, navigation }) => {
                   maxLength={1}
                 />
 
-                <Text style={appStyles.label}>Comment</Text>
+                <Text style={appStyles.label}>{t("review.commentLabel")}</Text>
                 <TextInput
                   style={[appStyles.input, appStyles.textArea]}
                   value={comment}
                   onChangeText={setComment}
                   multiline
-                  placeholder="Write your review..."
+                  placeholder={t("review.commentPlaceholder")}
                 />
 
                 <TouchableOpacity style={appStyles.primaryBtn} onPress={submit}>
-                  <Text style={appStyles.primaryBtnText}>Submit Review</Text>
+                  <Text style={appStyles.primaryBtnText}>{t("review.submitReview")}</Text>
                 </TouchableOpacity>
               </View>
             )}

@@ -7,20 +7,26 @@ import {
   TouchableOpacity,
   Image,
 } from "react-native";
+import { useTranslation } from "react-i18next";
+import { useTheme } from "../../context/ThemeContext";
 import Header from "../../components/Common/Header";
 import FloatingActions from "../../components/Common/FloatingActions";
 import HeroSection from "../../components/Common/HeroSection";
 import API from "../../services/api";
-import appStyles from "../../styles/mobileStyles";
+import { getStyles } from "../../styles/mobileStyles";
 
 const localFallbackImages = {
   Plumbing: require("../../assets/plumbing.png"),
-  Electrical: require("../../assets/Electrical.png"),
+  Electrical: require("../../assets/electrical.png"),
   Painting: require("../../assets/Painting.png"),
   Decoration: require("../../assets/Decoration.png"),
 };
 
 function Home({ navigation }) {
+  const { t } = useTranslation();
+  const { c } = useTheme();
+  const appStyles = getStyles(c);
+
   const [services, setServices] = useState([]);
 
   const getImageUrl = (url) => {
@@ -58,18 +64,18 @@ function Home({ navigation }) {
 
   return (
     <SafeAreaView style={appStyles.safe}>
-      <Header navigation={navigation} title="Home" />
+      <Header navigation={navigation} title={t("home.title")} />
 
       <ScrollView
         contentContainerStyle={appStyles.pageContent}
         showsVerticalScrollIndicator={false}
       >
         <HeroSection
-          title="Welcome to خدمة"
-          subtitle="Choose a service and book trusted technicians easily."
+          title={t("home.welcomeTitle")}
+          subtitle={t("home.description")}
         />
 
-        <Text style={appStyles.sectionTitle}>Services</Text>
+        <Text style={appStyles.sectionTitle}>{t("home.availableServices")}</Text>
 
         <View style={appStyles.grid}>
           {fixedServices.map((service) => {

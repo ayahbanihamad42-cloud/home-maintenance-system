@@ -15,6 +15,8 @@ import {
 import * as ImagePicker from "expo-image-picker";
 import * as Location from "expo-location";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { useTranslation } from "react-i18next";
+import { useTheme } from "../../context/ThemeContext";
 
 import appStyles, { colors } from "../../styles/mobileStyles";
 import API from "../../services/api";
@@ -25,6 +27,9 @@ import {
 } from "../../services/chatService";
 
 function FloatingActions({ navigation }) {
+  const { t } = useTranslation();
+  const { c } = useTheme();
+
   const [chatOpen, setChatOpen] = useState(false);
   const [aiOpen, setAiOpen] = useState(false);
   const [chatListOpen, setChatListOpen] = useState(false);
@@ -40,7 +45,7 @@ function FloatingActions({ navigation }) {
   const [aiMessages, setAiMessages] = useState([
     {
       role: "assistant",
-      text: "Hi! How can I help you with home maintenance today?",
+      text: t("aiChat.greeting"),
     },
   ]);
   const [aiText, setAiText] = useState("");
@@ -70,7 +75,7 @@ function FloatingActions({ navigation }) {
       }, 120);
     } catch {
       setMessages([]);
-      setChatError("Could not load messages.");
+      setChatError(t("chat.errorLoadMessages"));
     }
   };
 
@@ -81,7 +86,7 @@ function FloatingActions({ navigation }) {
       setChatUsers(Array.isArray(data) ? data : []);
     } catch {
       setChatUsers([]);
-      setChatError("Could not load conversations.");
+      setChatError(t("chat.errorLoadConversations"));
     }
   };
 
@@ -102,14 +107,14 @@ function FloatingActions({ navigation }) {
 
     global.openMobileChatWith = async (person) => {
       if (!person?.id) {
-        setChatError("Could not open this conversation.");
+        setChatError(t("chat.errorOpenConversation"));
         setChatListOpen(true);
         return;
       }
 
       setReceiver({
         id: person.id,
-        name: person.name || "Chat",
+        name: person.name || t("nav.chat"),
       });
 
       setChatListOpen(false);
@@ -151,7 +156,7 @@ function FloatingActions({ navigation }) {
       item.receiver_name ||
       item.sender_name ||
       item.name ||
-      "Chat"
+      t("nav.chat")
     );
   };
 
@@ -160,7 +165,7 @@ function FloatingActions({ navigation }) {
     const name = getReceiverName(item);
 
     if (!id) {
-      setChatError("Could not open this conversation.");
+      setChatError(t("chat.errorOpenConversation"));
       return;
     }
 
@@ -183,7 +188,7 @@ function FloatingActions({ navigation }) {
       setChatText("");
       await loadMessages(receiver.id);
     } catch (err) {
-      setChatError(err.response?.data?.message || "Failed to send message.");
+      setChatError(err.response?.data?.message || t("chat.errorSendMessage"));
     }
   };
 
@@ -194,7 +199,7 @@ function FloatingActions({ navigation }) {
       const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
 
       if (!permission.granted) {
-        setChatError("Please allow gallery access.");
+        setChatError(t("chat.errorGalleryAccess"));
         return;
       }
 
@@ -209,7 +214,7 @@ function FloatingActions({ navigation }) {
       const asset = result.assets?.[0];
 
       if (!asset?.base64) {
-        setChatError("Failed to read selected image.");
+        setChatError(t("chat.errorReadImage"));
         return;
       }
 
@@ -221,7 +226,7 @@ function FloatingActions({ navigation }) {
 
       await loadMessages(receiver.id);
     } catch (err) {
-      setChatError(err.response?.data?.message || "Failed to send image.");
+      setChatError(err.response?.data?.message || t("chat.errorSendImage"));
     }
   };
 
@@ -232,7 +237,7 @@ function FloatingActions({ navigation }) {
       const permission = await Location.requestForegroundPermissionsAsync();
 
       if (permission.status !== "granted") {
-        setChatError("Please allow location access.");
+        setChatError(t("chat.errorLocationAccess"));
         return;
       }
 
@@ -250,7 +255,7 @@ function FloatingActions({ navigation }) {
 
       await loadMessages(receiver.id);
     } catch (err) {
-      setChatError(err.response?.data?.message || "Failed to send location.");
+      setChatError(err.response?.data?.message || t("chat.errorSendLocation"));
     }
   };
 
@@ -309,7 +314,7 @@ function FloatingActions({ navigation }) {
     } catch {
       setAiMessages((prev) => [
         ...prev,
-        { role: "assistant", text: "AI assistant failed." },
+        { role: "assistant", text: t("aiChat.error") },
       ]);
     } finally {
       setAiLoading(false);
@@ -324,19 +329,23 @@ function FloatingActions({ navigation }) {
     return (
       <View
         key={item.id || index}
-        style={[styles.messageBubble, mine && styles.mineBubble]}
+        style={[
+          styles.messageBubble,
+          { backgroundColor: c.card, borderColor: c.border },
+          mine && { alignSelf: "flex-end", backgroundColor: c.primary, borderColor: c.primary },
+        ]}
       >
         {type === "image" ? (
           <Image source={{ uri: content }} style={styles.messageImage} />
         ) : type === "location" ? (
           <Text
-            style={[styles.messageText, mine && styles.mineText]}
+            style={[styles.messageText, { color: c.text }, mine && { color: "#fff" }]}
             onPress={() => Linking.openURL(content)}
           >
-            📍 Open Location
+            {t("chat.openSharedLocation")}
           </Text>
         ) : (
-          <Text style={[styles.messageText, mine && styles.mineText]}>
+          <Text style={[styles.messageText, { color: c.text }, mine && { color: "#fff" }]}>
             {content}
           </Text>
         )}
@@ -347,22 +356,22 @@ function FloatingActions({ navigation }) {
   return (
     <>
       <View pointerEvents="box-none" style={styles.floatingWrap}>
-        <TouchableOpacity style={styles.floatBtn} onPress={openChatList}>
-          <Text style={styles.floatText}>💬</Text>
+        <TouchableOpacity style={[styles.floatBtn, { backgroundColor: c.primary }]} onPress={openChatList}>
+          <Text style={styles.floatText}>{"💬"}</Text>
         </TouchableOpacity>
 
-        <TouchableOpacity style={styles.floatBtn} onPress={() => setAiOpen(true)}>
-          <Text style={styles.floatText}>✨</Text>
+        <TouchableOpacity style={[styles.floatBtn, { backgroundColor: c.primary }]} onPress={() => setAiOpen(true)}>
+          <Text style={styles.floatText}>{"✨"}</Text>
         </TouchableOpacity>
       </View>
 
       <Modal transparent visible={chatListOpen} animationType="slide">
-        <View style={styles.overlay}>
-          <View style={styles.bottomCard}>
+        <View style={[styles.overlay, { backgroundColor: c.overlay }]}>
+          <View style={[styles.bottomCard, { backgroundColor: c.card, borderColor: c.border }]}>
             <View style={styles.cardHeader}>
-              <Text style={styles.cardTitle}>Chat</Text>
+              <Text style={[styles.cardTitle, { color: c.text }]}>{t("nav.chat")}</Text>
               <TouchableOpacity onPress={() => setChatListOpen(false)}>
-                <Text style={styles.close}>✕</Text>
+                <Text style={[styles.close, { color: c.text }]}>{"✕"}</Text>
               </TouchableOpacity>
             </View>
 
@@ -374,32 +383,32 @@ function FloatingActions({ navigation }) {
 
             <ScrollView showsVerticalScrollIndicator={false}>
               {chatUsers.length === 0 ? (
-                <View style={styles.emptyCard}>
-                  <Text style={styles.emptyTitle}>No conversations</Text>
-                  <Text style={styles.emptyText}>Messages will appear here.</Text>
+                <View style={[styles.emptyCard, { backgroundColor: c.bg, borderColor: c.border }]}>
+                  <Text style={[styles.emptyTitle, { color: c.text }]}>{t("chat.noConversations")}</Text>
+                  <Text style={[styles.emptyText, { color: c.muted }]}>{t("chatList.noConversationsMsg")}</Text>
                 </View>
               ) : (
                 chatUsers.map((item, index) => (
                   <TouchableOpacity
                     key={item.id || item.user_id || index}
-                    style={styles.conversationItem}
+                    style={[styles.conversationItem, { backgroundColor: c.bg, borderColor: c.border }]}
                     onPress={() => openChatWith(item)}
                   >
-                    <View style={styles.smallAvatar}>
-                      <Text style={styles.smallAvatarText}>
+                    <View style={[styles.smallAvatar, { backgroundColor: c.primarySoft }]}>
+                      <Text style={[styles.smallAvatarText, { color: c.primary }]}>
                         {String(getReceiverName(item)).charAt(0).toUpperCase()}
                       </Text>
                     </View>
 
                     <View style={{ flex: 1 }}>
-                      <Text style={styles.conversationName}>
+                      <Text style={[styles.conversationName, { color: c.text }]}>
                         {getReceiverName(item)}
                       </Text>
-                      <Text style={styles.conversationLast} numberOfLines={1}>
+                      <Text style={[styles.conversationLast, { color: c.muted }]} numberOfLines={1}>
                         {item.last_message ||
                           item.message ||
                           item.snippet ||
-                          "Open conversation"}
+                          t("chat.openConversation")}
                       </Text>
                     </View>
                   </TouchableOpacity>
@@ -412,14 +421,14 @@ function FloatingActions({ navigation }) {
 
       <Modal transparent visible={chatOpen} animationType="slide">
         <KeyboardAvoidingView
-          style={styles.overlay}
+          style={[styles.overlay, { backgroundColor: c.overlay }]}
           behavior={Platform.OS === "ios" ? "padding" : undefined}
         >
-          <View style={styles.bottomCard}>
+          <View style={[styles.bottomCard, { backgroundColor: c.card, borderColor: c.border }]}>
             <View style={styles.cardHeader}>
-              <Text style={styles.cardTitle}>{receiver?.name || "Chat"}</Text>
+              <Text style={[styles.cardTitle, { color: c.text }]}>{receiver?.name || t("nav.chat")}</Text>
               <TouchableOpacity onPress={() => setChatOpen(false)}>
-                <Text style={styles.close}>✕</Text>
+                <Text style={[styles.close, { color: c.text }]}>{"✕"}</Text>
               </TouchableOpacity>
             </View>
 
@@ -431,13 +440,13 @@ function FloatingActions({ navigation }) {
 
             <ScrollView
               ref={scrollRef}
-              style={styles.messagesArea}
+              style={[styles.messagesArea, { backgroundColor: c.bg, borderColor: c.border }]}
               showsVerticalScrollIndicator={false}
             >
               {messages.length === 0 ? (
-                <View style={styles.emptyCard}>
-                  <Text style={styles.emptyTitle}>No messages yet</Text>
-                  <Text style={styles.emptyText}>Start the conversation.</Text>
+                <View style={[styles.emptyCard, { backgroundColor: c.bg, borderColor: c.border }]}>
+                  <Text style={[styles.emptyTitle, { color: c.text }]}>{t("chat.noMessages")}</Text>
+                  <Text style={[styles.emptyText, { color: c.muted }]}>{t("chat.startConversation")}</Text>
                 </View>
               ) : (
                 messages.map(renderMessage)
@@ -445,25 +454,26 @@ function FloatingActions({ navigation }) {
             </ScrollView>
 
             <View style={styles.toolsRow}>
-              <TouchableOpacity style={styles.toolBtn} onPress={sendImage}>
-                <Text style={styles.toolText}>📷 Image</Text>
+              <TouchableOpacity style={[styles.toolBtn, { backgroundColor: c.primarySoft }]} onPress={sendImage}>
+                <Text style={[styles.toolText, { color: c.primaryDark }]}>{t("chat.image")}</Text>
               </TouchableOpacity>
 
-              <TouchableOpacity style={styles.toolBtn} onPress={sendLocation}>
-                <Text style={styles.toolText}>📍 Location</Text>
+              <TouchableOpacity style={[styles.toolBtn, { backgroundColor: c.primarySoft }]} onPress={sendLocation}>
+                <Text style={[styles.toolText, { color: c.primaryDark }]}>{t("chat.location")}</Text>
               </TouchableOpacity>
             </View>
 
             <View style={styles.inputRow}>
               <TextInput
-                style={styles.messageInput}
+                style={[styles.messageInput, { borderColor: c.border, color: c.text, backgroundColor: c.inputBg }]}
                 value={chatText}
                 onChangeText={setChatText}
-                placeholder="Type a message..."
+                placeholder={t("chat.typePlaceholder")}
+                placeholderTextColor={c.muted}
               />
 
-              <TouchableOpacity style={styles.sendBtn} onPress={sendText}>
-                <Text style={styles.sendText}>Send</Text>
+              <TouchableOpacity style={[styles.sendBtn, { backgroundColor: c.primary }]} onPress={sendText}>
+                <Text style={styles.sendText}>{t("chat.send")}</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -472,30 +482,32 @@ function FloatingActions({ navigation }) {
 
       <Modal transparent visible={aiOpen} animationType="slide">
         <KeyboardAvoidingView
-          style={styles.overlay}
+          style={[styles.overlay, { backgroundColor: c.overlay }]}
           behavior={Platform.OS === "ios" ? "padding" : undefined}
         >
-          <View style={styles.bottomCard}>
+          <View style={[styles.bottomCard, { backgroundColor: c.card, borderColor: c.border }]}>
             <View style={styles.cardHeader}>
-              <Text style={styles.cardTitle}>AI Assistant</Text>
+              <Text style={[styles.cardTitle, { color: c.text }]}>{t("nav.aiAssistant")}</Text>
               <TouchableOpacity onPress={() => setAiOpen(false)}>
-                <Text style={styles.close}>✕</Text>
+                <Text style={[styles.close, { color: c.text }]}>{"✕"}</Text>
               </TouchableOpacity>
             </View>
 
-            <ScrollView style={styles.messagesArea}>
+            <ScrollView style={[styles.messagesArea, { backgroundColor: c.bg, borderColor: c.border }]}>
               {aiMessages.map((item, index) => (
                 <View
                   key={index}
                   style={[
                     styles.messageBubble,
-                    item.role === "user" && styles.mineBubble,
+                    { backgroundColor: c.card, borderColor: c.border },
+                    item.role === "user" && { alignSelf: "flex-end", backgroundColor: c.primary, borderColor: c.primary },
                   ]}
                 >
                   <Text
                     style={[
                       styles.messageText,
-                      item.role === "user" && styles.mineText,
+                      { color: c.text },
+                      item.role === "user" && { color: "#fff" },
                     ]}
                   >
                     {item.text}
@@ -508,8 +520,8 @@ function FloatingActions({ navigation }) {
               ))}
 
               {aiLoading ? (
-                <View style={styles.messageBubble}>
-                  <Text style={styles.messageText}>Thinking...</Text>
+                <View style={[styles.messageBubble, { backgroundColor: c.card, borderColor: c.border }]}>
+                  <Text style={[styles.messageText, { color: c.text }]}>{t("aiChat.thinking")}</Text>
                 </View>
               ) : null}
             </ScrollView>
@@ -518,25 +530,26 @@ function FloatingActions({ navigation }) {
               <View style={styles.previewBox}>
                 <Image source={{ uri: aiImage }} style={styles.previewImage} />
                 <TouchableOpacity onPress={() => setAiImage(null)}>
-                  <Text style={styles.removeImage}>Remove</Text>
+                  <Text style={styles.removeImage}>{t("aiChat.remove")}</Text>
                 </TouchableOpacity>
               </View>
             ) : null}
 
             <View style={styles.inputRow}>
-              <TouchableOpacity style={styles.aiImageBtn} onPress={pickAIImage}>
-                <Text style={styles.aiImageText}>📷</Text>
+              <TouchableOpacity style={[styles.aiImageBtn, { backgroundColor: c.primarySoft }]} onPress={pickAIImage}>
+                <Text style={styles.aiImageText}>{"📷"}</Text>
               </TouchableOpacity>
 
               <TextInput
-                style={styles.messageInput}
+                style={[styles.messageInput, { borderColor: c.border, color: c.text, backgroundColor: c.inputBg }]}
                 value={aiText}
                 onChangeText={setAiText}
-                placeholder="Ask AI..."
+                placeholder={t("aiChat.askPlaceholder")}
+                placeholderTextColor={c.muted}
               />
 
-              <TouchableOpacity style={styles.sendBtn} onPress={sendAI}>
-                <Text style={styles.sendText}>Send</Text>
+              <TouchableOpacity style={[styles.sendBtn, { backgroundColor: c.primary }]} onPress={sendAI}>
+                <Text style={styles.sendText}>{t("chat.send")}</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -558,7 +571,6 @@ const styles = StyleSheet.create({
     width: 66,
     height: 66,
     borderRadius: 24,
-    backgroundColor: colors.primary,
     justifyContent: "center",
     alignItems: "center",
     elevation: 7,
@@ -566,17 +578,14 @@ const styles = StyleSheet.create({
   floatText: { fontSize: 27 },
   overlay: {
     flex: 1,
-    backgroundColor: "rgba(31,22,51,0.38)",
     justifyContent: "flex-end",
   },
   bottomCard: {
-    backgroundColor: "#fff",
     borderTopLeftRadius: 30,
     borderTopRightRadius: 30,
     padding: 18,
     height: "66%",
     borderWidth: 1,
-    borderColor: colors.border,
   },
   cardHeader: {
     flexDirection: "row",
@@ -585,12 +594,10 @@ const styles = StyleSheet.create({
     marginBottom: 14,
   },
   cardTitle: {
-    color: colors.text,
     fontSize: 30,
     fontWeight: "900",
   },
   close: {
-    color: colors.text,
     fontSize: 34,
     fontWeight: "900",
   },
@@ -598,9 +605,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 14,
-    backgroundColor: "#FBFAFF",
     borderWidth: 1,
-    borderColor: colors.border,
     borderRadius: 22,
     padding: 14,
     marginBottom: 12,
@@ -609,72 +614,53 @@ const styles = StyleSheet.create({
     width: 56,
     height: 56,
     borderRadius: 20,
-    backgroundColor: colors.primarySoft,
     justifyContent: "center",
     alignItems: "center",
   },
   smallAvatarText: {
-    color: colors.primary,
     fontSize: 22,
     fontWeight: "900",
   },
   conversationName: {
-    color: colors.text,
     fontSize: 17,
     fontWeight: "900",
   },
   conversationLast: {
-    color: colors.muted,
     fontSize: 15,
     marginTop: 4,
   },
   emptyCard: {
-    backgroundColor: "#FBFAFF",
     borderWidth: 1,
-    borderColor: colors.border,
     borderRadius: 22,
     padding: 18,
   },
   emptyTitle: {
-    color: colors.text,
     fontSize: 17,
     fontWeight: "900",
   },
   emptyText: {
-    color: colors.muted,
     marginTop: 6,
     fontWeight: "700",
   },
   messagesArea: {
     flex: 1,
-    backgroundColor: "#FBFAFF",
     borderWidth: 1,
-    borderColor: colors.border,
     borderRadius: 22,
     padding: 12,
   },
   messageBubble: {
     maxWidth: "82%",
-    backgroundColor: "#fff",
     borderWidth: 1,
-    borderColor: colors.border,
     borderRadius: 18,
     padding: 12,
     marginBottom: 10,
     alignSelf: "flex-start",
   },
-  mineBubble: {
-    alignSelf: "flex-end",
-    backgroundColor: colors.primary,
-    borderColor: colors.primary,
-  },
   messageText: {
-    color: colors.text,
     fontSize: 15,
     lineHeight: 23,
     fontWeight: "700",
   },
-  mineText: { color: "#fff" },
   messageImage: {
     width: 190,
     height: 160,
@@ -688,13 +674,11 @@ const styles = StyleSheet.create({
   },
   toolBtn: {
     flex: 1,
-    backgroundColor: colors.primarySoft,
     borderRadius: 16,
     paddingVertical: 11,
     alignItems: "center",
   },
   toolText: {
-    color: colors.primaryDark,
     fontWeight: "900",
   },
   inputRow: {
@@ -708,15 +692,12 @@ const styles = StyleSheet.create({
     minHeight: 54,
     borderRadius: 18,
     borderWidth: 1,
-    borderColor: colors.border,
     paddingHorizontal: 14,
-    color: colors.text,
     fontSize: 15,
   },
   sendBtn: {
     minHeight: 54,
     borderRadius: 18,
-    backgroundColor: colors.primary,
     paddingHorizontal: 16,
     justifyContent: "center",
     alignItems: "center",
@@ -730,7 +711,6 @@ const styles = StyleSheet.create({
     width: 54,
     height: 54,
     borderRadius: 18,
-    backgroundColor: colors.primarySoft,
     justifyContent: "center",
     alignItems: "center",
   },

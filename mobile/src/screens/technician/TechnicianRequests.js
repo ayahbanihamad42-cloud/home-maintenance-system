@@ -12,6 +12,8 @@ import {
 import MapView, { Marker } from "react-native-maps";
 import * as Location from "expo-location";
 
+import { useTranslation } from "react-i18next";
+import { useTheme } from "../../context/ThemeContext";
 import Header from "../../components/Common/Header";
 import FloatingActions from "../../components/Common/FloatingActions";
 import HeroSection from "../../components/Common/HeroSection";
@@ -22,18 +24,20 @@ import {
 } from "../../services/technicianService";
 import appStyles, { colors } from "../../styles/mobileStyles";
 
-const requestStatuses = [
-  { label: "All", value: "all" },
-  { label: "Pending", value: "pending" },
-  { label: "Accepted", value: "accepted" },
-  { label: "On The Way", value: "on_the_way" },
-  { label: "In Progress", value: "in_progress" },
-  { label: "Completed", value: "completed" },
-  { label: "Rejected", value: "rejected" },
-  { label: "Cancelled", value: "cancelled" },
+const getRequestStatuses = (t) => [
+  { label: t("techRequests.statusAll"), value: "all" },
+  { label: t("techRequests.statusPending"), value: "pending" },
+  { label: t("techRequests.statusAccepted"), value: "accepted" },
+  { label: t("techRequests.statusOnTheWay"), value: "on_the_way" },
+  { label: t("techRequests.statusInProgress"), value: "in_progress" },
+  { label: t("techRequests.statusCompleted"), value: "completed" },
+  { label: t("techRequests.statusRejected"), value: "rejected" },
+  { label: t("techRequests.statusCancelled"), value: "cancelled" },
 ];
 
 function TechnicianRequests({ navigation }) {
+  const { t } = useTranslation();
+  const { c } = useTheme();
   const [requests, setRequests] = useState([]);
   const [statusFilter, setStatusFilter] = useState("all");
   const [message, setMessage] = useState(null);
@@ -90,7 +94,7 @@ function TechnicianRequests({ navigation }) {
       setRequests([]);
       setMessage({
         type: "error",
-        body: err?.response?.data?.message || "Failed to load requests.",
+        body: err?.response?.data?.message || t("techRequests.failedLoad"),
       });
     } finally {
       setLoading(false);
@@ -134,7 +138,7 @@ function TechnicianRequests({ navigation }) {
         if (!loc) {
           setMessage({
             type: "error",
-            body: "Please allow location access so the customer can track the technician.",
+            body: t("techRequests.allowLocation"),
           });
           return;
         }
@@ -152,15 +156,15 @@ function TechnicianRequests({ navigation }) {
         type: "success",
         body:
           cleanStatus === "on_the_way"
-            ? "Status updated and live location sent to the customer."
-            : "Request status updated successfully.",
+            ? t("techRequests.statusUpdatedLocation")
+            : t("techRequests.statusUpdatedSuccess"),
       });
 
       await loadRequests();
     } catch (err) {
       setMessage({
         type: "error",
-        body: err?.response?.data?.message || "Failed to update request status.",
+        body: err?.response?.data?.message || t("techRequests.failedUpdate"),
       });
     } finally {
       setUpdatingId(null);
@@ -180,7 +184,7 @@ function TechnicianRequests({ navigation }) {
       item.user_id || item.customer_id || item.client_id || item.request_user_id;
 
     if (!receiverId) {
-      Alert.alert("Chat", "Customer id is missing.");
+      Alert.alert(t("techRequests.chat"), t("techRequests.customerIdMissing"));
       return;
     }
 
@@ -200,9 +204,9 @@ function TechnicianRequests({ navigation }) {
 
     return (
       <View style={styles.mapCard}>
-        <Text style={styles.mapTitle}>{title}</Text>
+        <Text style={[styles.mapTitle, { color: c.text }]}>{title}</Text>
 
-        <View style={styles.mapWrap}>
+        <View style={[styles.mapWrap, { borderColor: c.border }]}>
           <MapView
             style={styles.map}
             initialRegion={{
@@ -217,7 +221,7 @@ function TechnicianRequests({ navigation }) {
         </View>
 
         <TouchableOpacity style={appStyles.secondaryBtn} onPress={() => openMap(loc)}>
-          <Text style={appStyles.secondaryBtnText}>Open Map</Text>
+          <Text style={appStyles.secondaryBtnText}>{t("techRequests.openMap")}</Text>
         </TouchableOpacity>
       </View>
     );
@@ -237,7 +241,7 @@ function TechnicianRequests({ navigation }) {
             onPress={() => updateStatus(requestId, "accepted")}
           >
             <Text style={appStyles.primaryBtnText}>
-              {disabled ? "Updating..." : "Accept"}
+              {disabled ? t("techRequests.updating") : t("techRequests.accept")}
             </Text>
           </TouchableOpacity>
 
@@ -246,7 +250,7 @@ function TechnicianRequests({ navigation }) {
             disabled={disabled}
             onPress={() => updateStatus(requestId, "rejected")}
           >
-            <Text style={appStyles.secondaryBtnText}>Reject</Text>
+            <Text style={appStyles.secondaryBtnText}>{t("techRequests.reject")}</Text>
           </TouchableOpacity>
         </View>
       );
@@ -260,7 +264,7 @@ function TechnicianRequests({ navigation }) {
           onPress={() => updateStatus(requestId, "on_the_way")}
         >
           <Text style={appStyles.primaryBtnText}>
-            {disabled ? "Getting Location..." : "On The Way"}
+            {disabled ? t("techRequests.gettingLocation") : t("techRequests.onTheWay")}
           </Text>
         </TouchableOpacity>
       );
@@ -274,7 +278,7 @@ function TechnicianRequests({ navigation }) {
           onPress={() => updateStatus(requestId, "in_progress")}
         >
           <Text style={appStyles.primaryBtnText}>
-            {disabled ? "Updating..." : "In Progress"}
+            {disabled ? t("techRequests.updating") : t("techRequests.inProgress")}
           </Text>
         </TouchableOpacity>
       );
@@ -288,7 +292,7 @@ function TechnicianRequests({ navigation }) {
           onPress={() => updateStatus(requestId, "completed")}
         >
           <Text style={appStyles.primaryBtnText}>
-            {disabled ? "Updating..." : "Completed"}
+            {disabled ? t("techRequests.updating") : t("techRequests.completed")}
           </Text>
         </TouchableOpacity>
       );
@@ -298,27 +302,27 @@ function TechnicianRequests({ navigation }) {
   };
 
   return (
-    <SafeAreaView style={appStyles.safe}>
-      <Header navigation={navigation} title="Requests" />
+    <SafeAreaView style={[appStyles.safe, { backgroundColor: c.bg }]}>
+      <Header navigation={navigation} title={t("techRequests.headerTitle")} />
 
       <ScrollView contentContainerStyle={appStyles.pageContent}>
         <HeroSection
-          title="Technician Requests"
-          subtitle="Manage assigned maintenance requests and update their status."
+          title={t("techRequests.title")}
+          subtitle={t("techRequests.subtitle")}
         />
 
-        <View style={styles.filterBox}>
+        <View style={[styles.filterBox, { backgroundColor: c.card, borderColor: c.border }]}>
           <View style={{ flex: 1 }}>
             <CustomDropdown
-              label="Status"
+              label={t("techRequests.statusLabel")}
               value={statusFilter}
-              options={requestStatuses}
+              options={getRequestStatuses(t)}
               onChange={setStatusFilter}
             />
           </View>
 
-          <TouchableOpacity style={styles.clearBtn} onPress={() => setStatusFilter("all")}>
-            <Text style={styles.clearText}>Clear</Text>
+          <TouchableOpacity style={[styles.clearBtn, { backgroundColor: c.primarySoft }]} onPress={() => setStatusFilter("all")}>
+            <Text style={[styles.clearText, { color: c.primary }]}>{t("techRequests.clear")}</Text>
           </TouchableOpacity>
         </View>
 
@@ -331,12 +335,12 @@ function TechnicianRequests({ navigation }) {
         ) : null}
 
         {loading ? (
-          <View style={appStyles.card}>
-            <Text style={appStyles.sectionTitle}>Loading...</Text>
+          <View style={[appStyles.card, { backgroundColor: c.card }]}>
+            <Text style={[appStyles.sectionTitle, { color: c.text }]}>{t("techRequests.loading")}</Text>
           </View>
         ) : filteredRequests.length === 0 ? (
-          <View style={appStyles.card}>
-            <Text style={appStyles.sectionTitle}>No requests found</Text>
+          <View style={[appStyles.card, { backgroundColor: c.card }]}>
+            <Text style={[appStyles.sectionTitle, { color: c.text }]}>{t("techRequests.noRequests")}</Text>
           </View>
         ) : (
           filteredRequests.map((item) => {
@@ -346,9 +350,9 @@ function TechnicianRequests({ navigation }) {
             const techLoc = getTechnicianLocation(item);
 
             return (
-              <View style={appStyles.card} key={requestId}>
+              <View style={[appStyles.card, { backgroundColor: c.card }]} key={requestId}>
                 <View style={appStyles.between}>
-                  <Text style={appStyles.sectionTitle}>Request #{requestId}</Text>
+                  <Text style={[appStyles.sectionTitle, { color: c.text }]}>{t("techRequests.requestId")} #{requestId}</Text>
                   <View style={appStyles.statusBadge}>
                     <Text style={appStyles.statusText}>
                       {status.replace(/_/g, " ")}
@@ -356,42 +360,42 @@ function TechnicianRequests({ navigation }) {
                   </View>
                 </View>
 
-                <Text style={appStyles.text}>
-                  Customer: {item.user_name || item.customer_name || "-"}
+                <Text style={[appStyles.text, { color: c.text }]}>
+                  {t("techRequests.customer")} {item.user_name || item.customer_name || "-"}
                 </Text>
-                <Text style={appStyles.text}>
-                  Phone: {item.user_phone || "-"}
+                <Text style={[appStyles.text, { color: c.text }]}>
+                  {t("techRequests.phone")} {item.user_phone || "-"}
                 </Text>
-                <Text style={appStyles.text}>
-                  Service: {item.service || item.service_type || "-"}
+                <Text style={[appStyles.text, { color: c.text }]}>
+                  {t("techRequests.service")} {item.service || item.service_type || "-"}
                 </Text>
-                <Text style={appStyles.text}>
-                  Date: {formatDateOnly(item.scheduled_date)}
+                <Text style={[appStyles.text, { color: c.text }]}>
+                  {t("techRequests.date")} {formatDateOnly(item.scheduled_date)}
                 </Text>
-                <Text style={appStyles.text}>
-                  Time: {formatTimeOnly(item.scheduled_time)}
+                <Text style={[appStyles.text, { color: c.text }]}>
+                  {t("techRequests.time")} {formatTimeOnly(item.scheduled_time)}
                 </Text>
-                <Text style={appStyles.text}>
-                  Payment: {item.payment_method || "-"}
+                <Text style={[appStyles.text, { color: c.text }]}>
+                  {t("techRequests.payment")} {item.payment_method || "-"}
                 </Text>
-                <Text style={appStyles.text}>
-                  Total: {Number(item.total_price || item.amount || 0).toFixed(2)} JOD
+                <Text style={[appStyles.text, { color: c.text }]}>
+                  {t("techRequests.total")} {Number(item.total_price || item.amount || 0).toFixed(2)} JOD
                 </Text>
-                <Text style={appStyles.mutedText}>
-                  Note: {item.location_note || item.city || "-"}
+                <Text style={[appStyles.mutedText, { color: c.muted }]}>
+                  {t("techRequests.note")} {item.location_note || item.city || "-"}
                 </Text>
-                <Text style={appStyles.mutedText}>
+                <Text style={[appStyles.mutedText, { color: c.muted }]}>
                   {item.description || "-"}
                 </Text>
 
-                {renderMap("Customer Location", userLoc)}
+                {renderMap(t("techRequests.customerLocation"), userLoc)}
 
-                {status === "on_the_way" && renderMap("Your Shared Live Location", techLoc)}
+                {status === "on_the_way" && renderMap(t("techRequests.sharedLiveLocation"), techLoc)}
 
                 {status === "accepted" ? (
                   <View style={appStyles.successBox}>
                     <Text style={appStyles.successText}>
-                      When you press On The Way, your live location will be shared with the customer.
+                      {t("techRequests.onTheWayHint")}
                     </Text>
                   </View>
                 ) : null}
@@ -401,14 +405,14 @@ function TechnicianRequests({ navigation }) {
                     style={[appStyles.secondaryBtn, { flex: 1 }]}
                     onPress={() => openCustomerChat(item)}
                   >
-                    <Text style={appStyles.secondaryBtnText}>Chat</Text>
+                    <Text style={appStyles.secondaryBtnText}>{t("techRequests.chat")}</Text>
                   </TouchableOpacity>
 
                   <TouchableOpacity
                     style={[appStyles.secondaryBtn, { flex: 1 }]}
                     onPress={() => openMap(userLoc)}
                   >
-                    <Text style={appStyles.secondaryBtnText}>Customer Map</Text>
+                    <Text style={appStyles.secondaryBtnText}>{t("techRequests.customerMap")}</Text>
                   </TouchableOpacity>
                 </View>
 

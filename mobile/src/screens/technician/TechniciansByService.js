@@ -8,6 +8,8 @@ import {
   TouchableOpacity,
   StyleSheet,
 } from "react-native";
+import { useTranslation } from "react-i18next";
+import { useTheme } from "../../context/ThemeContext";
 import Header from "../../components/Common/Header";
 import FloatingActions from "../../components/Common/FloatingActions";
 import HeroSection from "../../components/Common/HeroSection";
@@ -41,6 +43,8 @@ const ratingOptions = [
 ];
 
 function TechniciansByService({ route, navigation }) {
+  const { t } = useTranslation();
+  const { c } = useTheme();
   const service = route?.params?.service || "";
   const [technicians, setTechnicians] = useState([]);
   const [message, setMessage] = useState("");
@@ -55,7 +59,7 @@ function TechniciansByService({ route, navigation }) {
       setTechnicians(Array.isArray(res.data) ? res.data : []);
     } catch {
       setTechnicians([]);
-      setMessage("Failed to load technicians.");
+      setMessage(t("techByService.failedLoad"));
     }
   };
 
@@ -98,13 +102,13 @@ function TechniciansByService({ route, navigation }) {
   };
 
   return (
-    <SafeAreaView style={appStyles.safe}>
-      <Header navigation={navigation} title="Technicians" />
+    <SafeAreaView style={[appStyles.safe, { backgroundColor: c.bg }]}>
+      <Header navigation={navigation} title={t("techByService.headerTitle")} />
 
       <ScrollView contentContainerStyle={appStyles.pageContent}>
         <HeroSection
-          title={`${service} Technicians`}
-          subtitle="Choose a technician, filter by city or rating, and book your request."
+          title={`${service} ${t("techByService.technicians")}`}
+          subtitle={t("techByService.subtitle")}
         />
 
         {message ? (
@@ -113,19 +117,19 @@ function TechniciansByService({ route, navigation }) {
           </View>
         ) : null}
 
-        <View style={styles.filterBox}>
+        <View style={[styles.filterBox, { backgroundColor: c.card, borderColor: c.border }]}>
           <TextInput
-            style={styles.searchInput}
+            style={[styles.searchInput, { backgroundColor: c.inputBg, borderColor: c.border, color: c.text }]}
             value={search}
             onChangeText={setSearch}
-            placeholder="Search by name, city, phone..."
-            placeholderTextColor={colors.muted}
+            placeholder={t("techByService.searchPlaceholder")}
+            placeholderTextColor={c.muted}
           />
 
           <View style={styles.filterRow}>
             <View style={styles.filterHalf}>
               <CustomDropdown
-                label="City"
+                label={t("techByService.city")}
                 value={cityFilter}
                 options={cityOptions}
                 onChange={setCityFilter}
@@ -134,7 +138,7 @@ function TechniciansByService({ route, navigation }) {
 
             <View style={styles.filterHalf}>
               <CustomDropdown
-                label="Rating"
+                label={t("techByService.rating")}
                 value={ratingFilter}
                 options={ratingOptions}
                 onChange={setRatingFilter}
@@ -143,34 +147,34 @@ function TechniciansByService({ route, navigation }) {
           </View>
 
           <TouchableOpacity style={styles.clearSmallBtn} onPress={clearFilters}>
-            <Text style={styles.clearSmallText}>Clear Filters</Text>
+            <Text style={[styles.clearSmallText, { color: c.primary }]}>{t("techByService.clearFilters")}</Text>
           </TouchableOpacity>
         </View>
 
         {filtered.length === 0 ? (
-          <View style={appStyles.card}>
-            <Text style={appStyles.sectionTitle}>No technicians found</Text>
+          <View style={[appStyles.card, { backgroundColor: c.card }]}>
+            <Text style={[appStyles.sectionTitle, { color: c.text }]}>{t("techByService.noTechnicians")}</Text>
           </View>
         ) : (
           filtered.map((tech) => (
-            <View style={appStyles.card} key={tech.id || tech.technicianId}>
+            <View style={[appStyles.card, { backgroundColor: c.card }]} key={tech.id || tech.technicianId}>
               <View style={appStyles.between}>
-                <Text style={appStyles.sectionTitle}>{tech.name || "-"}</Text>
+                <Text style={[appStyles.sectionTitle, { color: c.text }]}>{tech.name || "-"}</Text>
                 <View style={appStyles.statusBadge}>
                   <Text style={appStyles.statusText}>{tech.service || "-"}</Text>
                 </View>
               </View>
 
-              <Text style={appStyles.text}>
-                Rating: ⭐ {Number(tech.rating || 0).toFixed(1)}
+              <Text style={[appStyles.text, { color: c.text }]}>
+                {t("techByService.ratingLabel")} ⭐ {Number(tech.rating || 0).toFixed(1)}
               </Text>
-              <Text style={appStyles.text}>City: {tech.city || "-"}</Text>
-              <Text style={appStyles.text}>Phone: {tech.phone || "-"}</Text>
-              <Text style={appStyles.text}>
-                Experience: {tech.experience || 0} years
+              <Text style={[appStyles.text, { color: c.text }]}>{t("techByService.cityLabel")} {tech.city || "-"}</Text>
+              <Text style={[appStyles.text, { color: c.text }]}>{t("techByService.phoneLabel")} {tech.phone || "-"}</Text>
+              <Text style={[appStyles.text, { color: c.text }]}>
+                {t("techByService.experienceLabel")} {tech.experience || 0} {t("techByService.years")}
               </Text>
-              <Text style={appStyles.text}>
-                Price: {Number(tech.price_per_hour || 0).toFixed(2)} JOD/hour
+              <Text style={[appStyles.text, { color: c.text }]}>
+                {t("techByService.priceLabel")} {Number(tech.price_per_hour || 0).toFixed(2)} JOD/{t("techByService.hour")}
               </Text>
 
               <TouchableOpacity
@@ -181,7 +185,7 @@ function TechniciansByService({ route, navigation }) {
                   })
                 }
               >
-                <Text style={appStyles.primaryBtnText}>View Profile</Text>
+                <Text style={appStyles.primaryBtnText}>{t("techByService.viewProfile")}</Text>
               </TouchableOpacity>
 
               <TouchableOpacity
@@ -195,7 +199,7 @@ function TechniciansByService({ route, navigation }) {
                   })
                 }
               >
-                <Text style={appStyles.secondaryBtnText}>Book Now</Text>
+                <Text style={appStyles.secondaryBtnText}>{t("techByService.bookNow")}</Text>
               </TouchableOpacity>
             </View>
           ))

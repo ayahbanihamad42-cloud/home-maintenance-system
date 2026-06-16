@@ -1,17 +1,21 @@
 import React from "react";
 import { View, Text, Pressable, StyleSheet } from "react-native";
 import { useNavigation } from "@react-navigation/native";
+import { useTranslation } from "react-i18next";
+import { useTheme } from "../../context/ThemeContext";
 
 function TechnicianCard({ technician }) {
   const navigation = useNavigation();
+  const { t } = useTranslation();
+  const { c } = useTheme();
 
   if (!technician) return null;
 
   return (
-    <View style={styles.card}>
-      <Text style={styles.name}>{technician.name}</Text>
-      <Text style={styles.info}>{technician.service}</Text>
-      <Text style={styles.info}>{technician.experience} years</Text>
+    <View style={[styles.card, { borderColor: c.border, backgroundColor: c.card }]}>
+      <Text style={[styles.name, { color: c.text }]}>{technician.name}</Text>
+      <Text style={[styles.info, { color: c.muted }]}>{technician.service}</Text>
+      <Text style={[styles.info, { color: c.muted }]}>{technician.experience} {t("cards.years")}</Text>
 
       <Pressable
         onPress={() =>
@@ -19,9 +23,9 @@ function TechnicianCard({ technician }) {
             technicianId: technician.technicianId,
           })
         }
-        style={styles.primaryBtn}
+        style={[styles.primaryBtn, { backgroundColor: c.primary }]}
       >
-        <Text style={styles.primaryBtnText}>Booking</Text>
+        <Text style={styles.primaryBtnText}>{t("cards.booking")}</Text>
       </Pressable>
 
       <Pressable
@@ -30,9 +34,9 @@ function TechnicianCard({ technician }) {
             technicianId: technician.technicianId,
           })
         }
-        style={styles.secondaryBtn}
+        style={[styles.secondaryBtn, { backgroundColor: c.primarySoft }]}
       >
-        <Text style={styles.secondaryBtnText}>View Profile</Text>
+        <Text style={[styles.secondaryBtnText, { color: c.text }]}>{t("cards.viewProfile")}</Text>
       </Pressable>
     </View>
   );
@@ -44,23 +48,18 @@ const styles = StyleSheet.create({
     marginVertical: 8,
     borderWidth: 1,
     borderRadius: 16,
-    borderColor: "#D8C8B8",
-    backgroundColor: "#FFF9F3",
   },
   name: {
     fontSize: 18,
     fontWeight: "bold",
-    color: "#111",
     marginBottom: 6,
   },
   info: {
     fontSize: 14,
-    color: "#444",
     marginBottom: 4,
   },
   primaryBtn: {
     marginTop: 12,
-    backgroundColor: "#111",
     padding: 12,
     borderRadius: 12,
     alignItems: "center",
@@ -71,13 +70,11 @@ const styles = StyleSheet.create({
   },
   secondaryBtn: {
     marginTop: 10,
-    backgroundColor: "#ECE2D6",
     padding: 12,
     borderRadius: 12,
     alignItems: "center",
   },
   secondaryBtnText: {
-    color: "#111",
     fontWeight: "700",
   },
 });

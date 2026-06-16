@@ -2,6 +2,8 @@ import React from "react";
 import { View, ActivityIndicator } from "react-native";
 import { NavigationContainer } from "@react-navigation/native";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
+import { ThemeProvider, useTheme } from "./src/context/ThemeContext";
+import "./src/i18n";
 
 import AdminRedirect from "./src/components/Common/AdminRedirect";
 import ProtectedRoute from "./src/components/Common/ProtectedRoute";
@@ -37,16 +39,17 @@ import ChatList from "./src/screens/ChatList";
 const Stack = createNativeStackNavigator();
 
 function LoadingScreen() {
+  const { c } = useTheme();
   return (
     <View
       style={{
         flex: 1,
-        backgroundColor: "#FBFAFF",
+        backgroundColor: c.bg,
         alignItems: "center",
         justifyContent: "center",
       }}
     >
-      <ActivityIndicator size="large" color="#7C3AED" />
+      <ActivityIndicator size="large" color={c.primary} />
     </View>
   );
 }
@@ -79,7 +82,9 @@ function AdminScreen({ children }) {
   );
 }
 
-export default function App() {
+function AppNavigator() {
+  const { c } = useTheme();
+
   return (
     <NavigationContainer fallback={<LoadingScreen />}>
       <Stack.Navigator
@@ -88,7 +93,7 @@ export default function App() {
           headerShown: false,
           animation: "slide_from_right",
           contentStyle: {
-            backgroundColor: "#FBFAFF",
+            backgroundColor: c.bg,
           },
         }}
       >
@@ -243,5 +248,13 @@ export default function App() {
         </Stack.Screen>
       </Stack.Navigator>
     </NavigationContainer>
+  );
+}
+
+export default function App() {
+  return (
+    <ThemeProvider>
+      <AppNavigator />
+    </ThemeProvider>
   );
 }

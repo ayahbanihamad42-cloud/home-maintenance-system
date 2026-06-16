@@ -12,15 +12,21 @@ import {
 import MapView, { Marker } from "react-native-maps";
 import * as Location from "expo-location";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { useTranslation } from "react-i18next";
+import { useTheme } from "../../context/ThemeContext";
 
 import Header from "../../components/Common/Header";
 import FloatingActions from "../../components/Common/FloatingActions";
 import HeroSection from "../../components/Common/HeroSection";
 import CustomDropdown from "../../components/Common/CustomDropdown";
 import API from "../../services/api";
-import appStyles, { colors } from "../../styles/mobileStyles";
+import { getStyles } from "../../styles/mobileStyles";
 
 function MaintenanceRequest({ route, navigation }) {
+  const { t } = useTranslation();
+  const { c } = useTheme();
+  const appStyles = getStyles(c);
+
   const params = route?.params || {};
   const stateTech = params.technician || params.tech || {};
 
@@ -119,7 +125,7 @@ function MaintenanceRequest({ route, navigation }) {
         price_per_hour: prev.price_per_hour || tech.price_per_hour || 0,
       }));
     } catch {
-      setMessage({ type: "error", text: "Failed to load technician data." });
+      setMessage({ type: "error", text: t("request.errors.loadTechnician") });
     }
   };
 
@@ -180,7 +186,7 @@ function MaintenanceRequest({ route, navigation }) {
       if (!unique.length) {
         setMessage({
           type: "error",
-          text: "No available times for this date.",
+          text: t("request.errors.noTimesForDate"),
         });
       }
     } catch (err) {
@@ -190,7 +196,7 @@ function MaintenanceRequest({ route, navigation }) {
         type: "error",
         text:
           err.response?.data?.message ||
-          "Failed to load available dates and times.",
+          t("request.errors.loadTimes"),
       });
     } finally {
       setTimesLoading(false);
@@ -198,9 +204,9 @@ function MaintenanceRequest({ route, navigation }) {
   };
 
   const timeOptions = useMemo(() => {
-    if (!form.scheduled_date) return [{ label: "Choose a date first", value: "" }];
-    if (timesLoading) return [{ label: "Loading available times...", value: "" }];
-    if (!availableTimes.length) return [{ label: "No available times", value: "" }];
+    if (!form.scheduled_date) return [{ label: t("request.chooseDateFirst"), value: "" }];
+    if (timesLoading) return [{ label: t("request.loadingTimes"), value: "" }];
+    if (!availableTimes.length) return [{ label: t("request.noTimes"), value: "" }];
     return availableTimes;
   }, [form.scheduled_date, timesLoading, availableTimes]);
 
@@ -219,7 +225,7 @@ function MaintenanceRequest({ route, navigation }) {
       if (permission.status !== "granted") {
         setMessage({
           type: "error",
-          text: "Please allow location access.",
+          text: t("request.errors.locationPermission"),
         });
         return;
       }
@@ -237,30 +243,30 @@ function MaintenanceRequest({ route, navigation }) {
         url: `https://www.google.com/maps?q=${lat},${lng}`,
       });
 
-      setMessage({ type: "success", text: "Your location has been added." });
+      setMessage({ type: "success", text: t("request.locationAdded") });
     } catch {
-      setMessage({ type: "error", text: "Failed to get your location." });
+      setMessage({ type: "error", text: t("request.errors.locationFailed") });
     } finally {
       setLocationLoading(false);
     }
   };
 
   const validate = () => {
-    if (!selectedTechnicianId) return "Please choose a technician.";
-    if (!form.scheduled_date) return "Please choose a date.";
-    if (!form.scheduled_time) return "Please choose a time.";
+    if (!selectedTechnicianId) return t("request.errors.chooseTechnician");
+    if (!form.scheduled_date) return t("request.errors.chooseDate");
+    if (!form.scheduled_time) return t("request.errors.chooseTime");
     if (!form.description.trim() || form.description.trim().length < 3) {
-      return "Description must be at least 3 characters.";
+      return t("request.errors.descriptionMin");
     }
     if (Number(form.estimated_hours || 0) < 1) {
-      return "Estimated hours must be at least 1.";
+      return t("request.errors.hoursMin");
     }
 
     const selectedTimeExists = availableTimes.some(
       (t) => normalizeTime(t.value) === normalizeTime(form.scheduled_time)
     );
 
-    if (!selectedTimeExists) return "Please choose an available time.";
+    if (!selectedTimeExists) return t("request.errors.chooseAvailableTime");
 
     return "";
   };
@@ -310,14 +316,14 @@ function MaintenanceRequest({ route, navigation }) {
 
       await API.post("/maintenance", payload);
 
-      Alert.alert("Success", "Request submitted successfully.");
+      Alert.alert(t("common.success"), t("request.submitSuccess"));
       navigation.navigate("MaintenanceHistory");
     } catch (err) {
       setMessage({
         type: "error",
         text:
           err.response?.data?.message ||
-          "Failed to submit request. Please choose another time.",
+          t("request.errors.submitFailed"),
       });
     } finally {
       setSubmitting(false);
@@ -326,15 +332,15 @@ function MaintenanceRequest({ route, navigation }) {
 
   return (
     <SafeAreaView style={appStyles.safe}>
-      <Header navigation={navigation} title="Request" />
+      <Header navigation={navigation} title={t("request.headerTitle")} />
 
       <ScrollView
         contentContainerStyle={appStyles.pageContent}
         keyboardShouldPersistTaps="handled"
       >
         <HeroSection
-          title="Maintenance Request"
-          subtitle="Choose an available time and submit your request."
+          title={t("request.title")}
+          subtitle={t("request.subtitle")}
         />
 
         {message ? (
@@ -358,10 +364,10 @@ function MaintenanceRequest({ route, navigation }) {
         ) : null}
 
         <View style={appStyles.card}>
-          <Text style={appStyles.label}>Service</Text>
+          <Text style={appStyles.label}>{t("request.service")}</Text>
           <TextInput style={appStyles.input} value={form.service} editable={false} />
 
-          <Text style={appStyles.label}>Technician</Text>
+          <Text style={appStyles.label}>{t("request.technician")}</Text>
           <TextInput
             style={appStyles.input}
             value={form.technician_name}
@@ -369,10 +375,10 @@ function MaintenanceRequest({ route, navigation }) {
           />
 
           <CustomDropdown
-            label="Date"
+            label={t("request.date")}
             value={form.scheduled_date}
             options={dateOptions}
-            placeholder="Choose date"
+            placeholder={t("request.chooseDatePlaceholder")}
             onChange={(value) => {
               updateField("scheduled_date", value);
               updateField("scheduled_time", "");
@@ -381,14 +387,14 @@ function MaintenanceRequest({ route, navigation }) {
           />
 
           <CustomDropdown
-            label="Time Slot"
+            label={t("request.timeSlot")}
             value={form.scheduled_time}
             options={timeOptions}
-            placeholder="Choose time"
+            placeholder={t("request.chooseTimePlaceholder")}
             onChange={(value) => updateField("scheduled_time", value)}
           />
 
-          <Text style={appStyles.label}>Estimated Hours</Text>
+          <Text style={appStyles.label}>{t("request.estimatedHours")}</Text>
           <TextInput
             style={appStyles.input}
             value={form.estimated_hours}
@@ -398,11 +404,11 @@ function MaintenanceRequest({ route, navigation }) {
             }
           />
 
-          <Text style={appStyles.label}>Payment Method</Text>
+          <Text style={appStyles.label}>{t("request.paymentMethod")}</Text>
           <View style={appStyles.row}>
             {[
-              { label: "Cash", value: "cash" },
-              { label: "Online", value: "online" },
+              { label: t("request.cash"), value: "cash" },
+              { label: t("request.online"), value: "online" },
             ].map((item) => {
               const active = form.payment_method === item.value;
 
@@ -413,7 +419,7 @@ function MaintenanceRequest({ route, navigation }) {
                     appStyles.secondaryBtn,
                     {
                       flex: 1,
-                      backgroundColor: active ? colors.primary : "#fff",
+                      backgroundColor: active ? c.primary : c.card,
                     },
                   ]}
                   onPress={() => updateField("payment_method", item.value)}
@@ -421,7 +427,7 @@ function MaintenanceRequest({ route, navigation }) {
                   <Text
                     style={[
                       appStyles.secondaryBtnText,
-                      { color: active ? "#fff" : colors.primary },
+                      { color: active ? "#fff" : c.primary },
                     ]}
                   >
                     {item.label}
@@ -433,17 +439,17 @@ function MaintenanceRequest({ route, navigation }) {
 
           <View style={appStyles.warningBox}>
             <Text style={appStyles.text}>
-              {Number(form.price_per_hour || 0).toFixed(2)} JOD/hour ×{" "}
+              {Number(form.price_per_hour || 0).toFixed(2)} JOD/{t("request.hour")} ×{" "}
               {form.estimated_hours || 1} = {totalPrice.toFixed(2)} JOD
             </Text>
           </View>
 
-          <Text style={appStyles.label}>Location Note</Text>
+          <Text style={appStyles.label}>{t("request.locationNote")}</Text>
           <TextInput
             style={appStyles.input}
             value={form.location_note}
             onChangeText={(value) => updateField("location_note", value)}
-            placeholder="Write address details..."
+            placeholder={t("request.locationPlaceholder")}
           />
 
           <TouchableOpacity
@@ -452,7 +458,7 @@ function MaintenanceRequest({ route, navigation }) {
             disabled={locationLoading}
           >
             <Text style={appStyles.secondaryBtnText}>
-              {locationLoading ? "Getting Location..." : "Use My Location"}
+              {locationLoading ? t("request.gettingLocation") : t("request.useMyLocation")}
             </Text>
           </TouchableOpacity>
 
@@ -476,7 +482,7 @@ function MaintenanceRequest({ route, navigation }) {
                     latitude: userLocation.lat,
                     longitude: userLocation.lng,
                   }}
-                  title="Your Location"
+                  title={t("request.yourLocation")}
                 />
               </MapView>
 
@@ -484,18 +490,18 @@ function MaintenanceRequest({ route, navigation }) {
                 style={appStyles.secondaryBtn}
                 onPress={() => Linking.openURL(userLocation.url)}
               >
-                <Text style={appStyles.secondaryBtnText}>Open Location</Text>
+                <Text style={appStyles.secondaryBtnText}>{t("request.openLocation")}</Text>
               </TouchableOpacity>
             </View>
           ) : null}
 
-          <Text style={appStyles.label}>Description</Text>
+          <Text style={appStyles.label}>{t("request.description")}</Text>
           <TextInput
             style={[appStyles.input, appStyles.textArea]}
             value={form.description}
             multiline
             onChangeText={(value) => updateField("description", value)}
-            placeholder="Describe the problem..."
+            placeholder={t("request.descriptionPlaceholder")}
           />
 
           <TouchableOpacity
@@ -505,10 +511,10 @@ function MaintenanceRequest({ route, navigation }) {
           >
             <Text style={appStyles.primaryBtnText}>
               {submitting
-                ? "Submitting..."
+                ? t("request.submitting")
                 : form.payment_method === "online"
-                ? "Continue to Payment"
-                : "Submit Request"}
+                ? t("request.continueToPayment")
+                : t("request.submitRequest")}
             </Text>
           </TouchableOpacity>
         </View>

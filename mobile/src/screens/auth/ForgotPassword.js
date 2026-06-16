@@ -6,10 +6,16 @@ import {
   TextInput,
   TouchableOpacity,
 } from "react-native";
+import { useTranslation } from "react-i18next";
+import { useTheme } from "../../context/ThemeContext";
 import API from "../../services/api";
-import appStyles from "../../styles/mobileStyles";
+import appStyles, { getStyles } from "../../styles/mobileStyles";
 
 const ForgotPasswordScreen = ({ navigation }) => {
+  const { t } = useTranslation();
+  const { c } = useTheme();
+  const appS = getStyles(c);
+
   const [email, setEmail] = useState("");
   const [message, setMessage] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -31,12 +37,12 @@ const ForgotPasswordScreen = ({ navigation }) => {
 
       setMessage({
         type: "success",
-        text: res.data?.message || "Reset link sent successfully.",
+        text: res.data?.message || t("forgot.success"),
       });
     } catch (err) {
       setMessage({
         type: "error",
-        text: err.response?.data?.message || "Failed to send reset link.",
+        text: err.response?.data?.message || t("forgot.failed"),
       });
     } finally {
       setLoading(false);
@@ -44,29 +50,29 @@ const ForgotPasswordScreen = ({ navigation }) => {
   };
 
   return (
-    <SafeAreaView style={appStyles.safe}>
-      <View style={appStyles.authContent}>
-        <Text style={appStyles.brandText}>خدمة</Text>
+    <SafeAreaView style={[appS.safe, { backgroundColor: c.bg }]}>
+      <View style={appS.authContent}>
+        <Text style={[appS.brandText, { color: c.primary }]}>{t("brand")}</Text>
 
-        <View style={appStyles.authCard}>
-          <Text style={appStyles.pageTitle}>Forgot Password</Text>
-          <Text style={appStyles.mutedText}>
-            Enter your email to receive a reset link.
+        <View style={[appS.authCard, { backgroundColor: c.card, borderColor: c.border }]}>
+          <Text style={[appS.pageTitle, { color: c.text }]}>{t("forgot.title")}</Text>
+          <Text style={[appS.mutedText, { color: c.muted }]}>
+            {t("forgot.subtitle")}
           </Text>
 
           {message && (
             <View
               style={
                 message.type === "error"
-                  ? appStyles.errorBox
-                  : appStyles.successBox
+                  ? appS.errorBox
+                  : appS.successBox
               }
             >
               <Text
                 style={
                   message.type === "error"
-                    ? appStyles.errorText
-                    : appStyles.successText
+                    ? appS.errorText
+                    : appS.successText
                 }
               >
                 {message.text}
@@ -74,31 +80,32 @@ const ForgotPasswordScreen = ({ navigation }) => {
             </View>
           )}
 
-          <Text style={appStyles.label}>Email</Text>
+          <Text style={[appS.label, { color: c.text }]}>{t("forgot.email")}</Text>
           <TextInput
-            style={appStyles.input}
+            style={[appS.input, { color: c.text, backgroundColor: c.inputBg, borderColor: c.border }]}
             value={email}
             onChangeText={setEmail}
-            placeholder="example@email.com"
+            placeholder={t("forgot.emailPlaceholder")}
+            placeholderTextColor={c.muted}
             autoCapitalize="none"
             keyboardType="email-address"
           />
 
           <TouchableOpacity
-            style={appStyles.primaryBtn}
+            style={appS.primaryBtn}
             onPress={send}
             disabled={loading}
           >
-            <Text style={appStyles.primaryBtnText}>
-              {loading ? "Sending..." : "Send Reset Link"}
+            <Text style={appS.primaryBtnText}>
+              {loading ? t("forgot.submit") + "..." : t("forgot.submit")}
             </Text>
           </TouchableOpacity>
 
           <TouchableOpacity
-            style={appStyles.secondaryBtn}
+            style={appS.secondaryBtn}
             onPress={() => navigation.navigate("Login")}
           >
-            <Text style={appStyles.secondaryBtnText}>Back to Login</Text>
+            <Text style={appS.secondaryBtnText}>{t("forgot.backToLogin")}</Text>
           </TouchableOpacity>
         </View>
       </View>

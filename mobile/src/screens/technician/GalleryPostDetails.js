@@ -8,11 +8,15 @@ import {
   TouchableOpacity,
   Modal,
 } from "react-native";
+import { useTranslation } from "react-i18next";
+import { useTheme } from "../../context/ThemeContext";
 import Header from "../../components/Common/Header";
 import FloatingActions from "../../components/Common/FloatingActions";
 import appStyles from "../../styles/mobileStyles";
 
 function GalleryPostDetails({ route, navigation }) {
+  const { t } = useTranslation();
+  const { c } = useTheme();
   const post = route?.params?.post || {};
 
   const images = useMemo(() => {
@@ -43,33 +47,33 @@ function GalleryPostDetails({ route, navigation }) {
   };
 
   return (
-    <SafeAreaView style={appStyles.safe}>
-      <Header navigation={navigation} title="Work Details" />
+    <SafeAreaView style={[appStyles.safe, { backgroundColor: c.bg }]}>
+      <Header navigation={navigation} title={t("galleryPost.title")} />
 
       <View style={appStyles.pageContent}>
         <View style={appStyles.hero}>
-          <Text style={appStyles.heroTitle}>Work Gallery</Text>
-          <Text style={appStyles.heroSubtitle}>
-            Work post details open as a card.
+          <Text style={[appStyles.heroTitle, { color: c.text }]}>{t("galleryPost.heroTitle")}</Text>
+          <Text style={[appStyles.heroSubtitle, { color: c.muted }]}>
+            {t("galleryPost.heroSubtitle")}
           </Text>
         </View>
       </View>
 
       <Modal transparent visible animationType="fade">
-        <View style={appStyles.modalOverlay}>
-          <View style={appStyles.modalBox}>
+        <View style={[appStyles.modalOverlay, { backgroundColor: c.overlay }]}>
+          <View style={[appStyles.modalBox, { backgroundColor: c.card }]}>
             <View style={appStyles.between}>
-              <Text style={appStyles.modalTitle}>Work Post Details</Text>
+              <Text style={[appStyles.modalTitle, { color: c.text }]}>{t("galleryPost.modalTitle")}</Text>
 
               <TouchableOpacity onPress={close}>
-                <Text style={{ fontSize: 28, fontWeight: "900" }}>✕</Text>
+                <Text style={{ fontSize: 28, fontWeight: "900", color: c.text }}>✕</Text>
               </TouchableOpacity>
             </View>
 
             <ScrollView showsVerticalScrollIndicator={false}>
               {images.length === 0 ? (
-                <View style={appStyles.card}>
-                  <Text style={appStyles.mutedText}>No images available.</Text>
+                <View style={[appStyles.card, { backgroundColor: c.card }]}>
+                  <Text style={[appStyles.mutedText, { color: c.muted }]}>{t("galleryPost.noImages")}</Text>
                 </View>
               ) : (
                 images.map((img, index) => (
@@ -81,27 +85,27 @@ function GalleryPostDetails({ route, navigation }) {
                       height: 260,
                       borderRadius: 22,
                       marginBottom: 14,
-                      backgroundColor: "#FBFAFF",
+                      backgroundColor: c.bg,
                     }}
                     resizeMode="contain"
                   />
                 ))
               )}
 
-              <View style={appStyles.card}>
-                <Text style={appStyles.text}>
-                  Description:{" "}
-                  {post.description || post.caption || "No description"}
+              <View style={[appStyles.card, { backgroundColor: c.card }]}>
+                <Text style={[appStyles.text, { color: c.text }]}>
+                  {t("galleryPost.description")}{" "}
+                  {post.description || post.caption || t("galleryPost.noDescription")}
                 </Text>
 
-                <Text style={appStyles.text}>
-                  Location:{" "}
-                  {post.location_note || post.location || "Not provided"}
+                <Text style={[appStyles.text, { color: c.text }]}>
+                  {t("galleryPost.location")}{" "}
+                  {post.location_note || post.location || t("galleryPost.notProvided")}
                 </Text>
               </View>
 
               <TouchableOpacity style={appStyles.primaryBtn} onPress={close}>
-                <Text style={appStyles.primaryBtnText}>Close</Text>
+                <Text style={appStyles.primaryBtnText}>{t("galleryPost.close")}</Text>
               </TouchableOpacity>
             </ScrollView>
           </View>

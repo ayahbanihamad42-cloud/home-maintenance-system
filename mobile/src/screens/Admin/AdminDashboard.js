@@ -14,6 +14,8 @@ import {
 } from "react-native";
 import DateTimePicker from "@react-native-community/datetimepicker";
 import * as ImagePicker from "expo-image-picker";
+import { useTranslation } from "react-i18next";
+import { useTheme } from "../../context/ThemeContext";
 
 import Header from "../../components/Common/Header";
 import FloatingActions from "../../components/Common/FloatingActions";
@@ -53,6 +55,9 @@ const jordanCityOptions = [
 ].map((city) => ({ label: city, value: city }));
 
 function AdminDashboard({ navigation }) {
+  const { t } = useTranslation();
+  const { c } = useTheme();
+
   const [activeTab, setActiveTab] = useState("users");
   const [users, setUsers] = useState([]);
   const [technicians, setTechnicians] = useState([]);
@@ -87,10 +92,10 @@ function AdminDashboard({ navigation }) {
   const [form, setForm] = useState(emptyForm);
 
   const tabs = [
-    { key: "users", label: "Users", icon: "👥" },
-    { key: "technicians", label: "Technicians", icon: "👷" },
-    { key: "stores", label: "Stores", icon: "🏬" },
-    { key: "services", label: "Services", icon: "🔧" },
+    { key: "users", label: t("admin.users"), icon: "👥" },
+    { key: "technicians", label: t("admin.technicians"), icon: "👷" },
+    { key: "stores", label: t("admin.stores"), icon: "🏬" },
+    { key: "services", label: t("admin.services"), icon: "🔧" },
   ];
 
   const load = async () => {
@@ -98,7 +103,7 @@ function AdminDashboard({ navigation }) {
       setLoading(true);
       setMessage("");
 
-      const [u, t, st, s] = await Promise.all([
+      const [u, tech, st, s] = await Promise.all([
         getAdminUsers(),
         getAdminTechnicians(),
         getAdminStores(),
@@ -106,11 +111,11 @@ function AdminDashboard({ navigation }) {
       ]);
 
       setUsers(Array.isArray(u) ? u : []);
-      setTechnicians(Array.isArray(t) ? t : []);
+      setTechnicians(Array.isArray(tech) ? tech : []);
       setStores(Array.isArray(st) ? st : []);
       setServices(Array.isArray(s) ? s : []);
     } catch (err) {
-      setMessage(err.response?.data?.message || "Failed to load admin data.");
+      setMessage(err.response?.data?.message || t("admin.errorLoad"));
     } finally {
       setLoading(false);
     }
@@ -131,12 +136,12 @@ function AdminDashboard({ navigation }) {
 
   const addTitle =
     activeTab === "users"
-      ? "Add User"
+      ? t("admin.addUser")
       : activeTab === "technicians"
-      ? "Add Technician"
+      ? t("admin.addTechnician")
       : activeTab === "stores"
-      ? "Add Store"
-      : "Add Service";
+      ? t("admin.addStore")
+      : t("admin.addService");
 
   const update = (key, value) => {
     setMessage("");
@@ -221,7 +226,7 @@ function AdminDashboard({ navigation }) {
       setForm(emptyForm);
       await load();
     } catch (err) {
-      setMessage(err.response?.data?.message || "Failed to add item.");
+      setMessage(err.response?.data?.message || t("admin.errorAdd"));
     } finally {
       setLoading(false);
     }
@@ -235,10 +240,10 @@ function AdminDashboard({ navigation }) {
     item.id;
 
   const deleteItem = (item) => {
-    Alert.alert("Delete", "Are you sure you want to delete this item?", [
-      { text: "Cancel", style: "cancel" },
+    Alert.alert(t("admin.delete"), t("admin.deleteConfirm"), [
+      { text: t("admin.cancel"), style: "cancel" },
       {
-        text: "Delete",
+        text: t("admin.delete"),
         style: "destructive",
         onPress: async () => {
           try {
@@ -249,7 +254,7 @@ function AdminDashboard({ navigation }) {
             if (activeTab === "services") await deleteAdminService(id);
             await load();
           } catch (err) {
-            setMessage(err.response?.data?.message || "Failed to delete item.");
+            setMessage(err.response?.data?.message || t("admin.errorDelete"));
           }
         },
       },
@@ -257,14 +262,14 @@ function AdminDashboard({ navigation }) {
   };
 
   const titleOf = (item) =>
-    item.name || item.store_name || item.service_name || item.service || "Item";
+    item.name || item.store_name || item.service_name || item.service || t("admin.item");
 
   const subOf = (item) => {
     if (activeTab === "users") return item.role || "user";
     if (activeTab === "technicians")
-      return item.service_name || item.service || "technician";
-    if (activeTab === "stores") return item.category || "store";
-    return "service";
+      return item.service_name || item.service || t("admin.technician");
+    if (activeTab === "stores") return item.category || t("admin.store");
+    return t("admin.service");
   };
 
   const imageOf = (item) =>
@@ -279,13 +284,13 @@ function AdminDashboard({ navigation }) {
 
     if (img) {
       return (
-        <Image source={{ uri: getBackendImageUrl(img) }} style={styles.avatar} />
+        <Image source={{ uri: getBackendImageUrl(img) }} style={[styles.avatar, { backgroundColor: c.primarySoft }]} />
       );
     }
 
     return (
-      <View style={styles.avatarFallback}>
-        <Text style={styles.avatarText}>
+      <View style={[styles.avatarFallback, { backgroundColor: c.primarySoft }]}>
+        <Text style={[styles.avatarText, { color: c.primary }]}>
           {String(titleOf(item)).charAt(0).toUpperCase()}
         </Text>
       </View>
@@ -296,11 +301,11 @@ function AdminDashboard({ navigation }) {
     if (activeTab === "users") {
       return (
         <>
-          <Text style={styles.info}>✉️ Email: {item.email || "-"}</Text>
-          <Text style={styles.info}>☎️ Phone: {item.phone || "-"}</Text>
-          <Text style={styles.info}>🎂 Birth Date: {item.dob || "-"}</Text>
-          <Text style={styles.info}>📍 City: {item.city || "-"}</Text>
-          <Text style={styles.info}>🪪 Role: {item.role || "-"}</Text>
+          <Text style={[styles.info, { color: c.text }]}>{"✉️"} {t("admin.email")}: {item.email || "-"}</Text>
+          <Text style={[styles.info, { color: c.text }]}>{"☎️"} {t("admin.phone")}: {item.phone || "-"}</Text>
+          <Text style={[styles.info, { color: c.text }]}>{"🎂"} {t("admin.birthDate")}: {item.dob || "-"}</Text>
+          <Text style={[styles.info, { color: c.text }]}>{"📍"} {t("admin.city")}: {item.city || "-"}</Text>
+          <Text style={[styles.info, { color: c.text }]}>{"🪪"} {t("admin.role")}: {item.role || "-"}</Text>
         </>
       );
     }
@@ -308,15 +313,15 @@ function AdminDashboard({ navigation }) {
     if (activeTab === "technicians") {
       return (
         <>
-          <Text style={styles.info}>✉️ Email: {item.email || "-"}</Text>
-          <Text style={styles.info}>☎️ Phone: {item.phone || "-"}</Text>
-          <Text style={styles.info}>📍 City: {item.city || "-"}</Text>
-          <Text style={styles.info}>
-            🛠 Service: {item.service_name || item.service || "-"}
+          <Text style={[styles.info, { color: c.text }]}>{"✉️"} {t("admin.email")}: {item.email || "-"}</Text>
+          <Text style={[styles.info, { color: c.text }]}>{"☎️"} {t("admin.phone")}: {item.phone || "-"}</Text>
+          <Text style={[styles.info, { color: c.text }]}>{"📍"} {t("admin.city")}: {item.city || "-"}</Text>
+          <Text style={[styles.info, { color: c.text }]}>
+            {"🛠"} {t("admin.service")}: {item.service_name || item.service || "-"}
           </Text>
-          <Text style={styles.info}>⭐ Experience: {item.experience || 0}</Text>
-          <Text style={styles.info}>
-            💰 Price: {item.price_per_hour || 0} JOD
+          <Text style={[styles.info, { color: c.text }]}>{"⭐"} {t("admin.experience")}: {item.experience || 0}</Text>
+          <Text style={[styles.info, { color: c.text }]}>
+            {"💰"} {t("admin.price")}: {item.price_per_hour || 0} JOD
           </Text>
         </>
       );
@@ -325,31 +330,31 @@ function AdminDashboard({ navigation }) {
     if (activeTab === "stores") {
       return (
         <>
-          <Text style={styles.info}>🏬 Store: {item.store_name || "-"}</Text>
-          <Text style={styles.info}>📦 Category: {item.category || "-"}</Text>
-          <Text style={styles.info}>📍 City: {item.city || "-"}</Text>
-          <Text style={styles.info}>🧭 Address: {item.address || "-"}</Text>
-          <Text style={styles.info}>👤 Owner: {item.owner_name || "-"}</Text>
+          <Text style={[styles.info, { color: c.text }]}>{"🏬"} {t("admin.store")}: {item.store_name || "-"}</Text>
+          <Text style={[styles.info, { color: c.text }]}>{"📦"} {t("admin.category")}: {item.category || "-"}</Text>
+          <Text style={[styles.info, { color: c.text }]}>{"📍"} {t("admin.city")}: {item.city || "-"}</Text>
+          <Text style={[styles.info, { color: c.text }]}>{"🧭"} {t("admin.address")}: {item.address || "-"}</Text>
+          <Text style={[styles.info, { color: c.text }]}>{"👤"} {t("admin.owner")}: {item.owner_name || "-"}</Text>
         </>
       );
     }
 
     return (
       <>
-        <Text style={styles.info}>🔧 Name: {item.name || "-"}</Text>
-        <Text style={styles.info}>🖼 Image: {item.image_url || "-"}</Text>
+        <Text style={[styles.info, { color: c.text }]}>{"🔧"} {t("admin.name")}: {item.name || "-"}</Text>
+        <Text style={[styles.info, { color: c.text }]}>{"🖼"} {t("admin.image")}: {item.image_url || "-"}</Text>
       </>
     );
   };
 
   const Field = ({ placeholder, value, onChangeText, secure = false }) => (
     <TextInput
-      style={styles.input}
+      style={[styles.input, { backgroundColor: c.inputBg, borderColor: c.border, color: c.text }]}
       placeholder={placeholder}
       value={value}
       onChangeText={onChangeText}
       secureTextEntry={secure}
-      placeholderTextColor={colors.muted}
+      placeholderTextColor={c.muted}
     />
   );
 
@@ -357,37 +362,37 @@ function AdminDashboard({ navigation }) {
     if (activeTab === "users") {
       return (
         <>
-          <Field placeholder="Name" value={form.name} onChangeText={(v) => update("name", v)} />
-          <Field placeholder="Email" value={form.email} onChangeText={(v) => update("email", v)} />
-          <Field placeholder="Phone" value={form.phone} onChangeText={(v) => update("phone", v)} />
+          <Field placeholder={t("admin.name")} value={form.name} onChangeText={(v) => update("name", v)} />
+          <Field placeholder={t("admin.email")} value={form.email} onChangeText={(v) => update("email", v)} />
+          <Field placeholder={t("admin.phone")} value={form.phone} onChangeText={(v) => update("phone", v)} />
 
           <TouchableOpacity
-            style={styles.input}
+            style={[styles.input, { backgroundColor: c.inputBg, borderColor: c.border }]}
             onPress={() => setShowDobPicker(true)}
           >
-            <Text style={{ color: form.dob ? colors.text : colors.muted }}>
-              {form.dob || "Birth Date"}
+            <Text style={{ color: form.dob ? c.text : c.muted }}>
+              {form.dob || t("admin.birthDate")}
             </Text>
           </TouchableOpacity>
 
           <CustomDropdown
-            label="City"
+            label={t("admin.city")}
             value={form.city}
             options={jordanCityOptions}
-            placeholder="Choose city"
+            placeholder={t("admin.chooseCity")}
             onChange={(v) => update("city", v)}
           />
 
-          <Field placeholder="Password" value={form.password} onChangeText={(v) => update("password", v)} secure />
+          <Field placeholder={t("admin.password")} value={form.password} onChangeText={(v) => update("password", v)} secure />
 
           <View style={styles.roleRow}>
             {["user", "technician", "admin"].map((role) => (
               <TouchableOpacity
                 key={role}
-                style={[styles.roleBtn, form.role === role && styles.roleBtnActive]}
+                style={[styles.roleBtn, { borderColor: c.border }, form.role === role && { backgroundColor: c.primary, borderColor: c.primary }]}
                 onPress={() => update("role", role)}
               >
-                <Text style={[styles.roleText, form.role === role && styles.roleTextActive]}>
+                <Text style={[styles.roleText, { color: c.text }, form.role === role && { color: "#FFFFFF" }]}>
                   {role}
                 </Text>
               </TouchableOpacity>
@@ -400,23 +405,23 @@ function AdminDashboard({ navigation }) {
     if (activeTab === "technicians") {
       return (
         <>
-          <Field placeholder="Name" value={form.name} onChangeText={(v) => update("name", v)} />
-          <Field placeholder="Email" value={form.email} onChangeText={(v) => update("email", v)} />
-          <Field placeholder="Phone" value={form.phone} onChangeText={(v) => update("phone", v)} />
+          <Field placeholder={t("admin.name")} value={form.name} onChangeText={(v) => update("name", v)} />
+          <Field placeholder={t("admin.email")} value={form.email} onChangeText={(v) => update("email", v)} />
+          <Field placeholder={t("admin.phone")} value={form.phone} onChangeText={(v) => update("phone", v)} />
 
           <CustomDropdown
-            label="City"
+            label={t("admin.city")}
             value={form.city}
             options={jordanCityOptions}
-            placeholder="Choose city"
+            placeholder={t("admin.chooseCity")}
             onChange={(v) => update("city", v)}
           />
 
-          <Field placeholder="Password" value={form.password} onChangeText={(v) => update("password", v)} secure />
-          <Field placeholder="Service Name" value={form.service} onChangeText={(v) => update("service", v)} />
-          <Field placeholder="Service ID optional" value={form.service_id} onChangeText={(v) => update("service_id", v)} />
-          <Field placeholder="Experience" value={form.experience} onChangeText={(v) => update("experience", v)} />
-          <Field placeholder="Price Per Hour" value={form.price_per_hour} onChangeText={(v) => update("price_per_hour", v)} />
+          <Field placeholder={t("admin.password")} value={form.password} onChangeText={(v) => update("password", v)} secure />
+          <Field placeholder={t("admin.serviceName")} value={form.service} onChangeText={(v) => update("service", v)} />
+          <Field placeholder={t("admin.serviceIdOptional")} value={form.service_id} onChangeText={(v) => update("service_id", v)} />
+          <Field placeholder={t("admin.experience")} value={form.experience} onChangeText={(v) => update("experience", v)} />
+          <Field placeholder={t("admin.pricePerHour")} value={form.price_per_hour} onChangeText={(v) => update("price_per_hour", v)} />
         </>
       );
     }
@@ -424,29 +429,29 @@ function AdminDashboard({ navigation }) {
     if (activeTab === "stores") {
       return (
         <>
-          <Field placeholder="Store Name" value={form.store_name} onChangeText={(v) => update("store_name", v)} />
-          <Field placeholder="Category" value={form.category} onChangeText={(v) => update("category", v)} />
+          <Field placeholder={t("admin.storeName")} value={form.store_name} onChangeText={(v) => update("store_name", v)} />
+          <Field placeholder={t("admin.category")} value={form.category} onChangeText={(v) => update("category", v)} />
 
           <CustomDropdown
-            label="City"
+            label={t("admin.city")}
             value={form.city}
             options={jordanCityOptions}
-            placeholder="Choose city"
+            placeholder={t("admin.chooseCity")}
             onChange={(v) => update("city", v)}
           />
 
-          <Field placeholder="Address" value={form.address} onChangeText={(v) => update("address", v)} />
-          <Field placeholder="Owner ID optional" value={form.owner_id} onChangeText={(v) => update("owner_id", v)} />
+          <Field placeholder={t("admin.address")} value={form.address} onChangeText={(v) => update("address", v)} />
+          <Field placeholder={t("admin.ownerIdOptional")} value={form.owner_id} onChangeText={(v) => update("owner_id", v)} />
         </>
       );
     }
 
     return (
       <>
-        <Field placeholder="Service Name" value={form.name} onChangeText={(v) => update("name", v)} />
+        <Field placeholder={t("admin.serviceName")} value={form.name} onChangeText={(v) => update("name", v)} />
 
         <TouchableOpacity style={appStyles.secondaryBtn} onPress={chooseServiceImage}>
-          <Text style={appStyles.secondaryBtnText}>Choose Service Image</Text>
+          <Text style={appStyles.secondaryBtnText}>{t("admin.chooseServiceImage")}</Text>
         </TouchableOpacity>
 
         {form.image_base64 ? (
@@ -465,13 +470,13 @@ function AdminDashboard({ navigation }) {
   };
 
   return (
-    <SafeAreaView style={appStyles.safe}>
-      <Header navigation={navigation} title="Admin" />
+    <SafeAreaView style={[appStyles.safe, { backgroundColor: c.bg }]}>
+      <Header navigation={navigation} title={t("admin.title")} />
 
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         <HeroSection
-          title="Admin Dashboard"
-          subtitle="Manage users, technicians, stores, and services."
+          title={t("admin.dashboardTitle")}
+          subtitle={t("admin.dashboardSubtitle")}
         />
 
         {message ? (
@@ -484,48 +489,48 @@ function AdminDashboard({ navigation }) {
           {tabs.map((tab) => (
             <TouchableOpacity
               key={tab.key}
-              style={[styles.tab, activeTab === tab.key && styles.activeTab]}
+              style={[styles.tab, { backgroundColor: c.card, borderColor: c.border }, activeTab === tab.key && { backgroundColor: c.primary, borderColor: c.primary }]}
               onPress={() => setActiveTab(tab.key)}
             >
-              <Text style={[styles.tabText, activeTab === tab.key && styles.activeTabText]}>
+              <Text style={[styles.tabText, { color: c.text }, activeTab === tab.key && { color: "#FFFFFF" }]}>
                 {tab.icon} {tab.label}
               </Text>
             </TouchableOpacity>
           ))}
         </View>
 
-        <TouchableOpacity style={styles.addButton} onPress={() => setAddVisible(true)}>
-          <Text style={styles.addText}>＋ {addTitle}</Text>
+        <TouchableOpacity style={[styles.addButton, { backgroundColor: c.primary }]} onPress={() => setAddVisible(true)}>
+          <Text style={styles.addText}>{"＋"} {addTitle}</Text>
         </TouchableOpacity>
 
         {loading ? (
-          <View style={styles.emptyCard}>
-            <Text style={styles.emptyText}>Loading...</Text>
+          <View style={[styles.emptyCard, { backgroundColor: c.card, borderColor: c.border }]}>
+            <Text style={[styles.emptyText, { color: c.muted }]}>{t("admin.loading")}</Text>
           </View>
         ) : list.length === 0 ? (
-          <View style={styles.emptyCard}>
-            <Text style={styles.emptyText}>No data found.</Text>
+          <View style={[styles.emptyCard, { backgroundColor: c.card, borderColor: c.border }]}>
+            <Text style={[styles.emptyText, { color: c.muted }]}>{t("admin.noData")}</Text>
           </View>
         ) : (
           list.map((item, index) => (
-            <View style={styles.card} key={getId(item) || index}>
+            <View style={[styles.card, { backgroundColor: c.card, borderColor: c.border }]} key={getId(item) || index}>
               <View style={styles.cardHeader}>
                 {renderAvatar(item)}
                 <View style={{ flex: 1 }}>
-                  <Text style={styles.cardTitle}>{titleOf(item)}</Text>
-                  <Text style={styles.cardSub}>{subOf(item)}</Text>
+                  <Text style={[styles.cardTitle, { color: c.text }]}>{titleOf(item)}</Text>
+                  <Text style={[styles.cardSub, { color: c.muted }]}>{subOf(item)}</Text>
                 </View>
               </View>
 
               <View style={styles.infoBox}>{renderRows(item)}</View>
 
               <View style={styles.actions}>
-                <TouchableOpacity style={styles.viewBtn} onPress={() => setViewItem(item)}>
-                  <Text style={styles.viewText}>👁 View</Text>
+                <TouchableOpacity style={[styles.viewBtn, { backgroundColor: c.primary }]} onPress={() => setViewItem(item)}>
+                  <Text style={styles.viewText}>{"👁"} {t("admin.view")}</Text>
                 </TouchableOpacity>
 
-                <TouchableOpacity style={styles.deleteBtn} onPress={() => deleteItem(item)}>
-                  <Text style={styles.deleteText}>🗑 Delete</Text>
+                <TouchableOpacity style={[styles.deleteBtn, { backgroundColor: c.card }]} onPress={() => deleteItem(item)}>
+                  <Text style={styles.deleteText}>{"🗑"} {t("admin.delete")}</Text>
                 </TouchableOpacity>
               </View>
             </View>
@@ -535,20 +540,20 @@ function AdminDashboard({ navigation }) {
 
       <Modal transparent visible={addVisible} animationType="fade">
         <View style={appStyles.modalOverlay}>
-          <View style={appStyles.modalBox}>
+          <View style={[appStyles.modalBox, { backgroundColor: c.card }]}>
             <View style={appStyles.between}>
-              <Text style={appStyles.modalTitle}>{addTitle}</Text>
+              <Text style={[appStyles.modalTitle, { color: c.text }]}>{addTitle}</Text>
               <TouchableOpacity onPress={() => setAddVisible(false)}>
-                <Text style={styles.close}>✕</Text>
+                <Text style={[styles.close, { color: c.text }]}>{"✕"}</Text>
               </TouchableOpacity>
             </View>
 
             <ScrollView showsVerticalScrollIndicator={false}>
               {renderForm()}
 
-              <TouchableOpacity style={styles.saveBtn} onPress={createItem}>
+              <TouchableOpacity style={[styles.saveBtn, { backgroundColor: c.primary }]} onPress={createItem}>
                 <Text style={styles.saveText}>
-                  {loading ? "Saving..." : addTitle}
+                  {loading ? t("admin.saving") : addTitle}
                 </Text>
               </TouchableOpacity>
             </ScrollView>
@@ -558,11 +563,11 @@ function AdminDashboard({ navigation }) {
 
       <Modal transparent visible={!!viewItem} animationType="fade">
         <View style={appStyles.modalOverlay}>
-          <View style={appStyles.modalBox}>
+          <View style={[appStyles.modalBox, { backgroundColor: c.card }]}>
             <View style={appStyles.between}>
-              <Text style={appStyles.modalTitle}>Details</Text>
+              <Text style={[appStyles.modalTitle, { color: c.text }]}>{t("admin.details")}</Text>
               <TouchableOpacity onPress={() => setViewItem(null)}>
-                <Text style={styles.close}>✕</Text>
+                <Text style={[styles.close, { color: c.text }]}>{"✕"}</Text>
               </TouchableOpacity>
             </View>
 
@@ -570,8 +575,8 @@ function AdminDashboard({ navigation }) {
               <ScrollView showsVerticalScrollIndicator={false}>
                 <View style={styles.viewHead}>
                   {renderAvatar(viewItem)}
-                  <Text style={styles.viewName}>{titleOf(viewItem)}</Text>
-                  <Text style={styles.cardSub}>{subOf(viewItem)}</Text>
+                  <Text style={[styles.viewName, { color: c.text }]}>{titleOf(viewItem)}</Text>
+                  <Text style={[styles.cardSub, { color: c.muted }]}>{subOf(viewItem)}</Text>
                 </View>
 
                 <View style={styles.infoBox}>{renderRows(viewItem)}</View>
@@ -611,27 +616,16 @@ const styles = StyleSheet.create({
     marginBottom: 14,
   },
   tab: {
-    backgroundColor: "#FFFFFF",
     borderWidth: 1,
-    borderColor: colors.border,
     borderRadius: 16,
     paddingVertical: 11,
     paddingHorizontal: 14,
   },
-  activeTab: {
-    backgroundColor: colors.primary,
-    borderColor: colors.primary,
-  },
   tabText: {
-    color: colors.text,
     fontSize: 14,
     fontWeight: "900",
   },
-  activeTabText: {
-    color: "#FFFFFF",
-  },
   addButton: {
-    backgroundColor: colors.primary,
     borderRadius: 18,
     paddingVertical: 15,
     alignItems: "center",
@@ -643,9 +637,7 @@ const styles = StyleSheet.create({
     fontWeight: "900",
   },
   card: {
-    backgroundColor: "#FFFFFF",
     borderWidth: 1,
-    borderColor: colors.border,
     borderRadius: 26,
     padding: 18,
     marginBottom: 18,
@@ -660,28 +652,23 @@ const styles = StyleSheet.create({
     width: 54,
     height: 54,
     borderRadius: 27,
-    backgroundColor: colors.primarySoft,
   },
   avatarFallback: {
     width: 54,
     height: 54,
     borderRadius: 27,
-    backgroundColor: colors.primarySoft,
     justifyContent: "center",
     alignItems: "center",
   },
   avatarText: {
-    color: colors.primary,
     fontSize: 24,
     fontWeight: "900",
   },
   cardTitle: {
-    color: colors.text,
     fontSize: 19,
     fontWeight: "900",
   },
   cardSub: {
-    color: colors.muted,
     fontSize: 14,
     fontWeight: "800",
     marginTop: 3,
@@ -690,7 +677,6 @@ const styles = StyleSheet.create({
     marginTop: 14,
   },
   info: {
-    color: colors.text,
     fontSize: 14,
     lineHeight: 24,
     fontWeight: "700",
@@ -702,7 +688,6 @@ const styles = StyleSheet.create({
   },
   viewBtn: {
     flex: 1,
-    backgroundColor: colors.primary,
     borderRadius: 15,
     paddingVertical: 12,
     alignItems: "center",
@@ -714,7 +699,6 @@ const styles = StyleSheet.create({
   },
   deleteBtn: {
     flex: 1,
-    backgroundColor: "#FFFFFF",
     borderWidth: 1,
     borderColor: "#E9C6D4",
     borderRadius: 15,
@@ -727,28 +711,22 @@ const styles = StyleSheet.create({
     fontSize: 14,
   },
   emptyCard: {
-    backgroundColor: "#FFFFFF",
     borderWidth: 1,
-    borderColor: colors.border,
     borderRadius: 24,
     padding: 24,
     alignItems: "center",
   },
   emptyText: {
-    color: colors.muted,
     fontSize: 16,
     fontWeight: "800",
   },
   input: {
-    backgroundColor: "#FFFFFF",
     borderWidth: 1,
-    borderColor: colors.border,
     borderRadius: 18,
     minHeight: 54,
     paddingHorizontal: 14,
     justifyContent: "center",
     fontSize: 15,
-    color: colors.text,
     marginBottom: 12,
   },
   roleRow: {
@@ -759,24 +737,14 @@ const styles = StyleSheet.create({
   roleBtn: {
     flex: 1,
     borderWidth: 1,
-    borderColor: colors.border,
     borderRadius: 14,
     paddingVertical: 12,
     alignItems: "center",
   },
-  roleBtnActive: {
-    backgroundColor: colors.primary,
-    borderColor: colors.primary,
-  },
   roleText: {
-    color: colors.text,
     fontWeight: "900",
   },
-  roleTextActive: {
-    color: "#FFFFFF",
-  },
   saveBtn: {
-    backgroundColor: colors.primary,
     borderRadius: 18,
     paddingVertical: 15,
     alignItems: "center",
@@ -788,7 +756,6 @@ const styles = StyleSheet.create({
     fontWeight: "900",
   },
   close: {
-    color: colors.text,
     fontSize: 28,
     fontWeight: "900",
   },
@@ -797,7 +764,6 @@ const styles = StyleSheet.create({
     marginBottom: 14,
   },
   viewName: {
-    color: colors.text,
     fontSize: 22,
     fontWeight: "900",
     marginTop: 10,

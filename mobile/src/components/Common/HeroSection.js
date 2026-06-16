@@ -1,5 +1,6 @@
 import React from "react";
 import { ImageBackground, View, Text, StyleSheet } from "react-native";
+import { useTheme } from "../../context/ThemeContext";
 import { colors } from "../../styles/mobileStyles";
 
 const heroImage = {
@@ -7,10 +8,12 @@ const heroImage = {
 };
 
 function HeroSection({ title, subtitle }) {
+  const { c } = useTheme();
+
   return (
     <ImageBackground
       source={heroImage}
-      style={styles.hero}
+      style={[styles.hero, { backgroundColor: c.primary }]}
       imageStyle={styles.heroImage}
     >
       <View style={styles.overlay}>
