@@ -3,6 +3,7 @@ import { View, ActivityIndicator } from "react-native";
 import { NavigationContainer } from "@react-navigation/native";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import { ThemeProvider, useTheme } from "./src/context/ThemeContext";
+import '@formatjs/intl-pluralrules/polyfill';
 import "./src/i18n";
 
 import AdminRedirect from "./src/components/Common/AdminRedirect";

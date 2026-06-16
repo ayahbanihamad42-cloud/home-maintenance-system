@@ -15,9 +15,9 @@ import HeroSection from "../../components/Common/HeroSection";
 import API from "../../services/api";
 import { getStyles } from "../../styles/mobileStyles";
 
-const localFallbackImages = {
+ const localFallbackImages = {
   Plumbing: require("../../assets/plumbing.png"),
-  Electrical: require("../../assets/electrical.png"),
+  Electrical: require("../../assets/Electrical.png"),
   Painting: require("../../assets/Painting.png"),
   Decoration: require("../../assets/Decoration.png"),
 };
