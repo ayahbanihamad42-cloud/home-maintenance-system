@@ -75,7 +75,7 @@ function MaintenanceRequest() {
     ? `https://www.google.com/maps?q=${userLocation.lat},${userLocation.lng}&z=17&output=embed`
     : "";
 
-  const isBooked = (item) => {
+  const isBooked = (item ) => {
     return (
       Number(item?.is_booked) === 1 ||
       item?.is_booked === true ||
@@ -131,7 +131,7 @@ function MaintenanceRequest() {
           lat,
           lng,
           url: `https://www.google.com/maps?q=${lat},${lng}`,
-        });
+        } );
 
         setMessage({
           type: "success",
@@ -368,19 +368,17 @@ function MaintenanceRequest() {
         user_location_url: userLocation?.url || null,
       };
 
-      const res = await createMaintenanceRequest(payload);
-      const requestId = res.requestId || res.id;
-
       if (form.payment_method === "online") {
         navigate("/payment", {
           state: {
-            requestId,
+            requestDraft: payload,
             amount: Number(totalPrice),
             technicianId: selectedTechnicianId,
             estimated_hours: Number(form.estimated_hours || 1),
           },
         });
       } else {
+        await createMaintenanceRequest(payload);
         navigate("/history");
       }
     } catch (err) {

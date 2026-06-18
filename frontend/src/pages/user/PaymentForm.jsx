@@ -3,13 +3,15 @@ import { useLocation, useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import Header from "../../components/common/Header";
 import { confirmOnlinePayment } from "../../services/paymentService";
+import { createMaintenanceRequest } from "../../services/maintenanceService";
 
 function PaymentForm() {
   const navigate = useNavigate();
   const location = useLocation();
   const { t } = useTranslation();
 
-  const requestId = location.state?.requestId || "";
+  const requestDraft = location.state?.requestDraft || null;
+  const requestIdFromState = location.state?.requestId || "";
   const amount = Number(location.state?.amount || location.state?.total_price || 0);
 
   const [form, setForm] = useState({
@@ -109,7 +111,7 @@ function PaymentForm() {
     const expiry = form.expiry.trim();
     const cvv = form.cvv.trim();
 
-    if (!requestId) {
+    if (!requestDraft && !requestIdFromState) {
       return t("payment.missingRequestId");
     }
 
@@ -172,7 +174,15 @@ function PaymentForm() {
     try {
       setLoading(true);
 
-      const res = await confirmOnlinePayment(requestId, {
+      let finalRequestId = requestIdFromState;
+
+      // If we have a draft, create the request now
+      if (requestDraft) {
+        const createRes = await createMaintenanceRequest(requestDraft);
+        finalRequestId = createRes.requestId || createRes.id;
+      }
+
+      const res = await confirmOnlinePayment(finalRequestId, {
         amount: Number(totalAmount),
         card_last_four: onlyNumbers(form.cardNumber).slice(-4),
       });
@@ -182,9 +192,9 @@ function PaymentForm() {
       setSuccess(t("payment.success"));
 
       setTimeout(() => {
-        navigate(`/payment-success/${requestId}`, {
+        navigate(`/payment-success/${finalRequestId}`, {
           state: {
-            requestId,
+            requestId: finalRequestId,
             amount: Number(totalAmount),
             transactionId,
             message:
@@ -220,9 +230,11 @@ function PaymentForm() {
 
           <form className="form-container" onSubmit={handlePay}>
             <div className="request-details-grid">
-              <p>
-                <strong>{t("payment.requestId")}:</strong> {requestId || "-"}
-              </p>
+              {requestIdFromState && (
+                <p>
+                  <strong>{t("payment.requestId")}:</strong> {requestIdFromState}
+                </p>
+              )}
 
               <p>
                 <strong>{t("payment.totalAmount")}:</strong> {totalAmount} JOD

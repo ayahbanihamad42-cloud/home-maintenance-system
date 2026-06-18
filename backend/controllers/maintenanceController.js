@@ -74,6 +74,35 @@ export const createMaintenanceRequest = async (req, res) => {
     const cleanDate = normalizeDate(scheduled_date);
     const cleanTime = normalizeTime(scheduled_time);
 
+    if (
+      !user_id ||
+      !finalTechnicianId ||
+      !finalService ||
+      !description ||
+      !cleanDate ||
+      !cleanTime
+    ) {
+      return res.status(400).json({ message: "Missing data" });
+    }
+
+    // ✅ التحقق من availability (مش equality!)
+    const availability = await query(
+      `SELECT * FROM technician_availability
+       WHERE technician_id = ?
+       AND DATE(available_date) = DATE(?)
+       AND TIME(?) BETWEEN start_time AND end_time
+       AND is_booked = 0
+       LIMIT 1`,
+      [finalTechnicianId, cleanDate, cleanTime]
+    );
+
+    if (!availability.length) {
+      return res.status(409).json({
+        message: "Technician not available at this time",
+      });
+    }
+
+    // ✅ منع تكرار نفس الوقت
     const exists = await query(
       `SELECT id FROM maintenance_requests
        WHERE technician_id = ?
@@ -85,9 +114,12 @@ export const createMaintenanceRequest = async (req, res) => {
     );
 
     if (exists.length) {
-      return res.status(409).json({ message: "Time not available" });
+      return res.status(409).json({
+        message: "Time already booked",
+      });
     }
 
+    // ✅ الإدخال
     const result = await query(
       `INSERT INTO maintenance_requests
       (user_id, technician_id, service, description, city, location_note,
@@ -112,12 +144,23 @@ export const createMaintenanceRequest = async (req, res) => {
       ]
     );
 
+    // ✅ حجز الـ slot
+    await query(
+      `UPDATE technician_availability
+       SET is_booked = 1
+       WHERE id = ?`,
+      [availability[0].id]
+    );
+
     return res.status(201).json({
       id: result.insertId,
-      message: "Created",
+      message: "Request created successfully",
     });
+
   } catch (err) {
-    return res.status(500).json({ message: err.message });
+    return res.status(500).json({
+      message: err.sqlMessage || err.message,
+    });
   }
 };
 

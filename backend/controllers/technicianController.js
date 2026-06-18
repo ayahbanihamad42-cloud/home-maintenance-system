@@ -13,6 +13,12 @@ const timeToMinutes = (time) => {
   return h * 60 + (m || 0);
 };
 
+const minutesToTime = (totalMinutes) => {
+  const h = Math.floor(totalMinutes / 60);
+  const m = totalMinutes % 60;
+  return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}:00`;
+};
+
 const addMinutes = (time, minutes) => {
   const [h, m] = String(time).slice(0, 5).split(":").map(Number);
   const date = new Date(2000, 0, 1, h, m || 0, 0);
@@ -214,7 +220,7 @@ Rules:
               parts: [{ text: prompt }],
             },
           ],
-        }),
+        } ),
       }
     );
 
@@ -450,7 +456,7 @@ export const createAvailability = (req, res) => {
     if (err) return res.status(500).json({ message: "Server error" });
     if (!technicianId) return res.status(404).json({ message: "Technician not found" });
 
-    // ✅ منع التكرار (كان ناقص)
+    // ✅ منع التكرار
     db.query(
       `
       SELECT id FROM technician_availability
@@ -629,7 +635,6 @@ export const getAvailabilityByTechnician = (req, res) => {
     return res.status(400).json({ message: "Technician ID and date are required" });
   }
 
-  // 1. جلب الحجوزات القائمة (تم إصلاح خطأ الـ SQL بتكرار SELECT)
   const bookedQuery = `
     SELECT scheduled_time, estimated_hours 
     FROM maintenance_requests 
@@ -647,7 +652,6 @@ export const getAvailabilityByTechnician = (req, res) => {
 
     const slots = [];
 
-    // 2. فحص الأوقات الاستثنائية
     const oneTimeQuery = `
       SELECT id, start_time, end_time, is_booked 
       FROM technician_availability 
@@ -659,7 +663,14 @@ export const getAvailabilityByTechnician = (req, res) => {
 
       if (oneTimeAvail && oneTimeAvail.length > 0) {
         oneTimeAvail.forEach((slot) => {
-          if (Number(slot.is_booked) === 0) {
+          const slotStart = timeToMinutes(slot.start_time);
+          const slotEnd = timeToMinutes(slot.end_time);
+
+          const isSlotBooked = bookedSlots.some((b) => {
+            return slotStart < b.end && slotEnd > b.start;
+          });
+
+          if (Number(slot.is_booked) === 0 && !isSlotBooked) {
             slots.push({
               id: slot.id,
               available_date: date,
@@ -669,17 +680,28 @@ export const getAvailabilityByTechnician = (req, res) => {
             });
           }
         });
-        return res.json(slots); 
+        return res.json(slots);
       }
 
-      const dayOfWeek = new Date(date).toLocaleDateString("en-US", { weekday: "long" });
+      const days = [
+        "Sunday",
+        "Monday",
+        "Tuesday",
+        "Wednesday",
+        "Thursday",
+        "Friday",
+        "Saturday",
+      ];
+      const dayOfWeek = days[new Date(date).getDay()];
       const regularQuery = `
         SELECT id, start_time, end_time 
         FROM technician_regular_availability 
-        WHERE technician_id = ? AND day_of_week = ?
+        WHERE technician_id = ? 
+        AND (day_of_week = ? OR day_of_week = 'All')
+        AND ? BETWEEN month_start AND month_end
       `;
 
-      db.query(regularQuery, [id, dayOfWeek], (err, regularAvail) => {
+      db.query(regularQuery, [id, dayOfWeek, date], (err, regularAvail) => {
         if (err) return res.status(500).json({ message: err.sqlMessage || err.message });
 
         if (regularAvail && regularAvail.length > 0) {
@@ -787,7 +809,7 @@ export const updateRequestStatus = (req, res) => {
       ? `https://www.google.com/maps?q=${lat},${lng}`
       : null;
 
-  findMyTechnicianId(req.user.id, (lookupErr, technicianId) => {
+  findMyTechnicianId(req.user.id, (lookupErr, technicianId ) => {
     if (lookupErr) return res.status(500).json({ message: "Server error" });
 
     if (!technicianId) {
@@ -1003,6 +1025,7 @@ export const updateGalleryPost = (req, res) => {
     );
   });
 };
+
 export const deleteGalleryPost = (req, res) => {
   const { postId } = req.params;
 
