@@ -30,5 +30,4 @@ router.get("/:id/gallery", tech.getTechnicianGallery);
 router.get("/:id/availability", tech.getAvailabilityByTechnician);
 router.get("/user/:userId", tech.getTechnicianByUserId);
 router.get("/:id", tech.getTechnicianById);
-
 export default router;

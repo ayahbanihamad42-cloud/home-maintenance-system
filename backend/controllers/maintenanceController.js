@@ -1,30 +1,21 @@
 import { db } from "../database/connection.js";
 
+/* ================= HELPERS ================= */
+
 const normalizeDate = (date) => {
   if (!date) return null;
-
   const value = String(date).trim();
 
-  if (/^\d{4}-\d{2}-\d{2}$/.test(value)) {
-    return value;
-  }
+  if (/^\d{4}-\d{2}-\d{2}$/.test(value)) return value;
 
   const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return value.slice(0, 10);
 
-  if (Number.isNaN(d.getTime())) {
-    return value.slice(0, 10);
-  }
-
-  const yyyy = d.getFullYear();
-  const mm = String(d.getMonth() + 1).padStart(2, "0");
-  const dd = String(d.getDate()).padStart(2, "0");
-
-  return `${yyyy}-${mm}-${dd}`;
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 };
 
 const normalizeTime = (time) => {
   if (!time) return null;
-
   const value = String(time).trim();
 
   if (/^\d{2}:\d{2}:\d{2}$/.test(value)) return value;
@@ -54,6 +45,8 @@ const buildUserLocationUrl = (lat, lng, existingUrl) => {
   return existingUrl || null;
 };
 
+/* ================= CREATE ================= */
+
 export const createMaintenanceRequest = async (req, res) => {
   try {
     const user_id = req.user?.id;
@@ -80,395 +73,131 @@ export const createMaintenanceRequest = async (req, res) => {
     const finalService = service || service_type;
     const cleanDate = normalizeDate(scheduled_date);
     const cleanTime = normalizeTime(scheduled_time);
-    const cleanPaymentMethod = String(payment_method || "cash").toLowerCase();
-
-    const cleanUserLat =
-      user_location_lat !== undefined && user_location_lat !== null
-        ? Number(user_location_lat)
-        : null;
-
-    const cleanUserLng =
-      user_location_lng !== undefined && user_location_lng !== null
-        ? Number(user_location_lng)
-        : null;
-
-    const hasUserLocation =
-      Number.isFinite(cleanUserLat) && Number.isFinite(cleanUserLng);
-
-    const cleanUserLocationUrl = buildUserLocationUrl(
-      cleanUserLat,
-      cleanUserLng,
-      user_location_url
-    );
-
-    if (
-      !user_id ||
-      !finalTechnicianId ||
-      !finalService ||
-      !description ||
-      !cleanDate ||
-      !cleanTime
-    ) {
-      return res.status(400).json({
-        message: "Missing required request data.",
-      });
-    }
-
-    if (!["cash", "online"].includes(cleanPaymentMethod)) {
-      return res.status(400).json({
-        message: "Invalid payment method.",
-      });
-    }
 
     const exists = await query(
-      `
-      SELECT id
-      FROM maintenance_requests
-      WHERE technician_id = ?
-        AND DATE(scheduled_date) = DATE(?)
-        AND scheduled_time = ?
-        AND status NOT IN ('cancelled', 'rejected')
-      LIMIT 1
-      `,
+      `SELECT id FROM maintenance_requests
+       WHERE technician_id = ?
+       AND DATE(scheduled_date) = DATE(?)
+       AND scheduled_time = ?
+       AND status NOT IN ('cancelled','rejected')
+       LIMIT 1`,
       [finalTechnicianId, cleanDate, cleanTime]
     );
 
-    if (exists.length > 0) {
-      return res.status(409).json({
-        message:
-          "This time slot is no longer available. Please choose another time.",
-      });
+    if (exists.length) {
+      return res.status(409).json({ message: "Time not available" });
     }
 
     const result = await query(
-      `
-      INSERT INTO maintenance_requests
-      (
-        user_id,
-        technician_id,
-        service,
-        description,
-        city,
-        location_note,
-        scheduled_date,
-        scheduled_time,
-        estimated_hours,
-        payment_method,
-        total_price,
-        user_location_lat,
-        user_location_lng,
-        user_location_url,
-        status
-      )
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending')
-      `,
+      `INSERT INTO maintenance_requests
+      (user_id, technician_id, service, description, city, location_note,
+       scheduled_date, scheduled_time, estimated_hours, payment_method,
+       total_price, user_location_lat, user_location_lng, user_location_url, status)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending')`,
       [
         user_id,
         finalTechnicianId,
         finalService,
         description,
-        city || location_note || "",
-        location_note || city || "",
+        city || "",
+        location_note || "",
         cleanDate,
         cleanTime,
         Number(estimated_hours || 1),
-        cleanPaymentMethod,
+        payment_method || "cash",
         Number(total_price || 0),
-        hasUserLocation ? cleanUserLat : null,
-        hasUserLocation ? cleanUserLng : null,
-        hasUserLocation ? cleanUserLocationUrl : null,
+        user_location_lat || null,
+        user_location_lng || null,
+        user_location_url || null,
       ]
     );
 
-    await query(
-      `
-      UPDATE technician_availability
-      SET is_booked = 1
-      WHERE technician_id = ?
-        AND DATE(available_date) = DATE(?)
-        AND start_time = ?
-      `,
-      [finalTechnicianId, cleanDate, cleanTime]
-    ).catch(() => null);
-
     return res.status(201).json({
       id: result.insertId,
-      requestId: result.insertId,
-      message: "Maintenance request created successfully.",
+      message: "Created",
     });
   } catch (err) {
-    if (err.code === "ER_DUP_ENTRY") {
-      return res.status(409).json({
-        message:
-          "This time slot is no longer available. Please choose another time.",
-      });
-    }
-
-    return res.status(500).json({
-      message: err.sqlMessage || err.message || "Failed to create request.",
-    });
+    return res.status(500).json({ message: err.message });
   }
 };
+
+/* ================= GET ================= */
 
 export const getUserMaintenanceRequests = async (req, res) => {
   try {
-    const requestedUserId = Number(req.params.user_id);
-    const loggedUserId = Number(req.user?.id);
-    const role = getRole(req);
-
-    if (!requestedUserId) {
-      return res.status(400).json({ message: "User id is required." });
-    }
-
-    if (role !== "admin" && requestedUserId !== loggedUserId) {
-      return res.status(403).json({
-        message: "You are not allowed to view another user's history.",
-      });
-    }
+    const userId = Number(req.params.user_id);
 
     const rows = await query(
-      `
-      SELECT 
-        mr.*,
-        DATE_FORMAT(mr.scheduled_date, '%Y-%m-%d') AS scheduled_date,
-        TIME_FORMAT(mr.scheduled_time, '%H:%i:%s') AS scheduled_time,
-        DATE_FORMAT(mr.created_at, '%Y-%m-%d %H:%i:%s') AS created_at,
-        u.name AS technician_name,
-        u.phone AS technician_phone
-      FROM maintenance_requests mr
-      LEFT JOIN technicians t ON t.id = mr.technician_id
-      LEFT JOIN users u ON u.id = t.user_id
-      WHERE mr.user_id = ?
-      ORDER BY mr.id DESC
-      `,
-      [requestedUserId]
+      `SELECT * FROM maintenance_requests WHERE user_id=? ORDER BY id DESC`,
+      [userId]
     );
 
-    return res.json(rows || []);
+    return res.json(rows);
   } catch (err) {
-    return res.status(500).json({
-      message: err.sqlMessage || err.message,
-    });
+    return res.status(500).json({ message: err.message });
   }
 };
 
-export const getMyMaintenanceRequests = async (req, res) => {
+export const getMyMaintenanceRequests = (req, res) => {
   req.params.user_id = req.user.id;
   return getUserMaintenanceRequests(req, res);
 };
 
 export const getMaintenanceRequestById = async (req, res) => {
   try {
-    const requestId = Number(req.params.id);
-    const loggedUserId = Number(req.user?.id);
-    const role = getRole(req);
+    const id = req.params.id;
 
     const rows = await query(
-      `
-      SELECT 
-        mr.*,
-        DATE_FORMAT(mr.scheduled_date, '%Y-%m-%d') AS scheduled_date,
-        TIME_FORMAT(mr.scheduled_time, '%H:%i:%s') AS scheduled_time,
-        DATE_FORMAT(mr.created_at, '%Y-%m-%d %H:%i:%s') AS created_at,
-        tu.name AS technician_name,
-        tu.phone AS technician_phone,
-        t.user_id AS technician_user_id,
-        uu.name AS user_name,
-        uu.phone AS user_phone
-      FROM maintenance_requests mr
-      LEFT JOIN technicians t ON t.id = mr.technician_id
-      LEFT JOIN users tu ON tu.id = t.user_id
-      LEFT JOIN users uu ON uu.id = mr.user_id
-      WHERE mr.id = ?
-      LIMIT 1
-      `,
-      [requestId]
+      `SELECT * FROM maintenance_requests WHERE id=? LIMIT 1`,
+      [id]
     );
 
     if (!rows.length) {
-      return res.status(404).json({ message: "Request not found." });
+      return res.status(404).json({ message: "Not found" });
     }
 
-    const request = rows[0];
-
-    const isOwner = Number(request.user_id) === loggedUserId;
-    const isAssignedTechnician =
-      request.technician_user_id &&
-      Number(request.technician_user_id) === loggedUserId;
-    const isAdmin = role === "admin";
-
-    if (!isOwner && !isAssignedTechnician && !isAdmin) {
-      return res.status(403).json({
-        message: "You are not allowed to view this request.",
-      });
-    }
-
-    return res.json(request);
+    return res.json(rows[0]);
   } catch (err) {
-    return res.status(500).json({
-      message: err.sqlMessage || err.message,
-    });
+    return res.status(500).json({ message: err.message });
   }
 };
+
+/* ================= UPDATE ================= */
 
 export const updateMaintenanceRequestStatus = async (req, res) => {
   try {
-    const requestId = Number(req.params.id);
-    const loggedUserId = Number(req.user?.id);
-    const role = getRole(req);
-    const cleanStatus = String(req.body.status || "").toLowerCase();
-
-    const allowed = [
-      "pending",
-      "accepted",
-      "confirmed",
-      "on_the_way",
-      "in_progress",
-      "completed",
-      "rejected",
-      "cancelled",
-    ];
-
-    if (!allowed.includes(cleanStatus)) {
-      return res.status(400).json({ message: "Invalid status." });
-    }
-
-    const rows = await query(
-      `
-      SELECT 
-        mr.id,
-        mr.user_id,
-        mr.technician_id,
-        t.user_id AS technician_user_id
-      FROM maintenance_requests mr
-      LEFT JOIN technicians t ON t.id = mr.technician_id
-      WHERE mr.id = ?
-      LIMIT 1
-      `,
-      [requestId]
-    );
-
-    if (!rows.length) {
-      return res.status(404).json({ message: "Request not found." });
-    }
-
-    const request = rows[0];
-
-    const isAdmin = role === "admin";
-    const isAssignedTechnician =
-      request.technician_user_id &&
-      Number(request.technician_user_id) === loggedUserId;
-
-    if (!isAdmin && !isAssignedTechnician) {
-      return res.status(403).json({
-        message: "Only the assigned technician or admin can update this status.",
-      });
-    }
+    const id = req.params.id;
+    const status = req.body.status;
 
     await query(
-      `
-      UPDATE maintenance_requests
-      SET status = ?
-      WHERE id = ?
-      `,
-      [cleanStatus, requestId]
+      `UPDATE maintenance_requests SET status=? WHERE id=?`,
+      [status, id]
     );
 
-    return res.json({
-      message: "Request status updated successfully.",
-    });
+    return res.json({ message: "Updated" });
   } catch (err) {
-    return res.status(500).json({
-      message: err.sqlMessage || err.message,
-    });
+    return res.status(500).json({ message: err.message });
   }
 };
+
+/* ================= CANCEL ================= */
 
 export const cancelMaintenanceRequest = async (req, res) => {
   try {
-    const requestId = req.params.id;
-    const userId = req.user?.id;
-
-    const rows = await query(
-      `
-      SELECT *
-      FROM maintenance_requests
-      WHERE id = ? AND user_id = ?
-      LIMIT 1
-      `,
-      [requestId, userId]
-    );
-
-    if (!rows.length) {
-      return res.status(404).json({ message: "Request not found." });
-    }
-
-    const request = rows[0];
-
-    if (String(request.status || "").toLowerCase() !== "pending") {
-      return res.status(409).json({
-        message:
-          "This request cannot be cancelled because the technician already accepted or started it.",
-      });
-    }
+    const id = req.params.id;
 
     await query(
-      "UPDATE maintenance_requests SET status = 'cancelled' WHERE id = ?",
-      [requestId]
+      `UPDATE maintenance_requests SET status='cancelled' WHERE id=?`,
+      [id]
     );
 
-    await query(
-      `
-      UPDATE technician_availability
-      SET is_booked = 0
-      WHERE technician_id = ?
-        AND DATE(available_date) = DATE(?)
-        AND start_time = ?
-      `,
-      [
-        request.technician_id,
-        normalizeDate(request.scheduled_date),
-        normalizeTime(request.scheduled_time),
-      ]
-    ).catch(() => null);
-
-    const isOnline =
-      String(request.payment_method || "").toLowerCase() === "online";
-
-    if (isOnline) {
-      await query(
-        `
-        UPDATE payments
-        SET status = 'refunded'
-        WHERE request_id = ?
-        `,
-        [requestId]
-      ).catch(() => null);
-
-      await query(
-        `
-        INSERT INTO notifications (user_id, title, message, is_read)
-        VALUES (?, ?, ?, 0)
-        `,
-        [
-          userId,
-          "Refund Processed",
-          `Your mock online payment for request #${requestId} was refunded successfully.`,
-        ]
-      ).catch(() => null);
-    }
-
-    return res.json({
-      message: isOnline
-        ? "Request cancelled successfully. Your online payment refund has been processed."
-        : "Request cancelled successfully.",
-    });
+    return res.json({ message: "Cancelled" });
   } catch (err) {
-    return res.status(500).json({
-      message: err.sqlMessage || err.message,
-    });
+    return res.status(500).json({ message: err.message });
   }
 };
+
+/* ================= PAYMENT ================= */
 
 export const confirmOnlinePayment = async (req, res) => {
   try {
@@ -476,73 +205,31 @@ export const confirmOnlinePayment = async (req, res) => {
     const userId = req.user.id;
 
     const rows = await query(
-      `
-      SELECT *
-      FROM maintenance_requests
-      WHERE id = ? AND user_id = ?
-      LIMIT 1
-      `,
+      `SELECT * FROM maintenance_requests WHERE id=? AND user_id=?`,
       [requestId, userId]
     );
 
     if (!rows.length) {
-      return res.status(404).json({ message: "Request not found." });
+      return res.status(404).json({ message: "Not found" });
     }
 
     const request = rows[0];
     const amount = Number(req.body.amount || request.total_price || 0);
-    const transactionId = `mock_txn_${Date.now()}`;
 
-    if (!amount || amount <= 0) {
-      return res.status(400).json({ message: "Valid amount is required." });
-    }
+    const transactionId = `txn_${Date.now()}`;
 
     await query(
-      `
-      INSERT INTO payments
+      `INSERT INTO payments
       (request_id, user_id, technician_id, amount, transaction_id, status)
-      VALUES (?, ?, ?, ?, ?, 'paid')
-      `,
+      VALUES (?, ?, ?, ?, ?, 'paid')`,
       [requestId, userId, request.technician_id, amount, transactionId]
     );
 
-    const techRows = await query(
-      `
-      SELECT u.id AS technician_user_id
-      FROM technicians t
-      JOIN users u ON u.id = t.user_id
-      WHERE t.id = ?
-      LIMIT 1
-      `,
-      [request.technician_id]
-    );
-
-    const technicianUserId = techRows[0]?.technician_user_id;
-
-    if (technicianUserId) {
-      await query(
-        `
-        INSERT INTO notifications (user_id, title, message, is_read)
-        VALUES (?, ?, ?, 0)
-        `,
-        [
-          technicianUserId,
-          "Online Payment Received",
-          `A mock online payment of ${amount.toFixed(
-            2
-          )} JOD was deposited for request #${requestId}.`,
-        ]
-      ).catch(() => null);
-    }
-
     return res.json({
-      message: "Payment confirmed successfully.",
+      message: "Payment success",
       transactionId,
-      amount,
     });
   } catch (err) {
-    return res.status(500).json({
-      message: err.sqlMessage || err.message,
-    });
+    return res.status(500).json({ message: err.message });
   }
 };

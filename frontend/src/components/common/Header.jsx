@@ -38,8 +38,11 @@ function Header() {
   const [aiLoading, setAiLoading] = useState(false);
   const aiFileRef = useRef(null);
 
-  const unreadCount = useMemo(() => notifications.length, [notifications]);
+  const isFetchingNotifications = useRef(false);
+  const isFetchingConversations = useRef(false);
+  const isFetchingChatMessages = useRef(false);
 
+  const unreadCount = useMemo(() => notifications.length, [notifications]);
   const currentLang = i18n.language?.startsWith("ar") ? "ar" : "en";
 
   const changeLanguage = (lang) => {
@@ -55,38 +58,55 @@ function Header() {
   }, [i18n.language]);
 
   const loadNotifications = async () => {
+    // حماية إضافية: إذا لم يكن هناك مستخدم مسجل لا تطلب الإشعارات
+    const currentUser = JSON.parse(localStorage.getItem("user") || "{}");
+    if (!currentUser.id) return;
+
+    if (isFetchingNotifications.current) return;
     try {
+      isFetchingNotifications.current = true;
       const data = await getNotificationFeed();
       setNotifications(Array.isArray(data) ? data : []);
     } catch (err) {
       console.error("notifications error:", err);
       setNotifications([]);
+    } finally {
+      isFetchingNotifications.current = false;
     }
   };
 
   const loadConversations = async () => {
+    if (isFetchingConversations.current) return;
     try {
+      isFetchingConversations.current = true;
       const data = await getChatConversations();
       setConversations(Array.isArray(data) ? data : []);
     } catch {
       setConversations([]);
+    } finally {
+      isFetchingConversations.current = false;
     }
   };
 
   const loadChatMessages = async (chatUserId) => {
-    if (!chatUserId) return;
+    if (!chatUserId || isFetchingChatMessages.current) return;
     try {
+      isFetchingChatMessages.current = true;
       const data = await getChatMessages(chatUserId);
       setChatMessages(Array.isArray(data) ? data : []);
     } catch {
       setChatMessages([]);
+    } finally {
+      isFetchingChatMessages.current = false;
     }
   };
 
+  // تعديل: جلب الإشعارات فقط لو المستخدم مسجل دخوله لمنع الـ Loops العشوائية بالـ Login
   useEffect(() => {
-    loadNotifications();
-    const timer = setInterval(loadNotifications, 8000);
-    return () => clearInterval(timer);
+    const currentUser = JSON.parse(localStorage.getItem("user") || "{}");
+    if (currentUser.id) {
+      loadNotifications();
+    }
   }, []);
 
   useEffect(() => {
@@ -98,7 +118,7 @@ function Header() {
     loadChatMessages(selectedChatUser.userId);
     const timer = setInterval(
       () => loadChatMessages(selectedChatUser.userId),
-      3000
+      5000
     );
     return () => clearInterval(timer);
   }, [selectedChatUser?.userId]);
@@ -277,8 +297,7 @@ function Header() {
         ...prev,
         {
           role: "ai",
-          text:
-            err.response?.data?.reply || t("aiChat.error"),
+          text: err.response?.data?.reply || t("aiChat.error"),
         },
       ]);
     } finally {
@@ -378,7 +397,13 @@ function Header() {
             <button
               className="icon-button"
               type="button"
-              onClick={() => setShowNotifications((prev) => !prev)}
+              onClick={() => {
+                const nextState = !showNotifications;
+                setShowNotifications(nextState);
+                if (nextState) {
+                  loadNotifications();
+                }
+              }}
             >
               🔔
             </button>

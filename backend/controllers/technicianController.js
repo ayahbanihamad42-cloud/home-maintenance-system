@@ -443,60 +443,50 @@ export const createAvailability = (req, res) => {
     });
   }
 
-  const selectedDate = new Date(`${available_date}T00:00:00`);
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
+  const cleanStart = normalizeTime(start_time);
+  const cleanEnd = normalizeTime(end_time);
 
-  if (Number.isNaN(selectedDate.getTime())) {
-    return res.status(400).json({
-      message: "Invalid date format. Use YYYY-MM-DD",
-    });
-  }
+  findMyTechnicianId(req.user.id, (err, technicianId) => {
+    if (err) return res.status(500).json({ message: "Server error" });
+    if (!technicianId) return res.status(404).json({ message: "Technician not found" });
 
-  if (selectedDate < today) {
-    return res.status(400).json({
-      message: "You cannot add availability for a past date",
-    });
-  }
-
-  if (timeToMinutes(start_time) >= timeToMinutes(end_time)) {
-    return res.status(400).json({
-      message: "End time must be after start time",
-    });
-  }
-
-  findMyTechnicianId(req.user.id, (lookupErr, technicianId) => {
-    if (lookupErr) return res.status(500).json({ message: "Server error" });
-    if (!technicianId) {
-      return res.status(404).json({ message: "Technician not found" });
-    }
-
+    // ✅ منع التكرار (كان ناقص)
     db.query(
       `
-      INSERT INTO technician_availability
-      (technician_id, available_date, start_time, end_time, is_booked)
-      VALUES (?, ?, ?, ?, 0)
+      SELECT id FROM technician_availability
+      WHERE technician_id = ?
+      AND DATE(available_date) = DATE(?)
+      AND start_time = ?
       `,
-      [
-        technicianId,
-        available_date,
-        normalizeTime(start_time),
-        normalizeTime(end_time),
-      ],
-      (err, result) => {
-        if (err) {
-          return res.status(500).json({
-            message: err.sqlMessage || err.message,
-          });
+      [technicianId, available_date, cleanStart],
+      (checkErr, rows) => {
+        if (rows?.length) {
+          return res.status(400).json({ message: "Slot already exists" });
         }
 
-        res.status(201).json({
-          id: result.insertId,
-          technician_id: technicianId,
-          available_date,
-          start_time: normalizeTime(start_time),
-          end_time: normalizeTime(end_time),
-        });
+        db.query(
+          `
+          INSERT INTO technician_availability
+          (technician_id, available_date, start_time, end_time, is_booked)
+          VALUES (?, ?, ?, ?, 0)
+          `,
+          [technicianId, available_date, cleanStart, cleanEnd],
+          (err, result) => {
+            if (err) {
+              return res.status(500).json({
+                message: err.sqlMessage || err.message,
+              });
+            }
+
+            res.status(201).json({
+              id: result.insertId,
+              technician_id: technicianId,
+              available_date,
+              start_time: cleanStart,
+              end_time: cleanEnd,
+            });
+          }
+        );
       }
     );
   });
@@ -633,125 +623,99 @@ export const deleteRegularAvailability = (req, res) => {
 
 export const getAvailabilityByTechnician = (req, res) => {
   const { id } = req.params;
-  const selectedDate = req.query.date ? String(req.query.date).slice(0, 10) : "";
+  const { date } = req.query;
 
+  if (!id || !date) {
+    return res.status(400).json({ message: "Technician ID and date are required" });
+  }
+
+  // 1. جلب الحجوزات القائمة (تم إصلاح خطأ الـ SQL بتكرار SELECT)
   const bookedQuery = `
-    SELECT 
-      DATE_FORMAT(scheduled_date, '%Y-%m-%d') AS scheduled_date,
-      TIME_FORMAT(scheduled_time, '%H:%i:%s') AS scheduled_time
-    FROM maintenance_requests
-    WHERE technician_id = ?
-      AND status NOT IN ('rejected', 'cancelled')
+    SELECT scheduled_time, estimated_hours 
+    FROM maintenance_requests 
+    WHERE technician_id = ? AND scheduled_date = ? AND status != 'cancelled'
   `;
 
-  db.query(bookedQuery, [id], (bookedErr, bookedRows) => {
-    if (bookedErr) {
-      return res.status(500).json({ message: bookedErr.sqlMessage || bookedErr.message });
-    }
+  db.query(bookedQuery, [id, date], (err, bookedRequests) => {
+    if (err) return res.status(500).json({ message: err.sqlMessage || err.message });
 
-    const bookedSet = new Set(
-      (bookedRows || []).map(
-        (b) => `${b.scheduled_date}_${String(b.scheduled_time).slice(0, 8)}`
-      )
-    );
+    const bookedSlots = (bookedRequests || []).map((bReq) => {
+      const start = timeToMinutes(bReq.scheduled_time);
+      const end = start + Number(bReq.estimated_hours || 1) * 60;
+      return { start, end };
+    });
 
+    const slots = [];
+
+    // 2. فحص الأوقات الاستثنائية
     const oneTimeQuery = `
-      SELECT 
-        id,
-        technician_id,
-        DATE_FORMAT(available_date, '%Y-%m-%d') AS available_date,
-        TIME_FORMAT(start_time, '%H:%i:%s') AS start_time,
-        TIME_FORMAT(end_time, '%H:%i:%s') AS end_time
-      FROM technician_availability
-      WHERE technician_id = ?
-        AND available_date >= CURDATE()
-        AND COALESCE(is_booked, 0) = 0
-      ORDER BY available_date ASC, start_time ASC
+      SELECT id, start_time, end_time, is_booked 
+      FROM technician_availability 
+      WHERE technician_id = ? AND available_date = ?
     `;
 
-    db.query(oneTimeQuery, [id], (oneErr, oneRows) => {
-      if (oneErr) {
-        return res.status(500).json({ message: oneErr.sqlMessage || oneErr.message });
+    db.query(oneTimeQuery, [id, date], (err, oneTimeAvail) => {
+      if (err) return res.status(500).json({ message: err.sqlMessage || err.message });
+
+      if (oneTimeAvail && oneTimeAvail.length > 0) {
+        oneTimeAvail.forEach((slot) => {
+          if (Number(slot.is_booked) === 0) {
+            slots.push({
+              id: slot.id,
+              available_date: date,
+              start_time: slot.start_time,
+              end_time: slot.end_time,
+              is_booked: 0,
+            });
+          }
+        });
+        return res.json(slots); 
       }
 
+      const dayOfWeek = new Date(date).toLocaleDateString("en-US", { weekday: "long" });
       const regularQuery = `
-        SELECT *
-        FROM technician_regular_availability
-        WHERE technician_id = ?
-          AND month_end >= CURDATE()
+        SELECT id, start_time, end_time 
+        FROM technician_regular_availability 
+        WHERE technician_id = ? AND day_of_week = ?
       `;
 
-      db.query(regularQuery, [id], (regErr, regRows) => {
-        const result = [];
+      db.query(regularQuery, [id, dayOfWeek], (err, regularAvail) => {
+        if (err) return res.status(500).json({ message: err.sqlMessage || err.message });
 
-        for (const item of oneRows || []) {
-          const date = item.available_date;
-          const start = String(item.start_time).slice(0, 8);
+        if (regularAvail && regularAvail.length > 0) {
+          const duration = 60;
+          regularAvail.forEach((avail) => {
+            const startMins = timeToMinutes(avail.start_time);
+            const endMins = timeToMinutes(avail.end_time);
 
-          if (!selectedDate || date === selectedDate) {
-            if (!bookedSet.has(`${date}_${start}`)) {
-              result.push({
-                id: item.id,
-                technician_id: item.technician_id,
-                available_date: date,
-                start_time: item.start_time,
-                end_time: item.end_time,
-                source_type: "one-time",
+            let current = startMins;
+            let safetyCounter = 0; 
+
+            while (current + duration <= endMins) {
+              safetyCounter++;
+              if (safetyCounter > 48) break; 
+
+              const slotStart = current;
+              const slotEnd = current + duration;
+
+              const isSlotBooked = bookedSlots.some((slot) => {
+                return slotStart < slot.end && slotEnd > slot.start;
               });
-            }
-          }
-        }
 
-        if (!regErr) {
-          for (const rule of regRows || []) {
-            const startDate = new Date(rule.month_start);
-            const endDate = new Date(rule.month_end);
-
-            for (
-              let d = new Date(startDate);
-              d <= endDate;
-              d.setDate(d.getDate() + 1)
-            ) {
-              const dateText = formatDate(d);
-              if (selectedDate && dateText !== selectedDate) continue;
-
-              const dayName = d.toLocaleDateString("en-US", { weekday: "long" });
-
-              if (rule.day_of_week !== "All" && rule.day_of_week !== dayName) {
-                continue;
+              if (!isSlotBooked) {
+                slots.push({
+                  id: `${avail.id}-${current}`,
+                  available_date: date,
+                  start_time: minutesToTime(slotStart),
+                  end_time: minutesToTime(slotEnd),
+                  is_booked: 0,
+                });
               }
-
-              let current = String(rule.start_time).slice(0, 8);
-              const end = String(rule.end_time).slice(0, 8);
-              const slotMinutes = Number(rule.slot_minutes || 60);
-
-              while (timeToMinutes(addMinutes(current, slotMinutes)) <= timeToMinutes(end)) {
-                const slotEnd = addMinutes(current, slotMinutes);
-
-                if (!bookedSet.has(`${dateText}_${current}`)) {
-                  result.push({
-                    id: `${rule.id}-${dateText}-${current}`,
-                    technician_id: Number(id),
-                    available_date: dateText,
-                    start_time: current,
-                    end_time: slotEnd,
-                    source_type: "regular",
-                  });
-                }
-
-                current = slotEnd;
-              }
+              current += 30;
             }
-          }
+          });
         }
-
-        result.sort((a, b) =>
-          `${a.available_date} ${a.start_time}`.localeCompare(
-            `${b.available_date} ${b.start_time}`
-          )
-        );
-
-        return res.json(result);
+        return res.json(slots);
       });
     });
   });
