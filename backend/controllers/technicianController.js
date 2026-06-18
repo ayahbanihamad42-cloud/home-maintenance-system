@@ -631,117 +631,63 @@ export const getAvailabilityByTechnician = (req, res) => {
   const { id } = req.params;
   const { date } = req.query;
 
-  if (!id || !date) {
-    return res.status(400).json({ message: "Technician ID and date are required" });
-  }
-
-  const bookedQuery = `
-    SELECT scheduled_time, estimated_hours 
-    FROM maintenance_requests 
-    WHERE technician_id = ? AND scheduled_date = ? AND status != 'cancelled'
-  `;
-
+  // 1. جلب المواعيد المحجوزة مسبقاً
+  const bookedQuery = `SELECT scheduled_time, estimated_hours FROM maintenance_requests WHERE technician_id = ? AND scheduled_date = ? AND status != 'cancelled'`;
+  
   db.query(bookedQuery, [id, date], (err, bookedRequests) => {
-    if (err) return res.status(500).json({ message: err.sqlMessage || err.message });
-
-    const bookedSlots = (bookedRequests || []).map((bReq) => {
+    const bookedSlots = (bookedRequests || []).map(bReq => {
       const start = timeToMinutes(bReq.scheduled_time);
-      const end = start + Number(bReq.estimated_hours || 1) * 60;
-      return { start, end };
+      return { start, end: start + Number(bReq.estimated_hours || 1) * 60 };
     });
 
     const slots = [];
-
-    const oneTimeQuery = `
-      SELECT id, start_time, end_time, is_booked 
-      FROM technician_availability 
-      WHERE technician_id = ? AND available_date = ?
-    `;
-
+    // 2. جلب المواعيد "لمرة واحدة" (One-time)
+    const oneTimeQuery = `SELECT id, start_time, end_time, is_booked FROM technician_availability WHERE technician_id = ? AND available_date = ?`;
+    
     db.query(oneTimeQuery, [id, date], (err, oneTimeAvail) => {
-      if (err) return res.status(500).json({ message: err.sqlMessage || err.message });
-
-      if (oneTimeAvail && oneTimeAvail.length > 0) {
-        oneTimeAvail.forEach((slot) => {
-          const slotStart = timeToMinutes(slot.start_time);
-          const slotEnd = timeToMinutes(slot.end_time);
-
-          const isSlotBooked = bookedSlots.some((b) => {
-            return slotStart < b.end && slotEnd > b.start;
-          });
-
-          if (Number(slot.is_booked) === 0 && !isSlotBooked) {
-            slots.push({
-              id: slot.id,
-              available_date: date,
-              start_time: slot.start_time,
-              end_time: slot.end_time,
-              is_booked: 0,
-            });
+      if (oneTimeAvail) {
+        oneTimeAvail.forEach(slot => {
+          const sStart = timeToMinutes(slot.start_time);
+          const sEnd = timeToMinutes(slot.end_time);
+          const isBooked = bookedSlots.some(b => sStart < b.end && sEnd > b.start);
+          if (Number(slot.is_booked) === 0 && !isBooked) {
+            slots.push({ id: slot.id, available_date: date, start_time: slot.start_time, end_time: slot.end_time, is_booked: 0 });
           }
         });
-        return res.json(slots);
       }
 
-      const days = [
-        "Sunday",
-        "Monday",
-        "Tuesday",
-        "Wednesday",
-        "Thursday",
-        "Friday",
-        "Saturday",
-      ];
-      const dayOfWeek = days[new Date(date).getDay()];
-      const regularQuery = `
-        SELECT id, start_time, end_time 
-        FROM technician_regular_availability 
-        WHERE technician_id = ? 
-        AND (day_of_week = ? OR day_of_week = 'All')
-        AND ? BETWEEN month_start AND month_end
-      `;
+      // 3. جلب المواعيد المنتظمة (Regular) ومعالجة اليوم بشكل دقيق
+      const days = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+      const dateParts = date.split('-').map(Number);
+      const dayOfWeek = days[new Date(dateParts[0], dateParts[1] - 1, dateParts[2]).getDay()];
 
+      const regularQuery = `SELECT id, start_time, end_time FROM technician_regular_availability WHERE technician_id = ? AND (day_of_week = ? OR day_of_week = 'All') AND ? BETWEEN month_start AND month_end`;
+      
       db.query(regularQuery, [id, dayOfWeek, date], (err, regularAvail) => {
-        if (err) return res.status(500).json({ message: err.sqlMessage || err.message });
-
-        if (regularAvail && regularAvail.length > 0) {
-          const duration = 60;
-          regularAvail.forEach((avail) => {
-            const startMins = timeToMinutes(avail.start_time);
+        if (regularAvail) {
+          regularAvail.forEach(avail => {
+            let current = timeToMinutes(avail.start_time);
             const endMins = timeToMinutes(avail.end_time);
-
-            let current = startMins;
-            let safetyCounter = 0; 
-
-            while (current + duration <= endMins) {
-              safetyCounter++;
-              if (safetyCounter > 48) break; 
-
-              const slotStart = current;
-              const slotEnd = current + duration;
-
-              const isSlotBooked = bookedSlots.some((slot) => {
-                return slotStart < slot.end && slotEnd > slot.start;
-              });
-
-              if (!isSlotBooked) {
-                slots.push({
-                  id: `${avail.id}-${current}`,
-                  available_date: date,
-                  start_time: minutesToTime(slotStart),
-                  end_time: minutesToTime(slotEnd),
-                  is_booked: 0,
-                });
+            while (current + 60 <= endMins) {
+              const sStart = current;
+              const sEnd = current + 60;
+              const isBooked = bookedSlots.some(b => sStart < b.end && sEnd > b.start);
+              const isDuplicate = slots.some(s => sStart < timeToMinutes(s.end_time) && sEnd > timeToMinutes(s.start_time));
+              
+              if (!isBooked && !isDuplicate) {
+                slots.push({ id: `${avail.id}-${current}`, available_date: date, start_time: minutesToTime(sStart), end_time: minutesToTime(sEnd), is_booked: 0 });
               }
-              current += 30;
+              current += 30; // القفزة بين المواعيد
             }
           });
         }
-        return res.json(slots);
+        slots.sort((a, b) => timeToMinutes(a.start_time) - timeToMinutes(b.start_time));
+        res.json(slots);
       });
     });
   });
 };
+
 
 export const getMyRequests = (req, res) => {
   findMyTechnicianId(req.user.id, (lookupErr, technicianId) => {
