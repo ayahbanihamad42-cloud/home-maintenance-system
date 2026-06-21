@@ -631,59 +631,81 @@ export const getAvailabilityByTechnician = (req, res) => {
   const { id } = req.params;
   const { date } = req.query;
 
-  // 1. جلب المواعيد المحجوزة مسبقاً
+  console.log("--- DEBUG START ---");
+  console.log("Requested Date:", date, "Technician ID:", id);
+
   const bookedQuery = `SELECT scheduled_time, estimated_hours FROM maintenance_requests WHERE technician_id = ? AND scheduled_date = ? AND status != 'cancelled'`;
   
   db.query(bookedQuery, [id, date], (err, bookedRequests) => {
+    if (err) {
+      console.error("SQL ERROR (bookedQuery):", err);
+      return res.status(500).json({ message: "DB Error in bookedQuery" });
+    }
+    console.log("Booked slots found:", bookedRequests ? bookedRequests.length : 0);
+
     const bookedSlots = (bookedRequests || []).map(bReq => {
       const start = timeToMinutes(bReq.scheduled_time);
       return { start, end: start + Number(bReq.estimated_hours || 1) * 60 };
     });
 
     const slots = [];
-    // 2. جلب المواعيد "لمرة واحدة" (One-time)
-    const oneTimeQuery = `SELECT id, start_time, end_time, is_booked FROM technician_availability WHERE technician_id = ? AND available_date = ?`;
-    
+const oneTimeQuery = `
+    SELECT id, start_time, end_time 
+    FROM technician_availability 
+    WHERE technician_id = ? 
+    AND DATE(available_date) = DATE(?) 
+    AND is_booked = 0
+`;    
     db.query(oneTimeQuery, [id, date], (err, oneTimeAvail) => {
-      if (oneTimeAvail) {
-        oneTimeAvail.forEach(slot => {
-          const sStart = timeToMinutes(slot.start_time);
-          const sEnd = timeToMinutes(slot.end_time);
-          const isBooked = bookedSlots.some(b => sStart < b.end && sEnd > b.start);
-          if (Number(slot.is_booked) === 0 && !isBooked) {
-            slots.push({ id: slot.id, available_date: date, start_time: slot.start_time, end_time: slot.end_time, is_booked: 0 });
-          }
-        });
-      }
-
-      // 3. جلب المواعيد المنتظمة (Regular) ومعالجة اليوم بشكل دقيق
-      const days = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
-      const dateParts = date.split('-').map(Number);
-      const dayOfWeek = days[new Date(dateParts[0], dateParts[1] - 1, dateParts[2]).getDay()];
-
-      const regularQuery = `SELECT id, start_time, end_time FROM technician_regular_availability WHERE technician_id = ? AND (day_of_week = ? OR day_of_week = 'All') AND ? BETWEEN month_start AND month_end`;
-      
-      db.query(regularQuery, [id, dayOfWeek, date], (err, regularAvail) => {
-        if (regularAvail) {
-          regularAvail.forEach(avail => {
-            let current = timeToMinutes(avail.start_time);
-            const endMins = timeToMinutes(avail.end_time);
-            while (current + 60 <= endMins) {
-              const sStart = current;
-              const sEnd = current + 60;
-              const isBooked = bookedSlots.some(b => sStart < b.end && sEnd > b.start);
-              const isDuplicate = slots.some(s => sStart < timeToMinutes(s.end_time) && sEnd > timeToMinutes(s.start_time));
-              
-              if (!isBooked && !isDuplicate) {
-                slots.push({ id: `${avail.id}-${current}`, available_date: date, start_time: minutesToTime(sStart), end_time: minutesToTime(sEnd), is_booked: 0 });
-              }
-              current += 30; // القفزة بين المواعيد
-            }
-          });
+        if (err) console.error("SQL ERROR (oneTimeQuery):", err);
+        console.log("One-time slots found:", oneTimeAvail ? oneTimeAvail.length : 0);
+        
+        if (oneTimeAvail) {
+            oneTimeAvail.forEach(slot => {
+                const sStart = timeToMinutes(slot.start_time);
+                const sEnd = timeToMinutes(slot.end_time);
+                const isBooked = bookedSlots.some(b => sStart < b.end && sEnd > b.start);
+                if (!isBooked) {
+                    slots.push({ id: slot.id, available_date: date, start_time: slot.start_time, end_time: slot.end_time });
+                }
+            });
         }
-        slots.sort((a, b) => timeToMinutes(a.start_time) - timeToMinutes(b.start_time));
-        res.json(slots);
-      });
+
+        const days = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+        const d = new Date(date);
+        const dayOfWeek = days[d.getDay()];
+        console.log("Calculated Day of Week:", dayOfWeek);
+
+        const regularQuery = `SELECT id, start_time, end_time, slot_minutes FROM technician_regular_availability 
+                              WHERE technician_id = ? AND (day_of_week = ? OR day_of_week = 'All') 
+                              AND ? >= month_start AND ? <= month_end`;
+        
+        db.query(regularQuery, [id, dayOfWeek, date, date], (err, regularAvail) => {
+            if (err) {
+                console.error("SQL ERROR (regularQuery):", err);
+                return res.status(500).json({ message: "DB Error in regularQuery" });
+            }
+            console.log("Regular slots found:", regularAvail ? regularAvail.length : 0);
+
+            if (regularAvail) {
+                regularAvail.forEach(avail => {
+                    const slotDuration = Number(avail.slot_minutes) || 60;
+                    let current = timeToMinutes(avail.start_time);
+                    const endMins = timeToMinutes(avail.end_time);
+                    while (current + slotDuration <= endMins) {
+                        const sStart = current;
+                        const sEnd = current + slotDuration;
+                        const isBooked = bookedSlots.some(b => sStart < b.end && sEnd > b.start);
+                        if (!isBooked) {
+                            slots.push({ id: `reg-${avail.id}-${sStart}`, available_date: date, start_time: minutesToTime(sStart), end_time: minutesToTime(sEnd) });
+                        }
+                        current += slotDuration;
+                    }
+                });
+            }
+            console.log("Total slots generated:", slots.length);
+            res.json(slots);
+        });
     });
   });
 };

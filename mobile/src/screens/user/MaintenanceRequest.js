@@ -1,43 +1,72 @@
-const [rawDateOptions, setRawDateOptions] = useState([]);
+import React, { useEffect, useState } from "react";
+import { View, Text, TouchableOpacity, TextInput, ScrollView } from "react-native";
+import { useRoute } from "@react-navigation/native";
+import API from "../../services/api";
 
-useEffect(() => {
-  const generateDates = async () => {
-    const result = [];
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
+const MaintenanceRequest = () => {
+  const route = useRoute();
+  const technicianId = route.params?.technicianId;
 
-    // فحص الـ 45 يوماً القادمة
-    for (let i = 0; i < 45; i++) {
-      const d = new Date(today);
-      d.setDate(today.getDate() + i);
-      const value = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  const [dates, setDates] = useState([]);
+  const [selectedDate, setSelectedDate] = useState("");
+  const [description, setDescription] = useState("");
 
+  useEffect(() => {
+    const load = async () => {
       try {
-        // التأكد من وجود أوقات متاحة لهذا اليوم عبر الـ API
-        const res = await API.get(`/technicians/${selectedTechnicianId}/availability`, {
-          params: { date: value },
-        });
-        const list = Array.isArray(res.data) ? res.data : (res.data?.availability || []);
-        const hasTimes = list.some(x => !isBooked(x));
-        
-        if (hasTimes) {
-          result.push({ label: value, value });
-        }
-      } catch (err) {
-        console.log("Error checking date", value, err);
+        const res = await API.get(`/technicians/${technicianId}/availability`);
+        setDates(res.data || []);
+      } catch (e) {
+        console.log(e);
       }
+    };
+
+    if (technicianId) load();
+  }, [technicianId]);
+
+  const submit = async () => {
+    if (!selectedDate || description.length < 10) {
+      alert("Description must be at least 10 characters");
+      return;
     }
-    setRawDateOptions(result);
+
+    try {
+      await API.post("/maintenance", {
+        technicianId,
+        date: selectedDate,
+        description,
+        paymentMethod: "ONLINE"
+      });
+
+      alert("Success ✅");
+    } catch (err) {
+      console.log(err.response?.data || err);
+      alert("Error ❌");
+    }
   };
 
-  if (selectedTechnicianId) {
-    generateDates();
-  }
-}, [selectedTechnicianId]);
+  return (
+    <ScrollView style={{ padding: 20 }}>
+      <Text>Maintenance Request</Text>
 
-const dateOptions = useMemo(() => {
-  if (rawDateOptions.length === 0) {
-    return [{ label: t("request.noAvailableDates"), value: "" }];
-  }
-  return rawDateOptions;
-}, [rawDateOptions, t]);
+      {dates.map((d, i) => (
+        <TouchableOpacity key={i} onPress={() => setSelectedDate(d.date)}>
+          <Text>{d.date}</Text>
+        </TouchableOpacity>
+      ))}
+
+      <TextInput
+        placeholder="Enter description"
+        value={description}
+        onChangeText={setDescription}
+        style={{ borderWidth: 1, marginTop: 20, padding: 10 }}
+      />
+
+      <TouchableOpacity onPress={submit} style={{ marginTop: 20 }}>
+        <Text>Submit</Text>
+      </TouchableOpacity>
+    </ScrollView>
+  );
+};
+
+export default MaintenanceRequest;

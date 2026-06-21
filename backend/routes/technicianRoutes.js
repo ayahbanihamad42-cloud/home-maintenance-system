@@ -8,7 +8,6 @@ const router = express.Router();
 router.post("/smart-search", tech.smartTechnicianSearch);
 router.get("/service/:service", tech.getTechniciansByService);
 
-router.get("/availability/my", auth, requireRole("technician"), tech.getMyAvailability);
 router.post("/availability", auth, requireRole("technician"), tech.createAvailability);
 router.delete("/availability/:id", auth, requireRole("technician"), tech.deleteAvailability);
 
@@ -30,4 +29,5 @@ router.get("/:id/gallery", tech.getTechnicianGallery);
 router.get("/:id/availability", tech.getAvailabilityByTechnician);
 router.get("/user/:userId", tech.getTechnicianByUserId);
 router.get("/:id", tech.getTechnicianById);
+
 export default router;

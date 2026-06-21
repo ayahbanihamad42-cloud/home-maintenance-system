@@ -86,15 +86,39 @@ export const createMaintenanceRequest = async (req, res) => {
     }
 
     // ✅ التحقق من availability (مش equality!)
-    const availability = await query(
-      `SELECT * FROM technician_availability
-       WHERE technician_id = ?
-       AND DATE(available_date) = DATE(?)
-       AND TIME(?) BETWEEN start_time AND end_time
-       AND is_booked = 0
-       LIMIT 1`,
-      [finalTechnicianId, cleanDate, cleanTime]
-    );
+    const availability = await query(`
+SELECT *
+FROM
+(
+SELECT
+start_time,
+end_time,
+is_booked
+FROM technician_availability
+WHERE technician_id=?
+AND DATE(available_date)=DATE(?)
+
+UNION ALL
+
+SELECT
+start_time,
+end_time,
+0 as is_booked
+FROM technician_regular_availability
+WHERE technician_id=?
+AND day_of_week=DAYOFWEEK(?)
+) t
+WHERE t.start_time=?
+AND t.is_booked=0
+LIMIT 1
+`,
+[
+ finalTechnicianId,
+ cleanDate,
+ finalTechnicianId,
+ cleanDate,
+ cleanTime
+]);
 
     if (!availability.length) {
       return res.status(409).json({
@@ -144,7 +168,6 @@ export const createMaintenanceRequest = async (req, res) => {
       ]
     );
 
-    // ✅ حجز الـ slot
     await query(
       `UPDATE technician_availability
        SET is_booked = 1
